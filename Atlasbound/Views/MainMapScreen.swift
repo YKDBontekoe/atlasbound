@@ -507,23 +507,6 @@ struct SettingsSheet: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section("Activity") {
-                    Picker("Type", selection: Binding(
-                        get: { controller.recorder.activityType },
-                        set: { controller.setActivityType($0) }
-                    )) {
-                        ForEach(ActivityType.selectableCases, id: \.self) { type in
-                            Label(type.displayName, systemImage: type.symbolName).tag(type)
-                        }
-                    }
-                    .disabled(controller.isRecording)
-
-                    LabeledContent("Reveal width", value: controller.recorder.activityType.revealWidthLabel)
-                    Text("Tile size follows your activity — narrow for walking and running, medium for cycling, hiking, and transit, wide for driving. You can also change this from the map before starting.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
                 #if DEBUG
                 if DevConfig.isSimGPSFeatureAvailable {
                     Section("Developer") {
