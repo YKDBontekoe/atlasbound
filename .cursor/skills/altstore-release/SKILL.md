@@ -57,10 +57,14 @@ https://ykdbontekoe.github.io/atlasbound/apps.json
 
 ## Workflows
 
-| Trigger | Workflow | Publishes? |
-|---------|----------|------------|
-| PR | `build.yml` | IPA artifact only |
-| Push `main` / dispatch | `release.yml` | Release + Pages |
+| Trigger | Workflow | Jobs | Publishes? |
+|---------|----------|------|------------|
+| PR | `build.yml` | `validate` (static) · `test` (unit/visual/UI) · `build` (IPA) | IPA artifact only |
+| Push `main` / dispatch | `release.yml` | `validate` + `test` gate → IPA → Release + Pages | Yes |
+
+```bash
+./scripts/validate-pr.sh   # privacy alignment, apps.json, script unit tests
+```
 
 ## Agent rules
 

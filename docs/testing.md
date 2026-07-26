@@ -1,6 +1,48 @@
 # Testing
 
-No XCTest / Swift Testing target yet. CI validates **compile + unsigned IPA**, not behavior.
+CI on pull requests runs three parallel jobs: **static validation**, **unit + visual + UI tests**, and **unsigned IPA** build. Releases gate on the same validate + test suite before publishing.
+
+## Automated suite
+
+| Layer | Where | What |
+|-------|--------|------|
+| Static | `./scripts/validate-pr.sh` | Privacy/AltStore alignment, `apps.json` JSON, Python script unit tests |
+| Unit | `AtlasboundTests` | `TileEngine`, `ProgressionEngine`, `TileStore`, persistence (no geometry) |
+| Visual | `AtlasboundTests/Visual` | Non-map chrome snapshots (`ActivitySummaryView`, `ActivityTypeRow`) + theme color samples |
+| UI smoke | `AtlasboundUITests` | Launch, activity picker, settings, Activity tab |
+| Package | `./scripts/build-ipa.sh` | Unsigned IPA archive (PR artifact / release) |
+
+### Local commands
+
+```bash
+# Static checks (no Xcode)
+./scripts/validate-pr.sh
+
+# Unit + visual + UI tests (simulator)
+xcodebuild test \
+  -project Atlasbound.xcodeproj \
+  -scheme Atlasbound \
+  -destination 'platform=iOS Simulator,name=iPhone 16'
+
+# Unsigned IPA
+./scripts/build-ipa.sh
+```
+
+### Chrome snapshots
+
+Reference PNGs live in `AtlasboundTests/Visual/__Snapshots__/`. MapKit / `DiscoveryMapView` is **not** snapshotted (flaky map tiles + GPS).
+
+```bash
+# Regenerate golden images after intentional UI chrome changes
+RECORD_SNAPSHOTS=1 xcodebuild test \
+  -project Atlasbound.xcodeproj \
+  -scheme Atlasbound \
+  -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -only-testing:AtlasboundTests/ActivitySummarySnapshotTests \
+  -only-testing:AtlasboundTests/ActivityTypeRowSnapshotTests
+```
+
+Commit updated PNGs with the UI change. CI bootstraps missing references once (`BOOTSTRAP_SNAPSHOTS`) and uploads them as artifacts — commit those PNGs so later runs compare instead of re-record.
 
 ## Manual matrix
 
@@ -18,16 +60,6 @@ No XCTest / Swift Testing target yet. CI validates **compile + unsigned IPA**, n
 | Size mid-record | Try change while recording | Blocked |
 | Device GPS noise | Real device, try 60 vs 100 m | Finer grids more jitter-sensitive |
 
-## Future automated tests (preferred seams)
-
-Engines are already testable value types / injectable deps:
-
-1. **`TileEngine`** — project / round-trip / `hexLine` / ID parse / `makeTileID`
-2. **`ProgressionEngine`** — discovery once, familiarity table, mastery thresholds
-3. **`TileStore`** — temp `fileURL`, multi-size isolation, clear current size only
-
-`WorldController(store:recorder:)` accepts injection for session tests later.
-
 ## Agent checklist after behavioral changes
 
 - [ ] Discovery still awards once per tile ID
@@ -35,3 +67,4 @@ Engines are already testable value types / injectable deps:
 - [ ] Save file still has no geometry
 - [ ] Tile size switch still isolates grids
 - [ ] Privacy / AltStore permission copy still aligned if strings changed
+- [ ] Unit / visual / UI tests still pass (`xcodebuild test` or CI)

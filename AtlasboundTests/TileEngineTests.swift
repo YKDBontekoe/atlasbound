@@ -1,0 +1,87 @@
+import XCTest
+import CoreLocation
+@testable import Atlasbound
+
+final class TileEngineTests: XCTestCase {
+    private let engine = TileEngine(tileSizeMeters: 80)
+
+    func testMakeAndParseTileID() {
+        let id = TileEngine.makeTileID(q: 12, r: -4, sizeMeters: 80)
+        XCTAssertEqual(id, "hex:80:12:-4")
+
+        let parsed = engine.parseTileID(id)
+        XCTAssertEqual(parsed?.q, 12)
+        XCTAssertEqual(parsed?.r, -4)
+    }
+
+    func testParseTileIDRejectsMalformed() {
+        XCTAssertNil(engine.parseTileID("hex:80:onlytwo"))
+        XCTAssertNil(engine.parseTileID("tile:80:1:2"))
+        XCTAssertNil(engine.parseTileID(""))
+    }
+
+    func testProjectRoundTripPreservesLatLon() {
+        let original = CLLocationCoordinate2D(latitude: 52.0907, longitude: 5.1214)
+        let projected = TileEngine.project(original)
+        let roundTrip = TileEngine.unproject(x: projected.x, y: projected.y)
+        XCTAssertEqual(roundTrip.latitude, original.latitude, accuracy: 1e-9)
+        XCTAssertEqual(roundTrip.longitude, original.longitude, accuracy: 1e-9)
+    }
+
+    func testTileIDIncludesSizeAndIsStable() {
+        let coordinate = CLLocationCoordinate2D(latitude: 52.0907, longitude: 5.1214)
+        let first = engine.tileID(for: coordinate)
+        let second = engine.tileID(for: coordinate)
+        XCTAssertEqual(first, second)
+        XCTAssertTrue(first.hasPrefix("hex:80:"))
+    }
+
+    func testDifferentSizesDoNotCollide() {
+        let coordinate = CLLocationCoordinate2D(latitude: 52.0907, longitude: 5.1214)
+        let sixty = TileEngine(tileSizeMeters: 60).tileID(for: coordinate)
+        let hundred = TileEngine(tileSizeMeters: 100).tileID(for: coordinate)
+        XCTAssertNotEqual(sixty, hundred)
+        XCTAssertTrue(sixty.hasPrefix("hex:60:"))
+        XCTAssertTrue(hundred.hasPrefix("hex:100:"))
+    }
+
+    func testHexLineIsContinuous() {
+        let start = TileCoordinate(q: 0, r: 0)
+        let end = TileCoordinate(q: 4, r: -2)
+        let line = TileEngine.hexLine(from: start, to: end)
+
+        XCTAssertEqual(line.first, start)
+        XCTAssertEqual(line.last, end)
+        XCTAssertEqual(line.count, TileEngine.hexDistance(start, end) + 1)
+
+        for index in 1..<line.count {
+            let distance = TileEngine.hexDistance(line[index - 1], line[index])
+            XCTAssertLessThanOrEqual(distance, 1, "hexLine must not skip neighbors")
+        }
+    }
+
+    func testTileIDsCoveringRouteFillsGapsBetweenDistantSamples() {
+        let start = CLLocationCoordinate2D(latitude: 52.0907, longitude: 5.1214)
+        let startAxial = engine.axialCoordinate(for: start)
+        let farAxial = TileCoordinate(q: startAxial.q + 6, r: startAxial.r - 3)
+        let end = engine.centerCoordinate(for: farAxial)
+
+        let samples = [
+            LocationSample(coordinate: start, timestamp: .now, horizontalAccuracy: 5, speed: 10),
+            LocationSample(coordinate: end, timestamp: .now, horizontalAccuracy: 5, speed: 20),
+        ]
+
+        let pointOnly = engine.tileIDs(along: samples)
+        let covered = engine.tileIDsCoveringRoute(samples)
+
+        XCTAssertEqual(pointOnly.count, 2)
+        XCTAssertGreaterThan(covered.count, pointOnly.count)
+        XCTAssertEqual(covered.first, pointOnly.first)
+        XCTAssertEqual(covered.last, pointOnly.last)
+    }
+
+    func testPolygonHasSixVertices() {
+        let polygon = engine.polygon(for: TileCoordinate(q: 1, r: -1))
+        XCTAssertEqual(polygon.count, 6)
+    }
+}

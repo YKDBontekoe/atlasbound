@@ -53,7 +53,8 @@ DEFAULT_SOURCE: dict[str, Any] = {
                         "name": "NSLocationAlwaysAndWhenInUseUsageDescription",
                         "usageDescription": (
                             "Atlasbound can continue recording your route in the background "
-                            "so driving and walking stay passive."
+                            "so driving and walking stay passive—no phone interaction required "
+                            "while moving. Location is used only for tile discovery on your device."
                         ),
                     },
                 ],

@@ -31,6 +31,7 @@ struct ActivityPickerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
+                        .accessibilityIdentifier("activityPickerClose")
                 }
             }
         }

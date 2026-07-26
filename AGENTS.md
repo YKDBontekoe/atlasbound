@@ -52,9 +52,11 @@ Atlasbound/
   Map/                         # DiscoveryMapView (MapKit)
   Views/                       # MainMapScreen, summary, tabs
   Theme/                       # AtlasTheme
-scripts/                       # IPA, versioning, AltStore JSON
+AtlasboundTests/               # Unit + chrome snapshot tests
+AtlasboundUITests/             # UI smoke tests
+scripts/                       # IPA, versioning, AltStore JSON, validate-pr.sh
 altstore/                      # apps.json source template
-.github/workflows/             # PR build + main release
+.github/workflows/             # PR validate/test/IPA + main release
 ```
 
 ## Commands
@@ -62,6 +64,9 @@ altstore/                      # apps.json source template
 ```bash
 # Run: open Atlasbound.xcodeproj → scheme Atlasbound → ⌘R
 
+./scripts/validate-pr.sh
+xcodebuild test -project Atlasbound.xcodeproj -scheme Atlasbound \
+  -destination 'platform=iOS Simulator,name=iPhone 16'
 ./scripts/build-ipa.sh
 python3 scripts/auto-version.py --bump auto
 ```
@@ -87,4 +92,4 @@ Load these when the task matches (under `.cursor/skills/`):
 - Prefer extending engines over putting domain logic in views.
 - Keep privacy strings in `Atlasbound/Info.plist` aligned with `altstore/apps.json` permissions text.
 - Do not add SPM/CocoaPods unless explicitly requested.
-- No unit test target yet — prefer pure `Sendable` engines so tests can land later without refactor.
+- Prefer pure `Sendable` engines; unit tests live in `AtlasboundTests/`, UI smoke in `AtlasboundUITests/`.

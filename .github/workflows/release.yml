@@ -5,6 +5,7 @@ name: Build IPA & AltStore Source
 #   (conventional commits: feat→minor, BREAKING→major, else patch)
 # - Build number (CFBundleVersion): GitHub run number (always unique for AltStore updates)
 # Every push to main publishes a release + refreshes the AltStore source.
+# validate + test must pass before IPA / publish.
 
 on:
   push:
@@ -37,8 +38,92 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    name: Static validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate (privacy, JSON, script tests)
+        run: |
+          chmod +x scripts/validate-pr.sh scripts/check-privacy-alignment.py
+          ./scripts/validate-pr.sh
+
+  test:
+    name: Unit + visual + UI tests
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          CANDIDATE="$(ls -d /Applications/Xcode_16*.app /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)"
+          if [[ -z "$CANDIDATE" ]]; then
+            CANDIDATE="/Applications/Xcode.app"
+          fi
+          echo "Using $CANDIDATE"
+          sudo xcode-select -s "$CANDIDATE"
+          xcodebuild -version
+
+      - name: Resolve simulator destination
+        id: sim
+        run: |
+          set -euo pipefail
+          NAME="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = []
+          for runtime, items in data.get("devices", {}).items():
+              if "iOS" not in runtime:
+                  continue
+              for device in items:
+                  if device.get("isAvailable") and str(device.get("name", "")).startswith("iPhone"):
+                      devices.append(device["name"])
+          preferred = ["iPhone 16", "iPhone 16 Pro", "iPhone 15", "iPhone 15 Pro"]
+          for name in preferred:
+              if name in devices:
+                  print(name)
+                  raise SystemExit(0)
+          if not devices:
+              raise SystemExit("No available iPhone simulators")
+          print(devices[0])
+          ')"
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: ${NAME}"
+
+      - name: Boot simulator and grant location
+        run: |
+          set -euo pipefail
+          NAME="${{ steps.sim.outputs.name }}"
+          xcrun simctl boot "$NAME" 2>/dev/null || true
+          xcrun simctl bootstatus "$NAME" -b
+          xcrun simctl privacy "$NAME" grant location-always com.atlasbound.app || true
+          xcrun simctl privacy "$NAME" grant location com.atlasbound.app || true
+
+      - name: Run tests
+        run: |
+          set -euo pipefail
+          DEST="platform=iOS Simulator,name=${{ steps.sim.outputs.name }}"
+          xcodebuild test \
+            -project Atlasbound.xcodeproj \
+            -scheme Atlasbound \
+            -destination "$DEST" \
+            -resultBundlePath TestResults.xcresult
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlasbound-release-test-results
+          path: TestResults.xcresult
+          if-no-files-found: warn
+          retention-days: 14
+
   build:
     name: Build unsigned IPA
+    needs: [validate, test]
     runs-on: macos-15
     outputs:
       version: ${{ steps.version.outputs.version }}

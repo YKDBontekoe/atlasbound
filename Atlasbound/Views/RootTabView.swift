@@ -12,18 +12,21 @@ struct RootTabView: View {
                 .tabItem {
                     Label("Map", systemImage: "map.fill")
                 }
+                .accessibilityIdentifier("mapTab")
                 .tag(0)
 
             ActivityTabView(controller: controller, store: store)
                 .tabItem {
                     Label("Activity", systemImage: "waveform.path.ecg")
                 }
+                .accessibilityIdentifier("activityTab")
                 .tag(1)
 
             ProgressTabView(store: store)
                 .tabItem {
                     Label("Progress", systemImage: "flag.fill")
                 }
+                .accessibilityIdentifier("progressTab")
                 .tag(2)
         }
         .tint(AtlasTheme.blue)

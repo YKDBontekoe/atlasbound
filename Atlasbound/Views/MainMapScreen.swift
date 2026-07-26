@@ -173,6 +173,8 @@ struct MainMapScreen: View {
                         .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("settingsButton")
+                .accessibilityLabel("Settings")
             }
             .padding(.horizontal, 16)
 
@@ -224,6 +226,7 @@ struct MainMapScreen: View {
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("activityPickerButton")
             .accessibilityLabel("Activity type")
             .accessibilityValue(recorder.activityType.displayName)
             .accessibilityHint("Double tap to change activity")
@@ -538,6 +541,7 @@ struct SettingsSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .accessibilityIdentifier("settingsDone")
                 }
             }
         }
