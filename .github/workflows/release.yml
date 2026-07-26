@@ -1,17 +1,29 @@
 name: Build IPA & AltStore Source
 
+# Automatic versioning:
+# - Marketing version (CFBundleShortVersionString): next semver from latest v* tag
+#   (conventional commits: feat→minor, BREAKING→major, else patch)
+# - Build number (CFBundleVersion): GitHub run number (always unique for AltStore updates)
+# Every push to main publishes a release + refreshes the AltStore source.
+
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
   workflow_dispatch:
     inputs:
-      version:
-        description: "Marketing version (e.g. 0.1.0). Leave empty to use MARKETING_VERSION from the Xcode project."
-        required: false
-        default: ""
+      bump:
+        description: "Semver bump from latest tag"
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+          - none
       notes:
-        description: "What's new in this release (shown in AltStore)"
+        description: "What's new (shown in AltStore). Leave empty for auto release notes."
         required: false
         default: ""
 
@@ -21,7 +33,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-main
   cancel-in-progress: false
 
 jobs:
@@ -29,18 +41,21 @@ jobs:
     name: Build unsigned IPA
     runs-on: macos-15
     outputs:
-      version: ${{ steps.meta.outputs.version }}
-      build: ${{ steps.meta.outputs.build }}
-      tag: ${{ steps.meta.outputs.tag }}
-      ipa_name: ${{ steps.meta.outputs.ipa_name }}
-      notes: ${{ steps.meta.outputs.notes }}
+      version: ${{ steps.version.outputs.version }}
+      build: ${{ steps.version.outputs.build }}
+      tag: ${{ steps.version.outputs.tag }}
+      ipa_name: ${{ steps.version.outputs.ipa_name }}
+      notes: ${{ steps.version.outputs.notes }}
+      bump: ${{ steps.version.outputs.bump }}
+      publish: ${{ steps.guard.outputs.publish }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Select Xcode
         run: |
-          # Prefer a recent Xcode; fall back to the default app.
           CANDIDATE="$(ls -d /Applications/Xcode_16*.app /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)"
           if [[ -z "$CANDIDATE" ]]; then
             CANDIDATE="/Applications/Xcode.app"
@@ -49,52 +64,73 @@ jobs:
           sudo xcode-select -s "$CANDIDATE"
           xcodebuild -version
 
-      - name: Derive version metadata
-        id: meta
+      - name: Compute automatic version
+        id: version
+        env:
+          BUMP_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.bump || 'auto' }}
+          NOTES_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.notes || '' }}
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            RAW_TAG="${GITHUB_REF_NAME}"
-            VERSION="${RAW_TAG#v}"
-            NOTES="${{ inputs.notes }}"
-          else
-            if [[ -n "${{ inputs.version }}" ]]; then
-              VERSION="${{ inputs.version }}"
-            else
-              VERSION="$(python3 - <<'PY'
-          import re
-          text = open("Atlasbound.xcodeproj/project.pbxproj").read()
-          m = re.search(r"MARKETING_VERSION = ([^;]+);", text)
-          print(m.group(1).strip() if m else "0.1.0")
-          PY
-          )"
-            fi
-            RAW_TAG="v${VERSION}"
-            NOTES="${{ inputs.notes }}"
-          fi
+          chmod +x scripts/auto-version.py
+          eval "$(python3 scripts/auto-version.py --bump "${BUMP_INPUT}" | sed 's/^/export /')"
 
           BUILD="${GITHUB_RUN_NUMBER}"
-          NOTES="${NOTES:-Atlasbound ${VERSION} (build ${BUILD})}"
+          IPA_NAME="Atlasbound-${version}+${BUILD}.ipa"
+          NOTES="${NOTES_INPUT:-}"
+          if [[ -z "$NOTES" ]]; then
+            NOTES="Atlasbound ${version} (build ${BUILD}, ${bump} bump)"
+          fi
 
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "build=${BUILD}" >> "$GITHUB_OUTPUT"
-          echo "tag=${RAW_TAG}" >> "$GITHUB_OUTPUT"
-          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
-          echo "${NOTES}" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-          echo "ipa_name=Atlasbound-${VERSION}.ipa" >> "$GITHUB_OUTPUT"
+          {
+            echo "previous=${previous:-}"
+            echo "bump=${bump}"
+            echo "version=${version}"
+            echo "tag=${tag}"
+            echo "build=${BUILD}"
+            echo "ipa_name=${IPA_NAME}"
+            echo "notes<<EOF"
+            echo "${NOTES}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-          echo "Version ${VERSION} build ${BUILD} tag ${RAW_TAG}"
+          echo "Auto version → ${tag} (bump=${bump}, build=${BUILD})"
+
+      - name: Guard against duplicate tags
+        id: guard
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git rev-parse "$TAG" >/dev/null 2>&1 || git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "Tag $TAG already exists — skipping publish (choose a different bump)."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build IPA
+        if: steps.guard.outputs.publish == 'true'
         env:
-          MARKETING_VERSION: ${{ steps.meta.outputs.version }}
-          BUILD_NUMBER: ${{ steps.meta.outputs.build }}
+          MARKETING_VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          IPA_NAME: ${{ steps.version.outputs.ipa_name }}
         run: |
           chmod +x scripts/build-ipa.sh
           ./scripts/build-ipa.sh
+          SOURCE="$(ls dist/Atlasbound-*.ipa | head -1)"
+          if [[ "$(basename "$SOURCE")" != "$IPA_NAME" ]]; then
+            mv "$SOURCE" "dist/$IPA_NAME"
+          fi
+          {
+            echo "ipa_path=dist/$IPA_NAME"
+            echo "ipa_name=$IPA_NAME"
+            echo "version=${MARKETING_VERSION}"
+            echo "build=${BUILD_NUMBER}"
+            echo "size=$(stat -f%z "dist/$IPA_NAME")"
+            echo "sha256=$(shasum -a 256 "dist/$IPA_NAME" | awk '{print $1}')"
+          } > dist/ipa-metadata.env
 
       - name: Upload IPA artifact
+        if: steps.guard.outputs.publish == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: atlasbound-ipa
@@ -107,6 +143,7 @@ jobs:
   publish:
     name: Release + AltStore source
     needs: build
+    if: needs.build.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -114,6 +151,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Download IPA artifact
         uses: actions/download-artifact@v4
@@ -126,11 +165,13 @@ jobs:
         with:
           tag_name: ${{ needs.build.outputs.tag }}
           name: Atlasbound ${{ needs.build.outputs.version }}
-          body: ${{ needs.build.outputs.notes }}
+          body: |
+            ${{ needs.build.outputs.notes }}
+
+            Auto-versioned (`${{ needs.build.outputs.bump }}` bump). Build `${{ needs.build.outputs.build }}`.
           files: dist/${{ needs.build.outputs.ipa_name }}
           generate_release_notes: true
           fail_on_unmatched_files: true
-          # Creates the tag via the Releases API when missing (workflow_dispatch).
 
       - name: Fetch published source history
         run: |

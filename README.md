@@ -76,25 +76,44 @@ https://ykdbontekoe.github.io/atlasbound/apps.json
 
 In AltStore / SideStore: **Sources → + → paste the URL above**.
 
-### Cut a release
+### Automatic versioning
+
+Every push to `main` publishes a release. Versions are computed automatically:
+
+| Field | Source |
+|--------|--------|
+| Marketing version (`CFBundleShortVersionString`) | Next semver from the latest `v*` tag |
+| Build (`CFBundleVersion`) | GitHub Actions run number (always unique) |
+
+Bump rules (conventional commits since the previous tag):
+
+- `feat:` → **minor**
+- `BREAKING CHANGE` / `feat!:` → **major**
+- anything else → **patch**
+- first release (no tags) → **0.1.0**
+
+Override via **Actions → Build IPA & AltStore Source → Run workflow** (`auto` / `patch` / `minor` / `major` / `none`).
 
 ```bash
-# Option A — tag and push (recommended)
-git tag v0.1.0
-git push origin v0.1.0
+git push origin main   # auto-bumps, builds IPA, updates AltStore source
+```
 
-# Option B — Actions → "Build IPA & AltStore Source" → Run workflow
+Preview the next version locally:
+
+```bash
+python3 scripts/auto-version.py --bump auto
 ```
 
 The release workflow:
 
-1. Archives the iOS app without code signing
-2. Packages `Atlasbound-<version>.ipa`
-3. Uploads it to a GitHub Release
-4. Prepends a new entry to `apps.json` (keeps prior versions for updates)
-5. Deploys `apps.json` + `icon.png` to GitHub Pages
+1. Computes the next version from git tags
+2. Archives the iOS app without code signing
+3. Packages `Atlasbound-<version>+<build>.ipa`
+4. Creates a GitHub Release + `v*` tag
+5. Prepends a new entry to `apps.json` (keeps prior versions for updates)
+6. Deploys `apps.json` + `icon.png` to GitHub Pages
 
-AltStore detects updates by comparing the **first** entry in `versions` with the installed app — each release must bump `version` and/or `buildVersion`.
+AltStore detects updates from the first `versions` entry — unique `buildVersion` values ensure each main push is offered as an update.
 
 ### Local IPA build
 

@@ -1,8 +1,9 @@
 name: Build IPA
 
+# Validation-only builds for pull requests. Releases (with automatic versioning)
+# are handled by "Build IPA & AltStore Source" on pushes to main.
+
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -20,6 +21,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Select Xcode
         run: |
@@ -31,8 +34,18 @@ jobs:
           sudo xcode-select -s "$CANDIDATE"
           xcodebuild -version
 
+      - name: Compute automatic version
+        id: version
+        run: |
+          chmod +x scripts/auto-version.py
+          eval "$(python3 scripts/auto-version.py --bump auto | sed 's/^/export /')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "PR preview version ${version} (tag would be ${tag})"
+
       - name: Build IPA
         env:
+          MARKETING_VERSION: ${{ steps.version.outputs.version }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           chmod +x scripts/build-ipa.sh
