@@ -212,7 +212,7 @@ struct MainMapScreen: View {
                             Text(recorder.activityType.displayName)
                                 .font(.headline)
                                 .foregroundStyle(.primary)
-                            Image(systemName: "chevron.up.chevron.down")
+                            Image(systemName: "chevron.down")
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(.secondary)
                         }
