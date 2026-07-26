@@ -65,7 +65,7 @@ struct ActivityTabView: View {
                     .padding(.vertical, 4)
                 }
 
-                Section("Activity type") {
+                Section {
                     ForEach(ActivityType.selectableCases, id: \.self) { type in
                         Button {
                             controller.setActivityType(type)
@@ -78,6 +78,8 @@ struct ActivityTabView: View {
                         .buttonStyle(.plain)
                         .disabled(controller.isRecording)
                     }
+                } header: {
+                    Text("Activity type")
                 } footer: {
                     Text(controller.isRecording
                           ? "Finish the current session before switching activities."
