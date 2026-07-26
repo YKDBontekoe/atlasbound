@@ -1,0 +1,49 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build unsigned IPA
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          CANDIDATE="$(ls -d /Applications/Xcode_16*.app /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)"
+          if [[ -z "$CANDIDATE" ]]; then
+            CANDIDATE="/Applications/Xcode.app"
+          fi
+          echo "Using $CANDIDATE"
+          sudo xcode-select -s "$CANDIDATE"
+          xcodebuild -version
+
+      - name: Build IPA
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          chmod +x scripts/build-ipa.sh
+          ./scripts/build-ipa.sh
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlasbound-ipa
+          path: |
+            dist/*.ipa
+            dist/ipa-metadata.env
+          if-no-files-found: error
+          retention-days: 7

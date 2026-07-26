@@ -1,0 +1,38 @@
+{
+  "name": "Atlasbound",
+  "subtitle": "Location-based exploration RPG",
+  "description": "Walk, run, cycle, or drive to discover hexagonal map tiles. Revisiting awards familiarity XP. Sideload via AltStore or SideStore.",
+  "tintColor": "#2E8F6B",
+  "website": "https://github.com/YKDBontekoe/atlasbound",
+  "iconURL": "https://ykdbontekoe.github.io/atlasbound/icon.png",
+  "featuredApps": [
+    "com.atlasbound.app"
+  ],
+  "apps": [
+    {
+      "name": "Atlasbound",
+      "bundleIdentifier": "com.atlasbound.app",
+      "developerName": "Youri Bontekoe",
+      "subtitle": "Discover the world, one hex at a time",
+      "localizedDescription": "Atlasbound is a location-based exploration RPG for iPhone.\n\n• Discover hexagonal tiles as you walk, run, cycle, or drive\n• Earn familiarity XP when revisiting tiles\n• Adjustable hex size (60 / 80 / 100 m)\n• All progress stored on-device",
+      "iconURL": "https://ykdbontekoe.github.io/atlasbound/icon.png",
+      "tintColor": "#2E8F6B",
+      "category": "games",
+      "versions": [],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": [
+          {
+            "name": "NSLocationWhenInUseUsageDescription",
+            "usageDescription": "Atlasbound uses your location while recording an activity to discover map tiles along your route."
+          },
+          {
+            "name": "NSLocationAlwaysAndWhenInUseUsageDescription",
+            "usageDescription": "Atlasbound can continue recording your route in the background so driving and walking stay passive."
+          }
+        ]
+      }
+    }
+  ],
+  "news": []
+}

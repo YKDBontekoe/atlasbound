@@ -1,0 +1,188 @@
+name: Build IPA & AltStore Source
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Marketing version (e.g. 0.1.0). Leave empty to use MARKETING_VERSION from the Xcode project."
+        required: false
+        default: ""
+      notes:
+        description: "What's new in this release (shown in AltStore)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build unsigned IPA
+    runs-on: macos-15
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      build: ${{ steps.meta.outputs.build }}
+      tag: ${{ steps.meta.outputs.tag }}
+      ipa_name: ${{ steps.meta.outputs.ipa_name }}
+      notes: ${{ steps.meta.outputs.notes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          # Prefer a recent Xcode; fall back to the default app.
+          CANDIDATE="$(ls -d /Applications/Xcode_16*.app /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)"
+          if [[ -z "$CANDIDATE" ]]; then
+            CANDIDATE="/Applications/Xcode.app"
+          fi
+          echo "Using $CANDIDATE"
+          sudo xcode-select -s "$CANDIDATE"
+          xcodebuild -version
+
+      - name: Derive version metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            RAW_TAG="${GITHUB_REF_NAME}"
+            VERSION="${RAW_TAG#v}"
+            NOTES="${{ inputs.notes }}"
+          else
+            if [[ -n "${{ inputs.version }}" ]]; then
+              VERSION="${{ inputs.version }}"
+            else
+              VERSION="$(python3 - <<'PY'
+          import re
+          text = open("Atlasbound.xcodeproj/project.pbxproj").read()
+          m = re.search(r"MARKETING_VERSION = ([^;]+);", text)
+          print(m.group(1).strip() if m else "0.1.0")
+          PY
+          )"
+            fi
+            RAW_TAG="v${VERSION}"
+            NOTES="${{ inputs.notes }}"
+          fi
+
+          BUILD="${GITHUB_RUN_NUMBER}"
+          NOTES="${NOTES:-Atlasbound ${VERSION} (build ${BUILD})}"
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "build=${BUILD}" >> "$GITHUB_OUTPUT"
+          echo "tag=${RAW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "${NOTES}" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "ipa_name=Atlasbound-${VERSION}.ipa" >> "$GITHUB_OUTPUT"
+
+          echo "Version ${VERSION} build ${BUILD} tag ${RAW_TAG}"
+
+      - name: Build IPA
+        env:
+          MARKETING_VERSION: ${{ steps.meta.outputs.version }}
+          BUILD_NUMBER: ${{ steps.meta.outputs.build }}
+        run: |
+          chmod +x scripts/build-ipa.sh
+          ./scripts/build-ipa.sh
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlasbound-ipa
+          path: |
+            dist/*.ipa
+            dist/ipa-metadata.env
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Release + AltStore source
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: atlasbound-ipa
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build.outputs.tag }}
+          name: Atlasbound ${{ needs.build.outputs.version }}
+          body: ${{ needs.build.outputs.notes }}
+          files: dist/${{ needs.build.outputs.ipa_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          # Creates the tag via the Releases API when missing (workflow_dispatch).
+
+      - name: Fetch published source history
+        run: |
+          set -euo pipefail
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          REPO="${GITHUB_REPOSITORY##*/}"
+          PAGES_URL="https://${OWNER}.github.io/${REPO}/apps.json"
+          mkdir -p altstore
+          if curl -fsSL "$PAGES_URL" -o altstore/apps.json.published; then
+            echo "Loaded existing source from Pages"
+            mv altstore/apps.json.published altstore/apps.json
+          else
+            echo "No published source yet — using repo template"
+            rm -f altstore/apps.json.published
+          fi
+
+      - name: Generate AltStore source JSON
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          BUILD: ${{ needs.build.outputs.build }}
+          IPA_NAME: ${{ needs.build.outputs.ipa_name }}
+          NOTES: ${{ needs.build.outputs.notes }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          set -euo pipefail
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          REPO="${GITHUB_REPOSITORY##*/}"
+          OWNER_LC="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${IPA_NAME}"
+          ICON_URL="https://${OWNER_LC}.github.io/${REPO}/icon.png"
+          WEBSITE="https://github.com/${GITHUB_REPOSITORY}"
+
+          chmod +x scripts/generate-altstore-source.py
+          python3 scripts/generate-altstore-source.py \
+            --ipa "dist/${IPA_NAME}" \
+            --download-url "$DOWNLOAD_URL" \
+            --version "$VERSION" \
+            --build "$BUILD" \
+            --notes "$NOTES" \
+            --icon-url "$ICON_URL" \
+            --website "$WEBSITE" \
+            --input altstore/apps.json \
+            --output altstore/apps.json
+
+          python3 -m json.tool altstore/apps.json > /dev/null
+          echo "Source URL: https://${OWNER_LC}.github.io/${REPO}/apps.json"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: altstore
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
