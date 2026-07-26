@@ -13,8 +13,29 @@ enum AtlasTheme {
     static let finishRed = Color(red: 0.92, green: 0.30, blue: 0.30)
     /// Soft page background behind cards.
     static let canvas = Color(red: 0.96, green: 0.97, blue: 0.98)
-    /// Fog wash over unexplored map.
+    /// Fog wash over unexplored map / fogged state fill.
     static let fog = Color.white.opacity(0.55)
+
+    /// Fog hex wash under discovered fills (lighter so teal reads through).
+    static let fogWashFill = Color.white.opacity(0.38)
+    static let fogWashStroke = Color.white.opacity(0.28)
+    static let fogWashStrokeWidth: CGFloat = 0.6
+
+    static let routeOutline = Color.white.opacity(0.9)
+    static let routeOutlineWidth: CGFloat = 7
+    static let routeLineWidth: CGFloat = 4
+
+    /// Soft-cap for discovered MapPolygon overlays inside the viewport.
+    static let maxVisiblePolygons = 140
+    /// Soft-cap for nearby fog wash hexes (MapKit struggles above ~200 polygons).
+    static let maxFogPolygons = 120
+    /// Cap for mastery marker annotations among visible tiles.
+    static let maxVisibleMarkers = 40
+    /// Extra span fraction so pans don’t pop tiles at the edge.
+    static let viewportPaddingFraction = 0.12
+    /// Local fog ring around the player (not full-viewport fill).
+    static let fogRadiusIdle = 4
+    static let fogRadiusRecording = 6
 
     static let cardRadius: CGFloat = 20
     static let pillRadius: CGFloat = 22
@@ -75,12 +96,16 @@ extension TileState {
         switch self {
         case .fogged:
             return AtlasTheme.fog
-        case .discovered, .explored:
-            return AtlasTheme.teal.opacity(0.45)
+        case .discovered:
+            return AtlasTheme.teal.opacity(0.32)
+        case .explored:
+            return AtlasTheme.teal.opacity(0.52)
         case .surveyed:
-            return AtlasTheme.slate.opacity(0.40)
-        case .mastered, .legendary:
-            return AtlasTheme.gold.opacity(0.50)
+            return AtlasTheme.slate.opacity(0.42)
+        case .mastered:
+            return AtlasTheme.gold.opacity(0.48)
+        case .legendary:
+            return AtlasTheme.gold.opacity(0.68)
         }
     }
 
@@ -88,37 +113,91 @@ extension TileState {
         switch self {
         case .fogged:
             return Color.white.opacity(0.35)
-        case .discovered, .explored:
-            return AtlasTheme.teal.opacity(0.85)
+        case .discovered:
+            return AtlasTheme.teal.opacity(0.65)
+        case .explored:
+            return AtlasTheme.teal.opacity(0.95)
         case .surveyed:
-            return AtlasTheme.slate.opacity(0.9)
-        case .mastered, .legendary:
+            return AtlasTheme.slate.opacity(0.95)
+        case .mastered:
+            return AtlasTheme.gold.opacity(0.9)
+        case .legendary:
             return AtlasTheme.gold
         }
     }
 
+    var mapStrokeWidth: CGFloat {
+        switch self {
+        case .fogged, .discovered:
+            return 0.8
+        case .explored, .surveyed:
+            return 1.2
+        case .mastered:
+            return 2
+        case .legendary:
+            return 2.5
+        }
+    }
+
+    /// Brighter fill for tiles first discovered in the active session.
+    var mapFillFresh: Color {
+        switch self {
+        case .discovered:
+            return AtlasTheme.teal.opacity(0.58)
+        case .explored:
+            return AtlasTheme.teal.opacity(0.68)
+        default:
+            return mapFill
+        }
+    }
+
+    var mapStrokeFresh: Color {
+        switch self {
+        case .discovered, .explored:
+            return AtlasTheme.teal
+        default:
+            return mapStroke
+        }
+    }
+
+    func mapFill(isFreshDiscovery: Bool) -> Color {
+        isFreshDiscovery ? mapFillFresh : mapFill
+    }
+
+    func mapStroke(isFreshDiscovery: Bool) -> Color {
+        isFreshDiscovery ? mapStrokeFresh : mapStroke
+    }
+
+    func mapStrokeWidth(isFreshDiscovery: Bool) -> CGFloat {
+        isFreshDiscovery ? max(mapStrokeWidth, 1.8) : mapStrokeWidth
+    }
+
     var markerSymbol: String? {
         switch self {
-        case .fogged:
+        case .fogged, .discovered:
             return nil
-        case .discovered, .explored:
+        case .explored:
             return "tree.fill"
         case .surveyed:
             return "mountain.2.fill"
-        case .mastered, .legendary:
+        case .mastered:
+            return "crown.fill"
+        case .legendary:
             return "crown.fill"
         }
     }
 
     var markerTint: Color {
         switch self {
-        case .fogged:
+        case .fogged, .discovered:
             return .clear
-        case .discovered, .explored:
+        case .explored:
             return AtlasTheme.teal
         case .surveyed:
             return AtlasTheme.slate
-        case .mastered, .legendary:
+        case .mastered:
+            return AtlasTheme.gold.opacity(0.92)
+        case .legendary:
             return AtlasTheme.gold
         }
     }

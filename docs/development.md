@@ -13,7 +13,7 @@
 3. Set Signing **Team** for physical devices (`DEVELOPMENT_TEAM` is empty in the project)
 4. ⌘R → allow location → **Start Activity**
 
-Simulator: Features → Location → City Run / City Bicycle Ride / Freeway Drive / custom GPX.
+Simulator / DEBUG Sim GPS: set `ATLASBOUND_ENABLE_SIM_GPS=true` in `.env`, run `python3 scripts/sync-env.py`, rebuild, then enable **Show Sim GPS controls** in Settings. The on-map pad stays hidden otherwise.
 
 ## Project layout conventions
 

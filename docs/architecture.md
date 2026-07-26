@@ -43,7 +43,7 @@ AtlasboundApp
 - Primary chrome: `MainMapScreen` + settings sheet.
 - Map: `DiscoveryMapView` (MapKit polygons / polyline / user annotation).
 - Discovered markers are capped (~80 highest-ranked) for performance.
-- Stubs: `regionName = "Dordrecht"`, `regionCompletionPercent` ≈ discovered/400 — not real regions.
+- Stubs: `regionName = "Dordrecht"` + discovered tile count in the header — not real geo regions / % coverage.
 
 ## Future seams (do not prematurely build)
 

@@ -6,9 +6,9 @@ No XCTest / Swift Testing target yet. CI validates **compile + unsigned IPA**, n
 
 | Scenario | How | Expect |
 |----------|-----|--------|
-| Discover tiles | Simulator City Run / walk with GPS | Fog → discovered fill; +100 XP first visit |
-| Familiarity | Revisit same path | Diminishing revisit XP (25→5 floor) |
-| High speed | Freeway Drive / fast GPX | Continuous hex fill via `hexLine` (no large gaps) |
+| Discover tiles | DEBUG Sim GPS pad (or City Run) | Fog → discovered fill; +100 XP first visit |
+| Familiarity | Revisit same path via Sim GPS / GPX | Diminishing revisit XP (25→5 floor) |
+| High speed | Sim GPS leap step + Auto, or Freeway Drive | Continuous hex fill via `hexLine` (no large gaps) |
 | Pause / resume | Pause mid-activity | Samples stop; resume continues route |
 | Finish summary | End activity | Sheet with discovery/familiarity splits |
 | Tile size switch | Settings 60 / 80 / 100 | Different grid; prior size progress retained |

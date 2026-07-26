@@ -25,7 +25,7 @@ Guidance for AI agents and contributors working in this repo.
 
 ## Phase 1 boundaries (do not build)
 
-Game Center, CloudKit, skill tree, social, StoreKit, Watch, challenges, widgets, Live Activities, Region Engine (real geo regions). Keep stubs (`regionName`, completion %) clearly placeholder.
+Game Center, CloudKit, skill tree, social, StoreKit, Watch, challenges, widgets, Live Activities, Region Engine (real geo regions). Keep stubs (`regionName`, tile-count header) clearly placeholder.
 
 ## Hard invariants
 

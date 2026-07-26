@@ -7,6 +7,8 @@ import Combine
 final class WorldController: ObservableObject {
     @Published private(set) var liveRoute: [CLLocationCoordinate2D] = []
     @Published private(set) var sessionVisitedTileIDs: Set<String> = []
+    /// Tile IDs first discovered during the active session (map highlight).
+    @Published private(set) var sessionDiscoveredIDs: Set<String> = []
     @Published private(set) var sessionDiscoveredCount = 0
     @Published private(set) var discoveryStreak = 0
     @Published private(set) var streakExpiresAt: Date?
@@ -14,7 +16,7 @@ final class WorldController: ObservableObject {
     @Published var showSummary = false
     @Published var showLayers = false
 
-    /// Soft regional label until Region Engine exists.
+    /// Soft regional label until Region Engine exists (not a real geo boundary).
     let regionName = "Dordrecht"
 
     let recorder: ActivityRecorder
@@ -41,11 +43,8 @@ final class WorldController: ObservableObject {
 
     var tileEngine: TileEngine { store.tileEngine }
 
-    /// Placeholder neighbourhood completion until regions ship.
-    var regionCompletionPercent: Double {
-        let discovered = Double(store.discoveredTiles.count)
-        return min(100, (discovered / 400.0) * 100.0)
-    }
+    /// Lifetime discovered tiles on the active grid (honest stand-in until real regions).
+    var discoveredTileCount: Int { store.discoveredTiles.count }
 
     var streakMultiplier: Double {
         1.0 + min(1.0, Double(discoveryStreak) * 0.1)
@@ -96,6 +95,7 @@ final class WorldController: ObservableObject {
         syncTileSizeToActivity()
         liveRoute = []
         sessionVisitedTileIDs = []
+        sessionDiscoveredIDs = []
         sessionDiscoveredCount = 0
         discoveryStreak = 0
         streakExpiresAt = nil
@@ -198,6 +198,11 @@ final class WorldController: ObservableObject {
             sessionTiles[id] = store.tiles[id]
         }
 
+        let discoveryCandidates = Set(newIDs.filter { id in
+            guard let tile = sessionTiles[id] else { return true }
+            return tile.state == .fogged || tile.firstVisitedAt == nil
+        })
+
         let progress = progression.processVisits(
             tileIDs: newIDs,
             tiles: &sessionTiles,
@@ -205,6 +210,14 @@ final class WorldController: ObservableObject {
             at: date,
             activity: activity
         )
+
+        var discovered = sessionDiscoveredIDs
+        for id in discoveryCandidates {
+            if let tile = sessionTiles[id], tile.isDiscovered {
+                discovered.insert(id)
+            }
+        }
+        sessionDiscoveredIDs = discovered
 
         sessionProgress.tilesVisited = sessionVisitedTileIDs.count
         sessionProgress.tilesDiscovered += progress.tilesDiscovered
@@ -226,3 +239,100 @@ final class WorldController: ObservableObject {
         store.addXP(discovery: progress.discoveryXP, familiarity: progress.familiarityXP)
     }
 }
+
+#if DEBUG
+extension WorldController {
+    /// Default seed for Simulator testing (matches placeholder region label).
+    static let debugDefaultCoordinate = CLLocationCoordinate2D(latitude: 51.8133, longitude: 4.6901)
+
+    enum DebugStepSize: Double, CaseIterable, Identifiable {
+        case fine = 25
+        case tile = 55
+        case leap = 120
+
+        var id: Double { rawValue }
+
+        var label: String {
+            switch self {
+            case .fine: "25 m"
+            case .tile: "55 m"
+            case .leap: "120 m"
+            }
+        }
+    }
+
+    func debugEnableSimulation(seedIfNeeded: Bool = true) {
+        recorder.setSimulationActive(true)
+        if seedIfNeeded, recorder.lastLocation == nil {
+            debugTeleport(to: Self.debugDefaultCoordinate)
+        }
+    }
+
+    func debugDisableSimulation() {
+        recorder.setSimulationActive(false)
+    }
+
+    func debugTeleport(to coordinate: CLLocationCoordinate2D, course: CLLocationDirection = 0, speed: CLLocationSpeed = 0) {
+        recorder.setSimulationActive(true)
+        recorder.ingestSimulatedLocation(
+            Self.debugLocation(coordinate: coordinate, course: course, speed: speed)
+        )
+    }
+
+    /// Move relative to the current simulated position (north/east meters).
+    func debugNudge(northMeters: Double, eastMeters: Double, speed: CLLocationSpeed = 1.4) {
+        recorder.setSimulationActive(true)
+        let base = recorder.lastLocation?.coordinate ?? Self.debugDefaultCoordinate
+        let next = Self.offset(base, northMeters: northMeters, eastMeters: eastMeters)
+        let course = Self.courseDegrees(northMeters: northMeters, eastMeters: eastMeters)
+        recorder.ingestSimulatedLocation(
+            Self.debugLocation(coordinate: next, course: course, speed: speed)
+        )
+    }
+
+    func debugNudge(headingDegrees: Double, distanceMeters: Double, speed: CLLocationSpeed = 1.4) {
+        let radians = headingDegrees * .pi / 180
+        let north = cos(radians) * distanceMeters
+        let east = sin(radians) * distanceMeters
+        debugNudge(northMeters: north, eastMeters: east, speed: speed)
+    }
+
+    private static func debugLocation(
+        coordinate: CLLocationCoordinate2D,
+        course: CLLocationDirection,
+        speed: CLLocationSpeed
+    ) -> CLLocation {
+        CLLocation(
+            coordinate: coordinate,
+            altitude: 0,
+            horizontalAccuracy: 5,
+            verticalAccuracy: -1,
+            course: course,
+            speed: max(0, speed),
+            timestamp: Date()
+        )
+    }
+
+    private static func offset(
+        _ coordinate: CLLocationCoordinate2D,
+        northMeters: Double,
+        eastMeters: Double
+    ) -> CLLocationCoordinate2D {
+        let earth = 6_378_137.0
+        let dLat = (northMeters / earth) * (180 / .pi)
+        let cosLat = cos(coordinate.latitude * .pi / 180)
+        let dLon = cosLat == 0 ? 0 : (eastMeters / (earth * cosLat)) * (180 / .pi)
+        return CLLocationCoordinate2D(
+            latitude: coordinate.latitude + dLat,
+            longitude: coordinate.longitude + dLon
+        )
+    }
+
+    private static func courseDegrees(northMeters: Double, eastMeters: Double) -> CLLocationDirection {
+        guard northMeters != 0 || eastMeters != 0 else { return 0 }
+        var degrees = atan2(eastMeters, northMeters) * 180 / .pi
+        if degrees < 0 { degrees += 360 }
+        return degrees
+    }
+}
+#endif

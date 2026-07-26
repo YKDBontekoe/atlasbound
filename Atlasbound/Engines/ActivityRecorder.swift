@@ -13,6 +13,8 @@ final class ActivityRecorder: NSObject, ObservableObject {
     @Published private(set) var lastLocation: CLLocation?
     @Published private(set) var distanceMeters: Double = 0
     @Published private(set) var startedAt: Date?
+    /// When true, GPS updates are ignored and locations come from `ingestSimulatedLocation`.
+    @Published private(set) var isSimulationActive = false
     @Published var activityType: ActivityType = .walk
     @Published var lastErrorMessage: String?
 
@@ -59,6 +61,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
     /// Lightweight location updates for the idle map (no tile recording).
     func startMonitoringIfNeeded() {
         requestAuthorization()
+        guard !isSimulationActive else { return }
         let status = manager.authorizationStatus
         guard status == .authorizedWhenInUse || status == .authorizedAlways else { return }
         guard !isRecording else { return }
@@ -79,7 +82,8 @@ final class ActivityRecorder: NSObject, ObservableObject {
         requestAuthorization()
 
         let status = manager.authorizationStatus
-        guard status == .authorizedWhenInUse || status == .authorizedAlways else {
+        let authorized = status == .authorizedWhenInUse || status == .authorizedAlways
+        guard authorized || isSimulationActive else {
             lastErrorMessage = "Location permission is required to record an activity."
             return
         }
@@ -92,6 +96,12 @@ final class ActivityRecorder: NSObject, ObservableObject {
         isPaused = false
         pausedAt = nil
         accumulatedPause = 0
+
+        if isSimulationActive {
+            manager.stopUpdatingLocation()
+            manager.allowsBackgroundLocationUpdates = false
+            return
+        }
 
         if status == .authorizedAlways {
             manager.allowsBackgroundLocationUpdates = true
@@ -106,7 +116,9 @@ final class ActivityRecorder: NSObject, ObservableObject {
         guard isRecording, !isPaused else { return }
         isPaused = true
         pausedAt = Date()
-        manager.stopUpdatingLocation()
+        if !isSimulationActive {
+            manager.stopUpdatingLocation()
+        }
     }
 
     func resume() {
@@ -116,7 +128,9 @@ final class ActivityRecorder: NSObject, ObservableObject {
         }
         pausedAt = nil
         isPaused = false
-        manager.startUpdatingLocation()
+        if !isSimulationActive {
+            manager.startUpdatingLocation()
+        }
     }
 
     func togglePause() {
@@ -163,6 +177,30 @@ final class ActivityRecorder: NSObject, ObservableObject {
         return (samples, distanceMeters, started, ended)
     }
 
+    // MARK: - Simulation (DEBUG / tests)
+
+    /// Prefer injected locations over Core Location (Simulator D-pad / unit tests).
+    func setSimulationActive(_ active: Bool) {
+        guard isSimulationActive != active else { return }
+        isSimulationActive = active
+        if active {
+            manager.stopUpdatingLocation()
+            manager.allowsBackgroundLocationUpdates = false
+            lastErrorMessage = nil
+        } else if isRecording, !isPaused {
+            manager.startUpdatingLocation()
+        } else if !isRecording {
+            startMonitoringIfNeeded()
+        }
+    }
+
+    /// Push a location through the same filter path as GPS. Updates `lastLocation` even when idle.
+    func ingestSimulatedLocation(_ location: CLLocation) {
+        lastLocation = location
+        guard isRecording, !isPaused else { return }
+        accept(location)
+    }
+
     // MARK: - Filtering
 
     private func accept(_ location: CLLocation) {
@@ -205,6 +243,7 @@ extension ActivityRecorder: CLLocationManagerDelegate {
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         Task { @MainActor in
+            guard !self.isSimulationActive else { return }
             guard let latest = locations.last else { return }
             self.lastLocation = latest
             guard self.isRecording, !self.isPaused else { return }

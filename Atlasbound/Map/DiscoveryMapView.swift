@@ -10,43 +10,49 @@ struct DiscoveryMapView: View {
     @Binding var position: MapCameraPosition
     @Binding var followsUser: Bool
 
-    var showFogWash: Bool = false
-    var showTileMarkers: Bool = true
+    /// When true (layers toggle), show mastery markers on top of fills.
+    var showLayers: Bool = false
+
+    @State private var visibleRegion: MKCoordinateRegion?
+    @State private var cachedDiscovered: [WorldTile] = []
+    @State private var cachedFog: [TileCoordinate] = []
+    @State private var cachedMarkers: [WorldTile] = []
 
     private var engine: TileEngine { store.tileEngine }
 
-    private var markerTiles: [WorldTile] {
-        guard showTileMarkers else { return [] }
-        // Cap annotations for performance; prefer higher ranks.
-        let ranked = store.discoveredTiles.sorted { $0.state.rawValue > $1.state.rawValue }
-        return Array(ranked.prefix(80))
-    }
-
     var body: some View {
         Map(position: $position) {
-            UserAnnotation()
-
-            if showFogWash {
-                ForEach(fogCoordinates, id: \.self) { axial in
-                    let vertices = engine.polygon(for: axial)
-                    if vertices.count >= 3 {
-                        MapPolygon(coordinates: vertices)
-                            .foregroundStyle(Color.white.opacity(0.52))
-                            .stroke(Color.white.opacity(0.25), lineWidth: 0.5)
-                    }
+            if recorder.isSimulationActive, let coordinate = recorder.lastLocation?.coordinate {
+                Annotation("", coordinate: coordinate, anchor: .center) {
+                    SimulatedUserDot()
                 }
+            } else {
+                UserAnnotation()
             }
 
-            ForEach(store.discoveredTiles) { tile in
-                let vertices = engine.polygon(for: tile.coordinate)
+            // Fill-only fog (no stroke) — cheaper for MapKit.
+            ForEach(cachedFog, id: \.self) { axial in
+                let vertices = engine.polygon(for: axial)
                 if vertices.count >= 3 {
                     MapPolygon(coordinates: vertices)
-                        .foregroundStyle(tile.state.mapFill)
-                        .stroke(tile.state.mapStroke, lineWidth: tile.state == .mastered || tile.state == .legendary ? 2 : 1)
+                        .foregroundStyle(AtlasTheme.fogWashFill)
                 }
             }
 
-            ForEach(markerTiles) { tile in
+            ForEach(cachedDiscovered) { tile in
+                let vertices = engine.polygon(for: tile.coordinate)
+                if vertices.count >= 3 {
+                    let fresh = controller.sessionDiscoveredIDs.contains(tile.id)
+                    MapPolygon(coordinates: vertices)
+                        .foregroundStyle(tile.state.mapFill(isFreshDiscovery: fresh))
+                        .stroke(
+                            tile.state.mapStroke(isFreshDiscovery: fresh),
+                            lineWidth: tile.state.mapStrokeWidth(isFreshDiscovery: fresh)
+                        )
+                }
+            }
+
+            ForEach(cachedMarkers) { tile in
                 if let symbol = tile.state.markerSymbol {
                     Annotation("", coordinate: engine.centerCoordinate(for: tile.coordinate), anchor: .center) {
                         TileMarkerView(symbol: symbol, tint: tile.state.markerTint)
@@ -56,34 +62,121 @@ struct DiscoveryMapView: View {
 
             if controller.liveRoute.count >= 2 {
                 MapPolyline(coordinates: controller.liveRoute)
-                    .stroke(.white.opacity(0.9), lineWidth: 7)
+                    .stroke(AtlasTheme.routeOutline, lineWidth: AtlasTheme.routeOutlineWidth)
                 MapPolyline(coordinates: controller.liveRoute)
-                    .stroke(AtlasTheme.blue, lineWidth: 4)
+                    .stroke(AtlasTheme.blue, lineWidth: AtlasTheme.routeLineWidth)
             }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll, showsTraffic: false))
         .mapControls {
             MapCompass()
         }
+        .onMapCameraChange(frequency: .onEnd) { context in
+            visibleRegion = context.region
+            refreshOverlays()
+        }
         .onAppear {
             controller.prepareLocation()
+            refreshOverlays()
+        }
+        .onChange(of: store.discoveredTiles.count) { _, _ in
+            refreshOverlays()
+        }
+        .onChange(of: controller.sessionDiscoveredIDs.count) { _, _ in
+            refreshOverlays()
+        }
+        .onChange(of: showLayers) { _, _ in
+            refreshOverlays()
+        }
+        .onChange(of: controller.isRecording) { _, _ in
+            refreshOverlays()
         }
         .onChange(of: recorder.lastLocation?.coordinate.latitude) { _, _ in
+            refreshOverlays()
             guard followsUser, let location = recorder.lastLocation else { return }
             withAnimation(.easeInOut(duration: 0.35)) {
                 position = .region(
                     MKCoordinateRegion(
                         center: location.coordinate,
-                        latitudinalMeters: controller.isRecording ? 450 : 700,
-                        longitudinalMeters: controller.isRecording ? 450 : 700
+                        latitudinalMeters: controller.isRecording ? 650 : 950,
+                        longitudinalMeters: controller.isRecording ? 650 : 950
                     )
                 )
             }
         }
     }
 
-    private var fogCoordinates: [TileCoordinate] {
-        controller.nearbyFogTiles(around: recorder.lastLocation?.coordinate, radius: 6)
+    private func refreshOverlays() {
+        let engine = store.tileEngine
+        let discovered = cullDiscovered(engine: engine)
+        cachedDiscovered = discovered
+        cachedFog = buildFog(engine: engine)
+        cachedMarkers = showLayers
+            ? Array(
+                discovered
+                    .filter { $0.state.markerSymbol != nil }
+                    .sorted { $0.state.rawValue > $1.state.rawValue }
+                    .prefix(AtlasTheme.maxVisibleMarkers)
+              )
+            : []
+    }
+
+    private func cullDiscovered(engine: TileEngine) -> [WorldTile] {
+        let all = store.discoveredTiles
+        guard let region = visibleRegion else {
+            return Array(all.prefix(AtlasTheme.maxVisiblePolygons))
+        }
+
+        let padded = region.padded(byFraction: AtlasTheme.viewportPaddingFraction)
+        let center = region.center
+        var inView: [WorldTile] = []
+        inView.reserveCapacity(min(all.count, AtlasTheme.maxVisiblePolygons * 2))
+
+        for tile in all {
+            let coord = engine.centerCoordinate(for: tile.coordinate)
+            guard padded.contains(coord) else { continue }
+            inView.append(tile)
+        }
+
+        if inView.count <= AtlasTheme.maxVisiblePolygons {
+            return inView
+        }
+
+        return Array(
+            inView
+                .sorted { lhs, rhs in
+                    let d0 = Self.approxDistanceSquared(lhs.coordinate, to: center, engine: engine)
+                    let d1 = Self.approxDistanceSquared(rhs.coordinate, to: center, engine: engine)
+                    if abs(d0 - d1) < 1e-14 {
+                        return lhs.state.rawValue > rhs.state.rawValue
+                    }
+                    return d0 < d1
+                }
+                .prefix(AtlasTheme.maxVisiblePolygons)
+        )
+    }
+
+    /// Local fog around the player — enough to read the grid without filling the whole camera.
+    private func buildFog(engine: TileEngine) -> [TileCoordinate] {
+        let anchor = recorder.lastLocation?.coordinate ?? visibleRegion?.center
+        let radius = controller.isRecording ? AtlasTheme.fogRadiusRecording : AtlasTheme.fogRadiusIdle
+        let tiles = controller.nearbyFogTiles(around: anchor, radius: radius)
+        if tiles.count <= AtlasTheme.maxFogPolygons {
+            return tiles
+        }
+        return Array(tiles.prefix(AtlasTheme.maxFogPolygons))
+    }
+
+    /// Cheap lat/lon delta for nearest-first soft capping (not geodesic-accurate).
+    private static func approxDistanceSquared(
+        _ axial: TileCoordinate,
+        to center: CLLocationCoordinate2D,
+        engine: TileEngine
+    ) -> Double {
+        let c = engine.centerCoordinate(for: axial)
+        let dLat = c.latitude - center.latitude
+        let dLon = c.longitude - center.longitude
+        return dLat * dLat + dLon * dLon
     }
 }
 
@@ -105,6 +198,25 @@ struct TileMarkerView: View {
     }
 }
 
+struct SimulatedUserDot: View {
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(AtlasTheme.blue.opacity(0.22))
+                .frame(width: 36, height: 36)
+            Circle()
+                .fill(AtlasTheme.blue)
+                .frame(width: 16, height: 16)
+                .overlay {
+                    Circle()
+                        .stroke(Color.white, lineWidth: 3)
+                }
+                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 struct HexShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -118,5 +230,24 @@ struct HexShape: Shape {
         path.addLine(to: CGPoint(x: 0, y: h * 0.25))
         path.closeSubpath()
         return path
+    }
+}
+
+private extension MKCoordinateRegion {
+    func padded(byFraction fraction: Double) -> MKCoordinateRegion {
+        MKCoordinateRegion(
+            center: center,
+            span: MKCoordinateSpan(
+                latitudeDelta: span.latitudeDelta * (1 + fraction * 2),
+                longitudeDelta: span.longitudeDelta * (1 + fraction * 2)
+            )
+        )
+    }
+
+    func contains(_ coordinate: CLLocationCoordinate2D) -> Bool {
+        let halfLat = span.latitudeDelta / 2
+        let halfLon = span.longitudeDelta / 2
+        return abs(coordinate.latitude - center.latitude) <= halfLat
+            && abs(coordinate.longitude - center.longitude) <= halfLon
     }
 }

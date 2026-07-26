@@ -10,11 +10,20 @@ struct MainMapScreen: View {
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var followsUser = true
     @State private var showSettings = false
+    @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
 
     init(controller: WorldController, store: TileStore) {
         self.controller = controller
         self.store = store
         self._recorder = ObservedObject(wrappedValue: controller.recorder)
+    }
+
+    private var showsSimGPSPad: Bool {
+        #if DEBUG
+        DevConfig.isSimGPSFeatureAvailable && showSimGPSControls
+        #else
+        false
+        #endif
     }
 
     var body: some View {
@@ -25,8 +34,7 @@ struct MainMapScreen: View {
                 recorder: recorder,
                 position: $position,
                 followsUser: $followsUser,
-                showFogWash: controller.isRecording,
-                showTileMarkers: true
+                showLayers: controller.showLayers
             )
             .ignoresSafeArea()
 
@@ -43,6 +51,15 @@ struct MainMapScreen: View {
             mapSideControls
                 .padding(.trailing, 16)
                 .padding(.bottom, controller.isRecording ? 300 : 168)
+
+            #if DEBUG
+            if showsSimGPSPad {
+                DebugLocationPad(controller: controller, followsUser: $followsUser)
+                    .padding(.leading, 16)
+                    .padding(.bottom, controller.isRecording ? 300 : 168)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            }
+            #endif
 
             VStack(spacing: 12) {
                 if let error = recorder.lastErrorMessage {
@@ -72,8 +89,28 @@ struct MainMapScreen: View {
             }
         }
         .sheet(isPresented: $showSettings) {
-            SettingsSheet(controller: controller, store: store)
-                .presentationDetents([.medium])
+            SettingsSheet(
+                controller: controller,
+                store: store,
+                showSimGPSControls: $showSimGPSControls
+            )
+            .presentationDetents([.medium])
+        }
+        .onChange(of: showSimGPSControls) { _, enabled in
+            #if DEBUG
+            if !enabled {
+                controller.debugDisableSimulation()
+            }
+            #else
+            _ = enabled
+            #endif
+        }
+        .onAppear {
+            #if DEBUG
+            if !DevConfig.isSimGPSFeatureAvailable || !showSimGPSControls {
+                controller.debugDisableSimulation()
+            }
+            #endif
         }
     }
 
@@ -104,7 +141,7 @@ struct MainMapScreen: View {
                     showSettings = true
                 } label: {
                     HStack(spacing: 6) {
-                        Text("\(controller.regionName) · \(controller.regionCompletionPercent, specifier: "%.1f")%")
+                        Text("\(controller.regionName) · \(controller.discoveredTileCount) tiles")
                             .font(.subheadline.weight(.semibold))
                         Image(systemName: "chevron.down")
                             .font(.caption.weight(.bold))
@@ -415,8 +452,8 @@ struct MainMapScreen: View {
             position = .region(
                 MKCoordinateRegion(
                     center: location.coordinate,
-                    latitudinalMeters: controller.isRecording ? 450 : 700,
-                    longitudinalMeters: controller.isRecording ? 450 : 700
+                    latitudinalMeters: controller.isRecording ? 650 : 950,
+                    longitudinalMeters: controller.isRecording ? 650 : 950
                 )
             )
         }
@@ -434,6 +471,7 @@ struct MainMapScreen: View {
 struct SettingsSheet: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
+    @Binding var showSimGPSControls: Bool
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -455,6 +493,17 @@ struct SettingsSheet: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+
+                #if DEBUG
+                if DevConfig.isSimGPSFeatureAvailable {
+                    Section("Developer") {
+                        Toggle("Show Sim GPS controls", isOn: $showSimGPSControls)
+                        Text("Requires ATLASBOUND_ENABLE_SIM_GPS=true in the project `.env` (then run `python3 scripts/sync-env.py` and rebuild).")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                #endif
 
                 Section {
                     Button("Clear discovered tiles", role: .destructive) {
