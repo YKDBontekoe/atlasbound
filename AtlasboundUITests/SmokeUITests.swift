@@ -65,7 +65,7 @@ final class SmokeUITests: XCTestCase {
         )
     }
 
-    func testOpenSettingsFromMapIfAvailable() {
+    func testOpenSettingsFromMapIfAvailable() throws {
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 12))
         app.tabBars.buttons["Map"].tap()
 
