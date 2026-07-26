@@ -19,7 +19,7 @@ Workflow: `.github/workflows/release.yml`
 5. `scripts/generate-altstore-source.py` prepends version to `altstore/apps.json`
 6. Deploy `apps.json` + `icon.png` to GitHub Pages
 
-PR workflow (`.github/workflows/build.yml`) builds IPA artifact only — no publish.
+PR workflow (`.github/workflows/build.yml`) runs `validate` + `test` + unsigned IPA artifact — no publish.
 
 ## Semver bump rules
 

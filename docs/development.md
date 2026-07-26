@@ -38,6 +38,21 @@ Xcode uses **PBXFileSystemSynchronizedRootGroup** — new files under `Atlasboun
 - No third-party deps unless requested
 - Appearance: `AppearancePreference` (`Auto` / `Light` / `Dark`) via `@AppStorage("appearance.preference")`; apply with `.preferredColorScheme` on the app root. Glass chrome/button styles live in `Theme/GlassChrome.swift`.
 
+## Tests
+
+```bash
+# Static: privacy alignment, apps.json, Python script tests
+./scripts/validate-pr.sh
+
+# Unit + chrome snapshots + UI smoke (simulator)
+xcodebuild test \
+  -project Atlasbound.xcodeproj \
+  -scheme Atlasbound \
+  -destination 'platform=iOS Simulator,name=iPhone 16'
+```
+
+Test sources live outside the app sync group: `AtlasboundTests/`, `AtlasboundUITests/`. See [testing.md](testing.md).
+
 ## Local IPA
 
 ```bash
@@ -50,7 +65,7 @@ Optional env: `SCHEME`, `CONFIGURATION`, `MARKETING_VERSION`, `BUILD_NUMBER`, `O
 
 ## Privacy strings
 
-Location usage copy lives in `Atlasbound/Info.plist`. Keep AltStore permission blurbs in `altstore/apps.json` aligned when you change wording.
+Location usage copy lives in `Atlasbound/Info.plist`. Keep AltStore permission blurbs in `altstore/apps.json` aligned when you change wording (`scripts/check-privacy-alignment.py` / `./scripts/validate-pr.sh`).
 
 ## Git / versioning
 

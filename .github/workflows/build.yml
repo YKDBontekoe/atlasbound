@@ -1,11 +1,13 @@
 name: Build IPA
 
-# Validation-only builds for pull requests. Releases (with automatic versioning)
-# are handled by "Build IPA & AltStore Source" on pushes to main.
+# PR validation: static checks, unit/snapshot/UI tests, unsigned IPA artifact.
+# Releases (with automatic versioning) are handled by "Build IPA & AltStore Source"
+# on pushes to main.
 
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,6 +17,111 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate:
+    name: Static validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate PR (privacy, JSON, script tests)
+        run: |
+          chmod +x scripts/validate-pr.sh scripts/check-privacy-alignment.py
+          ./scripts/validate-pr.sh
+
+  test:
+    name: Unit + visual + UI tests
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          CANDIDATE="$(ls -d /Applications/Xcode_16*.app /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)"
+          if [[ -z "$CANDIDATE" ]]; then
+            CANDIDATE="/Applications/Xcode.app"
+          fi
+          echo "Using $CANDIDATE"
+          sudo xcode-select -s "$CANDIDATE"
+          xcodebuild -version
+
+      - name: Resolve simulator destination
+        id: sim
+        run: |
+          set -euo pipefail
+          NAME="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = []
+          for runtime, items in data.get("devices", {}).items():
+              if "iOS" not in runtime:
+                  continue
+              for device in items:
+                  if device.get("isAvailable") and str(device.get("name", "")).startswith("iPhone"):
+                      devices.append(device["name"])
+          preferred = ["iPhone 16", "iPhone 16 Pro", "iPhone 15", "iPhone 15 Pro"]
+          for name in preferred:
+              if name in devices:
+                  print(name)
+                  raise SystemExit(0)
+          if not devices:
+              raise SystemExit("No available iPhone simulators")
+          print(devices[0])
+          ')"
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: ${NAME}"
+
+      - name: Bootstrap snapshots if missing
+        id: snapshots
+        run: |
+          set -euo pipefail
+          COUNT="$(find AtlasboundTests/Visual/__Snapshots__ -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
+          if [[ "$COUNT" -eq 0 ]]; then
+            echo "bootstrap=1" >> "$GITHUB_OUTPUT"
+            echo "No reference PNGs — will record snapshots this run"
+          else
+            echo "bootstrap=0" >> "$GITHUB_OUTPUT"
+            echo "Found ${COUNT} reference PNG(s)"
+          fi
+
+      - name: Boot simulator and grant location
+        run: |
+          set -euo pipefail
+          NAME="${{ steps.sim.outputs.name }}"
+          xcrun simctl boot "$NAME" 2>/dev/null || true
+          xcrun simctl bootstatus "$NAME" -b
+          # Pre-authorize so UI tests are not blocked by the system prompt.
+          xcrun simctl privacy "$NAME" grant location-always com.atlasbound.app || true
+          xcrun simctl privacy "$NAME" grant location com.atlasbound.app || true
+
+      - name: Run tests
+        env:
+          # TEST_RUNNER_* is forwarded into the test host with the prefix stripped.
+          TEST_RUNNER_BOOTSTRAP_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
+          TEST_RUNNER_RECORD_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
+          BOOTSTRAP_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
+          RECORD_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
+        run: |
+          set -euo pipefail
+          DEST="platform=iOS Simulator,name=${{ steps.sim.outputs.name }}"
+          xcodebuild test \
+            -project Atlasbound.xcodeproj \
+            -scheme Atlasbound \
+            -destination "$DEST" \
+            -resultBundlePath TestResults.xcresult
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlasbound-test-results
+          path: |
+            TestResults.xcresult
+            AtlasboundTests/Visual/__Snapshots__
+          if-no-files-found: warn
+          retention-days: 7
+
   build:
     name: Build unsigned IPA
     runs-on: macos-15

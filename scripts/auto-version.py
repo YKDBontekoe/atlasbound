@@ -53,13 +53,8 @@ def bump(version: tuple[int, int, int], kind: str) -> tuple[int, int, int]:
     raise SystemExit(f"unknown bump kind: {kind}")
 
 
-def detect_bump_from_commits(base_ref: str) -> str:
-    """Infer bump from conventional commit prefixes since base_ref (or all commits)."""
-    args = ["git", "log", "--pretty=%s"]
-    if base_ref:
-        args.append(f"{base_ref}..HEAD")
-    result = subprocess.run(args, check=False, capture_output=True, text=True)
-    subjects = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+def bump_kind_from_subjects(subjects: list[str]) -> str:
+    """Infer bump from conventional commit subject lines."""
     bump_kind = "patch"
     for subject in subjects:
         lower = subject.lower()
@@ -68,6 +63,16 @@ def detect_bump_from_commits(base_ref: str) -> str:
         if lower.startswith("feat:") or lower.startswith("feat("):
             bump_kind = "minor"
     return bump_kind
+
+
+def detect_bump_from_commits(base_ref: str) -> str:
+    """Infer bump from conventional commit prefixes since base_ref (or all commits)."""
+    args = ["git", "log", "--pretty=%s"]
+    if base_ref:
+        args.append(f"{base_ref}..HEAD")
+    result = subprocess.run(args, check=False, capture_output=True, text=True)
+    subjects = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return bump_kind_from_subjects(subjects)
 
 
 def format_version(version: tuple[int, int, int]) -> str:
