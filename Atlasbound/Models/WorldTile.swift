@@ -37,6 +37,11 @@ enum ActivityType: String, Codable, Sendable, CaseIterable, Hashable {
     case publicTransport
     case unknown
 
+    /// Activities the player can choose before recording (excludes `.unknown`).
+    static var selectableCases: [ActivityType] {
+        allCases.filter { $0 != .unknown }
+    }
+
     /// Hex flat-to-flat width for this activity's reveal corridor.
     /// Narrow for foot travel, medium for bike/transit, wide for driving.
     var tileSize: TileSizeOption {

@@ -22,7 +22,7 @@ Location-based exploration RPG prototype for iPhone. Walk, run, cycle, or drive 
 3. Set your **Team** under Signing & Capabilities (required for device; simulator usually works with automatic signing).
 4. Run (⌘R).
 5. Allow location access when prompted.
-6. Tap **Start Activity**, move (or simulate location), then **End Activity** for a summary.
+6. Tap the activity on the bottom sheet to choose Walk / Run / Cycle / Hike / Drive / Transit, then **Start …**, move (or simulate location), and **Finish** for a summary.
 
 ### Simulator location
 

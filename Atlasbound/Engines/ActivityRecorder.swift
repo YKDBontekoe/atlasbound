@@ -15,7 +15,12 @@ final class ActivityRecorder: NSObject, ObservableObject {
     @Published private(set) var startedAt: Date?
     /// When true, GPS updates are ignored and locations come from `ingestSimulatedLocation`.
     @Published private(set) var isSimulationActive = false
-    @Published var activityType: ActivityType = .walk
+    @Published var activityType: ActivityType = .walk {
+        didSet {
+            guard oldValue != activityType else { return }
+            applyCoreLocationActivityType()
+        }
+    }
     @Published var lastErrorMessage: String?
 
     private let manager = CLLocationManager()
@@ -34,11 +39,24 @@ final class ActivityRecorder: NSObject, ObservableObject {
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest
         manager.distanceFilter = settings.minSampleDistance
-        manager.activityType = .fitness
+        applyCoreLocationActivityType()
         manager.pausesLocationUpdatesAutomatically = true
         // Structure for later background use; only active while recording if authorized.
         manager.allowsBackgroundLocationUpdates = false
         manager.showsBackgroundLocationIndicator = true
+    }
+
+    private func applyCoreLocationActivityType() {
+        switch activityType {
+        case .walk, .run, .hike:
+            manager.activityType = .fitness
+        case .cycle, .publicTransport:
+            manager.activityType = .otherNavigation
+        case .drive:
+            manager.activityType = .automotiveNavigation
+        case .unknown:
+            manager.activityType = .other
+        }
     }
 
     func updateSettings(_ settings: ActivitySettings) {

@@ -11,7 +11,9 @@ No XCTest / Swift Testing target yet. CI validates **compile + unsigned IPA**, n
 | High speed | Sim GPS leap step + Auto, or Freeway Drive | Continuous hex fill via `hexLine` (no large gaps) |
 | Pause / resume | Pause mid-activity | Samples stop; resume continues route |
 | Finish summary | End activity | Sheet with discovery/familiarity splits |
-| Tile size switch | Settings 60 / 80 / 100 | Different grid; prior size progress retained |
+| Activity switch | Map idle sheet / Activity tab / Settings | Walk → Cycle etc.; reveal width + grid update |
+| Activity mid-record | Try change while recording | Blocked until finish |
+| Activity persistence | Pick Run, relaunch app | Still Run; Start button says Start Run |
 | Clear progress | Clear for current size | Only active size wiped |
 | Size mid-record | Try change while recording | Blocked |
 | Device GPS noise | Real device, try 60 vs 100 m | Finer grids more jitter-sensitive |
