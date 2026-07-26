@@ -4,6 +4,7 @@ import SwiftUI
 struct AtlasboundApp: App {
     @StateObject private var store = TileStore()
     @StateObject private var controllerHolder = ControllerHolder()
+    @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
 
     var body: some Scene {
         WindowGroup {
@@ -14,6 +15,9 @@ struct AtlasboundApp: App {
                     ProgressView("Loading world…")
                 }
             }
+            .preferredColorScheme(
+                AppearancePreference(rawValue: appearanceRaw)?.preferredColorScheme
+            )
             .onAppear {
                 controllerHolder.bootstrap(store: store)
             }

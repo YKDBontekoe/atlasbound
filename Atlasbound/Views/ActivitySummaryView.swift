@@ -4,6 +4,8 @@ struct ActivitySummaryView: View {
     let summary: ActivitySummary
     let onDismiss: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -35,7 +37,7 @@ struct ActivitySummaryView: View {
                 }
                 .padding(20)
             }
-            .background(AtlasTheme.canvas.ignoresSafeArea())
+            .background(AtlasTheme.canvas(for: colorScheme).ignoresSafeArea())
             .navigationTitle("Activity Summary")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -72,8 +74,12 @@ struct ActivitySummaryView: View {
 
     private var card: some View {
         RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous)
-            .fill(.white)
-            .shadow(color: .black.opacity(0.06), radius: 10, y: 3)
+            .fill(AtlasTheme.chromeFill(for: colorScheme))
+            .overlay {
+                RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous)
+                    .strokeBorder(AtlasTheme.chromeStroke(for: colorScheme), lineWidth: 1)
+            }
+            .shadow(color: AtlasTheme.cardShadow(for: colorScheme), radius: 10, y: 3)
     }
 
     private func summaryStat(title: String, value: String) -> some View {

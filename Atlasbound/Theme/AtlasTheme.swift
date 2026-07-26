@@ -39,6 +39,46 @@ enum AtlasTheme {
 
     static let cardRadius: CGFloat = 20
     static let pillRadius: CGFloat = 22
+
+    // MARK: - Adaptive chrome (map tile accents stay brand-fixed)
+
+    static func canvas(for scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.11, green: 0.12, blue: 0.14)
+            : canvas
+    }
+
+    static func chromeFill(for scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.18, green: 0.19, blue: 0.22)
+            : Color.white
+    }
+
+    static func chromeStroke(for scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color.white.opacity(0.14)
+            : Color.black.opacity(0.06)
+    }
+
+    static func divider(for scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color.white.opacity(0.16)
+            : Color.black.opacity(0.08)
+    }
+
+    static func headerFade(for scheme: ColorScheme) -> [Color] {
+        scheme == .dark
+            ? [Color.black.opacity(0.72), Color.black.opacity(0)]
+            : [Color.white.opacity(0.95), Color.white.opacity(0)]
+    }
+
+    static func tabBarBackground(for scheme: ColorScheme) -> Color {
+        chromeFill(for: scheme)
+    }
+
+    static func cardShadow(for scheme: ColorScheme) -> Color {
+        Color.black.opacity(scheme == .dark ? 0.4 : 0.08)
+    }
 }
 
 extension ActivityType {

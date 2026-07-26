@@ -30,8 +30,12 @@ struct DebugLocationPad: View {
         }
         .padding(12)
         .frame(maxWidth: 220, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+        .background {
+            GlassChrome(
+                shape: RoundedRectangle(cornerRadius: 16, style: .continuous),
+                weight: .ultraThin
+            )
+        }
         .onDisappear { stopAutoWalk() }
         .onChange(of: autoWalk) { _, walking in
             if walking { startAutoWalk() } else { stopAutoWalk() }
@@ -126,9 +130,8 @@ struct DebugLocationPad: View {
                     Image(systemName: "dot.scope")
                         .font(.system(size: 14, weight: .bold))
                         .frame(width: 40, height: 40)
-                        .background(Color.white.opacity(0.85), in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GlassButtonStyle(shape: .circle))
                 nudgeButton(systemName: "arrow.right", heading: 90)
             }
             nudgeButton(systemName: "arrow.down", heading: 180)
@@ -146,10 +149,8 @@ struct DebugLocationPad: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(AtlasTheme.blue)
                 .frame(width: 40, height: 40)
-                .background(Color.white.opacity(0.92), in: Circle())
-                .shadow(color: .black.opacity(0.08), radius: 3, y: 1)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassButtonStyle(shape: .circle))
     }
 
     private var speedForStep: CLLocationSpeed {
