@@ -12,7 +12,8 @@ enum TileSizeOption: Int, CaseIterable, Identifiable, Codable, Sendable {
 
     var label: String { "\(rawValue) m" }
 
-    static let `default`: TileSizeOption = .eighty
+    /// Default matches walking / running until an activity is chosen.
+    static let `default`: TileSizeOption = ActivityType.walk.tileSize
 }
 
 struct ActivitySettings: Codable, Sendable {

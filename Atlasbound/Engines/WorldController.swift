@@ -7,8 +7,15 @@ import Combine
 final class WorldController: ObservableObject {
     @Published private(set) var liveRoute: [CLLocationCoordinate2D] = []
     @Published private(set) var sessionVisitedTileIDs: Set<String> = []
+    @Published private(set) var sessionDiscoveredCount = 0
+    @Published private(set) var discoveryStreak = 0
+    @Published private(set) var streakExpiresAt: Date?
     @Published private(set) var lastSummary: ActivitySummary?
     @Published var showSummary = false
+    @Published var showLayers = false
+
+    /// Soft regional label until Region Engine exists.
+    let regionName = "Dordrecht"
 
     let recorder: ActivityRecorder
     let store: TileStore
@@ -26,29 +33,98 @@ final class WorldController: ObservableObject {
         self.recorder.onSample = { [weak self] sample in
             self?.handleSample(sample)
         }
+        syncTileSizeToActivity()
     }
 
     var isRecording: Bool { recorder.isRecording }
+    var isPaused: Bool { recorder.isPaused }
 
     var tileEngine: TileEngine { store.tileEngine }
 
-    func prepareLocation() {
-        recorder.requestAuthorization()
+    /// Placeholder neighbourhood completion until regions ship.
+    var regionCompletionPercent: Double {
+        let discovered = Double(store.discoveredTiles.count)
+        return min(100, (discovered / 400.0) * 100.0)
     }
 
-    func setTileSize(_ option: TileSizeOption) {
+    var streakMultiplier: Double {
+        1.0 + min(1.0, Double(discoveryStreak) * 0.1)
+    }
+
+    var streakProgress: Double {
+        guard discoveryStreak > 0 else { return 0 }
+        return Double(discoveryStreak % 10) / 10.0
+    }
+
+    func nearbyUndiscoveredCount(around coordinate: CLLocationCoordinate2D?, radius: Int = 3) -> Int {
+        guard let coordinate else { return 0 }
+        let engine = tileEngine
+        let center = engine.axialCoordinate(for: coordinate)
+        return engine.ring(around: center, radius: radius).filter { axial in
+            let id = TileEngine.makeTileID(q: axial.q, r: axial.r, sizeMeters: engine.tileSizeMeters)
+            let tile = store.tiles[id]
+            return tile == nil || tile?.state == .fogged
+        }.count
+    }
+
+    /// Fog hexes around the user for the active map wash.
+    func nearbyFogTiles(around coordinate: CLLocationCoordinate2D?, radius: Int = 5) -> [TileCoordinate] {
+        guard let coordinate else { return [] }
+        let engine = tileEngine
+        let center = engine.axialCoordinate(for: coordinate)
+        return engine.ring(around: center, radius: radius).filter { axial in
+            let id = TileEngine.makeTileID(q: axial.q, r: axial.r, sizeMeters: engine.tileSizeMeters)
+            let tile = store.tiles[id] ?? sessionTiles[id]
+            return tile == nil || tile?.state == .fogged
+        }
+    }
+
+    func prepareLocation() {
+        recorder.requestAuthorization()
+        recorder.startMonitoringIfNeeded()
+        syncTileSizeToActivity()
+    }
+
+    /// Activity selects the reveal grid — players never pick tile size manually.
+    func setActivityType(_ type: ActivityType) {
         guard !recorder.isRecording else { return }
-        store.tileSize = option
-        syncRecorderSettings()
+        recorder.activityType = type
+        syncTileSizeToActivity()
     }
 
     func startActivity() {
+        syncTileSizeToActivity()
         liveRoute = []
         sessionVisitedTileIDs = []
+        sessionDiscoveredCount = 0
+        discoveryStreak = 0
+        streakExpiresAt = nil
         sessionTiles = [:]
         sessionProgress = .empty
         lastSummary = nil
         recorder.start()
+    }
+
+    private func syncTileSizeToActivity() {
+        let option = recorder.activityType.tileSize
+        guard store.tileSize != option else {
+            syncRecorderSettings()
+            return
+        }
+        store.tileSize = option
+        syncRecorderSettings()
+    }
+
+    func pauseActivity() {
+        recorder.pause()
+    }
+
+    func resumeActivity() {
+        recorder.resume()
+    }
+
+    func togglePause() {
+        recorder.togglePause()
     }
 
     func stopActivity() {
@@ -74,6 +150,8 @@ final class WorldController: ObservableObject {
         )
         lastSummary = summary
         showSummary = true
+        discoveryStreak = 0
+        streakExpiresAt = nil
     }
 
     private func syncRecorderSettings() {
@@ -133,6 +211,12 @@ final class WorldController: ObservableObject {
         sessionProgress.tilesRevisited += progress.tilesRevisited
         sessionProgress.discoveryXP += progress.discoveryXP
         sessionProgress.familiarityXP += progress.familiarityXP
+        sessionDiscoveredCount = sessionProgress.tilesDiscovered
+
+        if progress.tilesDiscovered > 0 {
+            discoveryStreak += progress.tilesDiscovered
+            streakExpiresAt = date.addingTimeInterval(20 * 60)
+        }
 
         for id in newIDs {
             if let tile = sessionTiles[id], tile.isDiscovered {

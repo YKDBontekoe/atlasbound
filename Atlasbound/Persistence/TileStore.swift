@@ -8,10 +8,10 @@ final class TileStore: ObservableObject {
     @Published private(set) var discoveryXPTotal: Int = 0
     @Published private(set) var familiarityXPTotal: Int = 0
     @Published private(set) var activitiesCompleted: Int = 0
+    /// Active reveal grid — always driven by the current activity type, never a user preference.
     @Published var tileSize: TileSizeOption = .default {
         didSet {
             if oldValue != tileSize {
-                UserDefaults.standard.set(tileSize.rawValue, forKey: Self.tileSizeKey)
                 loadForCurrentTileSize()
             }
         }
@@ -32,7 +32,6 @@ final class TileStore: ObservableObject {
         return decoder
     }()
 
-    private static let tileSizeKey = "atlasbound.tileSizeMeters"
     private static let saveFileName = "atlasbound-world.json"
 
     var tileEngine: TileEngine { TileEngine(option: tileSize) }
@@ -52,11 +51,8 @@ final class TileStore: ObservableObject {
             self.fileURL = docs.appendingPathComponent(Self.saveFileName)
         }
 
-        if let stored = UserDefaults.standard.object(forKey: Self.tileSizeKey) as? Int,
-           let option = TileSizeOption(rawValue: stored) {
-            self.tileSize = option
-        }
-
+        // Start on the walking grid; WorldController syncs to the selected activity.
+        tileSize = ActivityType.walk.tileSize
         loadFromDisk()
         loadForCurrentTileSize()
     }

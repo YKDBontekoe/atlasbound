@@ -85,6 +85,29 @@ struct TileEngine: Sendable {
         return Self.unproject(x: x, y: y)
     }
 
+    /// Six axial neighbors of a flat-top hex.
+    func neighbors(of axial: TileCoordinate) -> [TileCoordinate] {
+        Self.neighborOffsets.map { TileCoordinate(q: axial.q + $0.0, r: axial.r + $0.1) }
+    }
+
+    /// All axial coordinates within `radius` (inclusive) of `center`.
+    func ring(around center: TileCoordinate, radius: Int) -> [TileCoordinate] {
+        guard radius > 0 else { return [center] }
+        var results: [TileCoordinate] = []
+        for q in -radius...radius {
+            let r1 = max(-radius, -q - radius)
+            let r2 = min(radius, -q + radius)
+            for r in r1...r2 {
+                results.append(TileCoordinate(q: center.q + q, r: center.r + r))
+            }
+        }
+        return results
+    }
+
+    private static let neighborOffsets: [(Int, Int)] = [
+        (1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)
+    ]
+
     /// Six vertices of a flat-top hex around `axial`, in lat/lon (closed ring optional).
     func polygon(for axial: TileCoordinate) -> [CLLocationCoordinate2D] {
         let center = centerCoordinate(for: axial)

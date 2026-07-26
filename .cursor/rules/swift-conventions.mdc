@@ -1,0 +1,15 @@
+---
+description: Swift engine and UI conventions for Atlasbound
+globs: Atlasbound/**/*.swift
+alwaysApply: false
+---
+
+# Swift conventions
+
+- `@MainActor` + `ObservableObject` for `TileStore`, `WorldController`, `ActivityRecorder`
+- Pure math/progression as `Sendable` structs (`TileEngine`, `ProgressionEngine`)
+- Route → tiles: use `tileIDsCoveringRoute` (hex line fill), not point-only sampling
+- Folder-synced project: add files under `Atlasbound/`; avoid hand-editing pbxproj membership
+- No new SPM/CocoaPods dependencies unless requested
+- Keep Info.plist location usage strings accurate when changing recording behavior
+- Region name / completion % are stubs — do not treat as real geo regions

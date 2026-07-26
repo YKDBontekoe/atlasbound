@@ -2,6 +2,8 @@
 
 Location-based exploration RPG prototype for iPhone. Walk, run, cycle, or drive — new hexagonal map tiles are **discovered**; revisiting awards **familiarity** XP instead of unlimited discovery.
 
+**Docs:** [docs/](docs/) · **Agents:** [AGENTS.md](AGENTS.md)
+
 ## Phase 1 (this prototype)
 
 - SwiftUI app shell with MapKit + user location
@@ -28,17 +30,19 @@ Features → Location → **City Run**, **City Bicycle Ride**, or a custom GPX. 
 
 ### Device
 
-Best validation for GPS noise vs tile size. Try 60 m vs 80 m vs 100 m from the slider menu.
+Best validation for GPS noise vs activity reveal widths (walk/run vs cycle vs drive).
 
-## Tile size
+## Reveal width (by activity)
 
-| Option | Flat-to-flat width | Notes |
-|--------|--------------------|--------|
-| 60 m   | Finer grid         | More sensitive to GPS jitter |
-| **80 m** | Default          | Spec midpoint |
-| 100 m  | Coarser grid       | More forgiving accuracy |
+Tile size is **not** a user setting. It follows the selected activity:
 
-Tile IDs include size (`hex:{meters}:{q}:{r}`), so grids do not collide when you switch sizes. Progress is stored per tile-size grid.
+| Activity | Reveal width | Flat-to-flat |
+|----------|--------------|--------------|
+| Walk, Run | Narrow | 60 m |
+| Cycle, Hike, Transit | Medium | 80 m |
+| Drive | Wide | 100 m |
+
+Tile IDs include size (`hex:{meters}:{q}:{r}`), so activity grids stay separate. Progress is stored per reveal grid.
 
 ## Architecture
 
@@ -47,11 +51,13 @@ Tile IDs include size (`hex:{meters}:{q}:{r}`), so grids do not collide when you
 | `ActivityRecorder` | CLLocationManager wrapper; accuracy/distance filtering |
 | `TileEngine` | Lat/lon → Web Mercator → flat-top axial hex IDs + polygons |
 | `ProgressionEngine` | First visit = discovery XP; revisit = diminishing familiarity XP |
-| `TileStore` | JSON FileManager persistence (`Documents/atlasbound-world.json`) + UserDefaults tile size |
-| `WorldController` | Session orchestration |
+| `TileStore` | JSON FileManager persistence (`Documents/atlasbound-world.json`) |
+| `WorldController` | Session orchestration; syncs tile size from activity |
 | `DiscoveryMapView` | MapKit overlay of discovered hexes + live route |
 
 Progress stores tile IDs and mastery fields only — hex geometry is derived at render time.
+
+Deeper write-ups: [docs/architecture.md](docs/architecture.md), [docs/domain.md](docs/domain.md).
 
 ## Privacy
 
@@ -122,3 +128,5 @@ AltStore detects updates from the first `versions` entry — unique `buildVersio
 # → dist/Atlasbound-<version>.ipa
 # → dist/ipa-metadata.env
 ```
+
+Full release notes: [docs/release.md](docs/release.md). Manual test matrix: [docs/testing.md](docs/testing.md).

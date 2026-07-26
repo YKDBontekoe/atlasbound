@@ -9,7 +9,7 @@ struct AtlasboundApp: App {
         WindowGroup {
             Group {
                 if let controller = controllerHolder.controller {
-                    MainMapScreen(controller: controller, store: store)
+                    RootTabView(controller: controller, store: store)
                 } else {
                     ProgressView("Loading world…")
                 }

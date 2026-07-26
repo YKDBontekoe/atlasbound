@@ -1,0 +1,13 @@
+---
+description: Release scripts and AltStore CI conventions
+globs: scripts/**/*.{sh,py},altstore/**/*,.github/workflows/**/*
+alwaysApply: false
+---
+
+# Release / AltStore
+
+- Unsigned IPA only in CI (`scripts/build-ipa.sh`)
+- Version via `scripts/auto-version.py` + conventional commits
+- Prepend versions in `altstore/apps.json` (newest first); unique `buildVersion`
+- Align AltStore permission text with `Atlasbound/Info.plist`
+- See skill `altstore-release` and `docs/release.md`

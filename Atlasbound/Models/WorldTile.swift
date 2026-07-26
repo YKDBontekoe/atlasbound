@@ -32,8 +32,31 @@ enum ActivityType: String, Codable, Sendable, CaseIterable, Hashable {
     case walk
     case run
     case cycle
+    case hike
     case drive
+    case publicTransport
     case unknown
+
+    /// Hex flat-to-flat width for this activity's reveal corridor.
+    /// Narrow for foot travel, medium for bike/transit, wide for driving.
+    var tileSize: TileSizeOption {
+        switch self {
+        case .walk, .run:
+            return .sixty
+        case .cycle, .hike, .publicTransport, .unknown:
+            return .eighty
+        case .drive:
+            return .hundred
+        }
+    }
+
+    var revealWidthLabel: String {
+        switch tileSize {
+        case .sixty: "Narrow"
+        case .eighty: "Medium"
+        case .hundred: "Wide"
+        }
+    }
 }
 
 /// In-memory / domain tile. Geometry is derived from id + tile size, not stored.

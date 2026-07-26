@@ -1,25 +1,67 @@
 import SwiftUI
+import MapKit
 import CoreLocation
 
 struct MainMapScreen: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
+    @ObservedObject private var recorder: ActivityRecorder
 
-    private var recorder: ActivityRecorder { controller.recorder }
+    @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
+    @State private var followsUser = true
+    @State private var showSettings = false
+
+    init(controller: WorldController, store: TileStore) {
+        self.controller = controller
+        self.store = store
+        self._recorder = ObservedObject(wrappedValue: controller.recorder)
+    }
 
     var body: some View {
-        ZStack {
-            DiscoveryMapView(controller: controller, store: store, recorder: recorder)
-                .ignoresSafeArea()
-
-            FogHintOverlay(discoveredCount: store.discoveredTiles.count)
-                .ignoresSafeArea()
+        ZStack(alignment: .bottom) {
+            DiscoveryMapView(
+                controller: controller,
+                store: store,
+                recorder: recorder,
+                position: $position,
+                followsUser: $followsUser,
+                showFogWash: controller.isRecording,
+                showTileMarkers: true
+            )
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                topBar
-                Spacer()
-                bottomPanel
+                if controller.isRecording {
+                    activeHeader
+                } else {
+                    idleHeader
+                }
+                Spacer(minLength: 0)
+                    .allowsHitTesting(false)
             }
+
+            mapSideControls
+                .padding(.trailing, 16)
+                .padding(.bottom, controller.isRecording ? 300 : 168)
+
+            VStack(spacing: 12) {
+                if let error = recorder.lastErrorMessage {
+                    Text(error)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(AtlasTheme.finishRed, in: Capsule())
+                        .padding(.horizontal, 16)
+                }
+
+                if controller.isRecording {
+                    activeBottomPanel
+                } else {
+                    idleBottomSheet
+                }
+            }
+            .padding(.bottom, 8)
         }
         .sheet(isPresented: $controller.showSummary) {
             if let summary = controller.lastSummary {
@@ -29,139 +71,405 @@ struct MainMapScreen: View {
                 .presentationDetents([.medium, .large])
             }
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsSheet(controller: controller, store: store)
+                .presentationDetents([.medium])
+        }
     }
 
-    private var topBar: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Atlasbound")
-                    .font(.custom("Avenir Next", size: 22).weight(.bold))
-                Text(statusLine)
-                    .font(.caption)
+    // MARK: - Idle chrome
+
+    private var idleHeader: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [AtlasTheme.blue, AtlasTheme.teal],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 40, height: 40)
+                    .overlay {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    showSettings = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("\(controller.regionName) · \(controller.regionCompletionPercent, specifier: "%.1f")%")
+                            .font(.subheadline.weight(.semibold))
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(.white.opacity(0.94), in: Capsule())
+                    .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
+                }
+                .buttonStyle(.plain)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 40, height: 40)
+                        .background(.white.opacity(0.94), in: Circle())
+                        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+
+            HStack(spacing: 6) {
+                HexShape()
+                    .fill(AtlasTheme.teal)
+                    .frame(width: 12, height: 13)
+                Text("\(nearbyCount) tiles nearby")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
-            Spacer()
-            Menu {
-                Picker("Tile size", selection: Binding(
-                    get: { store.tileSize },
-                    set: { controller.setTileSize($0) }
-                )) {
-                    ForEach(TileSizeOption.allCases) { option in
-                        Text(option.label).tag(option)
-                    }
-                }
-                .disabled(controller.isRecording)
-
-                Picker("Activity", selection: Binding(
-                    get: { controller.recorder.activityType },
-                    set: { controller.recorder.activityType = $0 }
-                )) {
-                    ForEach(ActivityType.allCases.filter { $0 != .unknown }, id: \.self) { type in
-                        Text(type.rawValue.capitalized).tag(type)
-                    }
-                }
-                .disabled(controller.isRecording)
-
-                Button("Clear tiles (\(store.tileSize.label))", role: .destructive) {
-                    store.clearCurrentGrid()
-                }
-                .disabled(controller.isRecording)
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .padding(10)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(.white.opacity(0.9), in: Capsule())
+            .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
         }
-        .padding(.horizontal, 16)
         .padding(.top, 8)
-        .padding(.bottom, 12)
+    }
+
+    private var idleBottomSheet: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(AtlasTheme.blue.opacity(0.12))
+                    .frame(width: 48, height: 48)
+                Image(systemName: recorder.activityType.symbolName)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(AtlasTheme.blue)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(recorder.activityType.displayName)
+                    .font(.headline)
+                Text(recorder.activityType.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Button {
+                controller.startActivity()
+                followsUser = true
+            } label: {
+                Text("Start Activity")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+                    .background(AtlasTheme.blue, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous)
+                .fill(.white)
+                .shadow(color: .black.opacity(0.12), radius: 20, y: -2)
+        )
+        .padding(.horizontal, 12)
+    }
+
+    // MARK: - Active chrome
+
+    private var activeHeader: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(recorder.activityType.activeTitle)
+                    .font(.system(size: 28, weight: .bold))
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(formatDuration(recorder.elapsedActive))
+                        .font(.system(size: 22, weight: .semibold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(AtlasTheme.blue)
+                        .contentTransition(.numericText())
+                }
+            }
+            Spacer()
+            Button {
+                recenter()
+            } label: {
+                Image(systemName: "location.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(AtlasTheme.blue)
+                    .frame(width: 40, height: 40)
+                    .background(.white, in: Circle())
+                    .shadow(color: .black.opacity(0.1), radius: 8, y: 3)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 16)
         .background(
             LinearGradient(
-                colors: [Color(.systemBackground).opacity(0.92), Color(.systemBackground).opacity(0)],
+                colors: [Color.white.opacity(0.95), Color.white.opacity(0)],
                 startPoint: .top,
                 endPoint: .bottom
             )
         )
     }
 
-    private var bottomPanel: some View {
+    private var activeBottomPanel: some View {
         VStack(spacing: 12) {
-            HStack {
-                statChip(title: "Discovered", value: "\(store.discoveredTiles.count)")
-                statChip(title: "Discovery XP", value: "\(store.discoveryXPTotal)")
-                statChip(title: "Familiarity", value: "\(store.familiarityXPTotal)")
+            HStack(spacing: 0) {
+                liveStat(
+                    icon: "mappin.and.ellipse",
+                    value: distanceValue,
+                    unit: distanceUnit
+                )
+                divider
+                liveStat(
+                    icon: "gauge.with.needle",
+                    value: String(format: "%.1f", recorder.speedKmh),
+                    unit: "km/h"
+                )
+                divider
+                liveStat(
+                    icon: "hexagon.fill",
+                    value: "\(controller.sessionDiscoveredCount)",
+                    unit: "new tiles",
+                    tint: AtlasTheme.teal
+                )
             }
+            .padding(.vertical, 14)
+            .background(cardBackground)
 
-            if controller.isRecording {
-                HStack {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 8, height: 8)
-                    Text(liveStats)
-                        .font(.subheadline.monospacedDigit())
-                    Spacer()
+            streakCard
+
+            HStack(spacing: 14) {
+                Button {
+                    controller.togglePause()
+                } label: {
+                    Image(systemName: controller.isPaused ? "play.fill" : "pause.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(AtlasTheme.blue)
+                        .frame(width: 56, height: 56)
+                        .background(.white, in: Circle())
+                        .overlay(Circle().stroke(Color.black.opacity(0.06), lineWidth: 1))
+                        .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
                 }
-            }
+                .buttonStyle(.plain)
 
-            if let error = recorder.lastErrorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            Button {
-                if controller.isRecording {
+                Button {
                     controller.stopActivity()
-                } else {
-                    controller.startActivity()
+                } label: {
+                    Text("Finish")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(AtlasTheme.finishRed, in: Capsule())
+                        .shadow(color: AtlasTheme.finishRed.opacity(0.35), radius: 10, y: 4)
                 }
-            } label: {
-                Text(controller.isRecording ? "End Activity" : "Start Activity")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(controller.isRecording ? .red : .accentColor)
         }
-        .padding(16)
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, 12)
     }
 
-    private var statusLine: String {
-        let auth = authorizationLabel(recorder.authorizationStatus)
-        return "Tiles \(store.tileSize.label) · \(auth)"
-    }
+    private var streakCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "flame.fill")
+                    .foregroundStyle(AtlasTheme.teal)
+                Text("Discovery streak")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text(String(format: "x%.1f", controller.streakMultiplier))
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(AtlasTheme.teal)
+            }
 
-    private var liveStats: String {
-        let km = recorder.distanceMeters
-        let tiles = controller.sessionVisitedTileIDs.count
-        if km >= 1000 {
-            return String(format: "%.2f km · %d tiles · %d samples", km / 1000, tiles, recorder.samples.count)
+            ProgressView(value: max(0.08, controller.streakProgress))
+                .tint(AtlasTheme.teal)
+
+            HStack {
+                Text("Keep exploring to build your streak")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    Text(streakRemainingLabel)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
-        return String(format: "%.0f m · %d tiles · %d samples", km, tiles, recorder.samples.count)
+        .padding(14)
+        .background(cardBackground)
     }
 
-    private func statChip(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
+    private var mapSideControls: some View {
+        VStack {
+            Spacer()
+            VStack(spacing: 10) {
+                Button {
+                    recenter()
+                } label: {
+                    Image(systemName: followsUser ? "location.fill" : "location")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(AtlasTheme.blue)
+                        .frame(width: 42, height: 42)
+                        .background(.white, in: Circle())
+                        .shadow(color: .black.opacity(0.1), radius: 8, y: 3)
+                }
+                .buttonStyle(.plain)
+                .opacity(controller.isRecording ? 0 : 1)
+
+                Button {
+                    controller.showLayers.toggle()
+                } label: {
+                    Image(systemName: "square.3.layers.3d.top.filled")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(controller.showLayers ? AtlasTheme.blue : .secondary)
+                        .frame(width: 42, height: 42)
+                        .background(.white, in: Circle())
+                        .shadow(color: .black.opacity(0.1), radius: 8, y: 3)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    // MARK: - Helpers
+
+    private var nearbyCount: Int {
+        controller.nearbyUndiscoveredCount(around: recorder.lastLocation?.coordinate)
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous)
+            .fill(.white)
+            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Color.black.opacity(0.08))
+            .frame(width: 1, height: 36)
+    }
+
+    private var distanceValue: String {
+        let meters = recorder.distanceMeters
+        if meters >= 1000 {
+            return String(format: "%.2f", meters / 1000)
+        }
+        return String(format: "%.0f", meters)
+    }
+
+    private var distanceUnit: String {
+        recorder.distanceMeters >= 1000 ? "km" : "m"
+    }
+
+    private var streakRemainingLabel: String {
+        guard let expires = controller.streakExpiresAt else { return "—" }
+        let remaining = max(0, expires.timeIntervalSinceNow)
+        let minutes = Int(remaining) / 60
+        let seconds = Int(remaining) % 60
+        return String(format: "%02d:%02d remaining", minutes, seconds)
+    }
+
+    private func liveStat(icon: String, value: String, unit: String, tint: Color = AtlasTheme.blue) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(tint)
+            Text(value)
+                .font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
+            Text(unit)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-            Text(value)
-                .font(.subheadline.weight(.semibold).monospacedDigit())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
     }
 
-    private func authorizationLabel(_ status: CLAuthorizationStatus) -> String {
-        switch status {
-        case .notDetermined: "Location not set"
-        case .restricted: "Location restricted"
-        case .denied: "Location denied"
-        case .authorizedAlways: "Always"
-        case .authorizedWhenInUse: "When In Use"
-        @unknown default: "Location unknown"
+    private func recenter() {
+        followsUser = true
+        guard let location = recorder.lastLocation else { return }
+        withAnimation(.easeInOut(duration: 0.35)) {
+            position = .region(
+                MKCoordinateRegion(
+                    center: location.coordinate,
+                    latitudinalMeters: controller.isRecording ? 450 : 700,
+                    longitudinalMeters: controller.isRecording ? 450 : 700
+                )
+            )
+        }
+    }
+
+    private func formatDuration(_ interval: TimeInterval) -> String {
+        let total = Int(interval)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let seconds = total % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+}
+
+struct SettingsSheet: View {
+    @ObservedObject var controller: WorldController
+    @ObservedObject var store: TileStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Activity") {
+                    Picker("Type", selection: Binding(
+                        get: { controller.recorder.activityType },
+                        set: { controller.setActivityType($0) }
+                    )) {
+                        ForEach(ActivityType.allCases.filter { $0 != .unknown }, id: \.self) { type in
+                            Label(type.displayName, systemImage: type.symbolName).tag(type)
+                        }
+                    }
+                    .disabled(controller.isRecording)
+
+                    LabeledContent("Reveal width", value: controller.recorder.activityType.revealWidthLabel)
+                    Text("Tile size follows your activity — narrow for walking and running, medium for cycling, hiking, and transit, wide for driving.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Button("Clear discovered tiles", role: .destructive) {
+                        store.clearCurrentGrid()
+                    }
+                    .disabled(controller.isRecording)
+                }
+            }
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
         }
     }
 }
