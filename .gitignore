@@ -21,3 +21,9 @@ Package.resolved
 *.p12
 .env
 Atlasbound/atlasbound.env
+
+# Python / test artifacts
+__pycache__/
+*.pyc
+TestResults.xcresult/
+*.xcresult/
