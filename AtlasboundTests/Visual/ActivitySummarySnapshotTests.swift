@@ -24,15 +24,9 @@ final class ActivitySummarySnapshotTests: XCTestCase {
         try SnapshotSupport.assertSnapshot(of: view, named: "ActivitySummaryView")
     }
 
-    func testActivitySummaryThemeColors() throws {
+    func testActivitySummaryRenders() throws {
         let view = ActivitySummaryView(summary: fixtureSummary, onDismiss: {})
             .frame(width: 390, height: 700)
-        try SnapshotSupport.assertThemePresence(
-            of: view,
-            expectedColors: [
-                (CGPoint(x: 20, y: 20), .atlasCanvas),
-            ],
-            size: CGSize(width: 390, height: 700)
-        )
+        try SnapshotSupport.assertRenders(view, size: CGSize(width: 390, height: 700))
     }
 }

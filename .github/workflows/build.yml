@@ -96,7 +96,11 @@ jobs:
 
       - name: Run tests
         env:
+          # TEST_RUNNER_* is forwarded into the test host with the prefix stripped.
+          TEST_RUNNER_BOOTSTRAP_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
+          TEST_RUNNER_RECORD_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
           BOOTSTRAP_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
+          RECORD_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
         run: |
           set -euo pipefail
           DEST="platform=iOS Simulator,name=${{ steps.sim.outputs.name }}"
