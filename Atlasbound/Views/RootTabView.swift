@@ -3,6 +3,7 @@ import SwiftUI
 struct RootTabView: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedTab = 0
 
@@ -31,7 +32,7 @@ struct RootTabView: View {
         }
         .tint(AtlasTheme.blue)
         .toolbarBackground(.visible, for: .tabBar)
-        .toolbarBackground(Color.white, for: .tabBar)
+        .toolbarBackground(AtlasTheme.tabBarBackground(for: colorScheme), for: .tabBar)
         .onChange(of: controller.isRecording) { _, isRecording in
             if isRecording {
                 selectedTab = 0

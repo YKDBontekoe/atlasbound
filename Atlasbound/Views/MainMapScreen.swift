@@ -6,6 +6,7 @@ struct MainMapScreen: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     @ObservedObject private var recorder: ActivityRecorder
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var followsUser = true
@@ -95,7 +96,7 @@ struct MainMapScreen: View {
                 store: store,
                 showSimGPSControls: $showSimGPSControls
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showActivityPicker) {
             ActivityPickerSheet(controller: controller)
@@ -155,10 +156,8 @@ struct MainMapScreen: View {
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(.white.opacity(0.94), in: Capsule())
-                    .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GlassButtonStyle(shape: .capsule))
 
                 Spacer(minLength: 0)
 
@@ -169,10 +168,8 @@ struct MainMapScreen: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .frame(width: 40, height: 40)
-                        .background(.white.opacity(0.94), in: Circle())
-                        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GlassButtonStyle(shape: .circle))
                 .accessibilityIdentifier("settingsButton")
                 .accessibilityLabel("Settings")
             }
@@ -188,8 +185,9 @@ struct MainMapScreen: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(.white.opacity(0.9), in: Capsule())
-            .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+            .background {
+                GlassChrome(shape: Capsule(), weight: .ultraThin)
+            }
         }
         .padding(.top, 8)
     }
@@ -239,19 +237,18 @@ struct MainMapScreen: View {
             } label: {
                 Text(recorder.activityType.startButtonTitle)
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 14)
-                    .background(AtlasTheme.blue, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TintedGlassButtonStyle(tint: AtlasTheme.blue, shape: .capsule))
         }
         .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous)
-                .fill(.white)
-                .shadow(color: .black.opacity(0.12), radius: 20, y: -2)
-        )
+        .background {
+            GlassChrome(
+                shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
+                weight: .regular
+            )
+        }
         .padding(.horizontal, 12)
     }
 
@@ -277,17 +274,15 @@ struct MainMapScreen: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(AtlasTheme.blue)
                     .frame(width: 40, height: 40)
-                    .background(.white, in: Circle())
-                    .shadow(color: .black.opacity(0.1), radius: 8, y: 3)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlassButtonStyle(shape: .circle))
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 16)
         .background(
             LinearGradient(
-                colors: [Color.white.opacity(0.95), Color.white.opacity(0)],
+                colors: AtlasTheme.headerFade(for: colorScheme),
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -329,24 +324,18 @@ struct MainMapScreen: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(AtlasTheme.blue)
                         .frame(width: 56, height: 56)
-                        .background(.white, in: Circle())
-                        .overlay(Circle().stroke(Color.black.opacity(0.06), lineWidth: 1))
-                        .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GlassButtonStyle(shape: .circle, weight: .regular))
 
                 Button {
                     controller.stopActivity()
                 } label: {
                     Text("Finish")
                         .font(.headline.weight(.bold))
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
-                        .background(AtlasTheme.finishRed, in: Capsule())
-                        .shadow(color: AtlasTheme.finishRed.opacity(0.35), radius: 10, y: 4)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(TintedGlassButtonStyle(tint: AtlasTheme.finishRed, shape: .capsule))
             }
         }
         .padding(.horizontal, 12)
@@ -395,10 +384,8 @@ struct MainMapScreen: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(AtlasTheme.blue)
                         .frame(width: 42, height: 42)
-                        .background(.white, in: Circle())
-                        .shadow(color: .black.opacity(0.1), radius: 8, y: 3)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GlassButtonStyle(shape: .circle))
                 .opacity(controller.isRecording ? 0 : 1)
 
                 Button {
@@ -408,10 +395,8 @@ struct MainMapScreen: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(controller.showLayers ? AtlasTheme.blue : .secondary)
                         .frame(width: 42, height: 42)
-                        .background(.white, in: Circle())
-                        .shadow(color: .black.opacity(0.1), radius: 8, y: 3)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GlassButtonStyle(shape: .circle))
             }
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -424,14 +409,15 @@ struct MainMapScreen: View {
     }
 
     private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous)
-            .fill(.white)
-            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        GlassChrome(
+            shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
+            weight: .regular
+        )
     }
 
     private var divider: some View {
         Rectangle()
-            .fill(Color.black.opacity(0.08))
+            .fill(AtlasTheme.divider(for: colorScheme))
             .frame(width: 1, height: 36)
     }
 
@@ -496,11 +482,31 @@ struct SettingsSheet: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     @Binding var showSimGPSControls: Bool
+    @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
     @Environment(\.dismiss) private var dismiss
+
+    private var appearanceBinding: Binding<AppearancePreference> {
+        Binding(
+            get: { AppearancePreference(rawValue: appearanceRaw) ?? .system },
+            set: { appearanceRaw = $0.rawValue }
+        )
+    }
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Appearance") {
+                    Picker("Theme", selection: appearanceBinding) {
+                        ForEach(AppearancePreference.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    Text("Auto follows your device appearance.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("Activity") {
                     Picker("Type", selection: Binding(
                         get: { controller.recorder.activityType },

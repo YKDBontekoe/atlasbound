@@ -24,7 +24,7 @@ Simulator / DEBUG Sim GPS: set `ATLASBOUND_ENABLE_SIM_GPS=true` in `.env`, run `
 | `Persistence/` | File IO + persisted DTOs |
 | `Map/` | MapKit views |
 | `Views/` | Screens / sheets |
-| `Theme/` | Colors, type helpers |
+| `Theme/` | Colors, type helpers, appearance preference, glass button styles |
 
 Xcode uses **PBXFileSystemSynchronizedRootGroup** — new files under `Atlasbound/` appear in the target automatically. Prefer not editing `project.pbxproj` membership by hand (`Info.plist` is a known exception).
 
@@ -36,6 +36,7 @@ Xcode uses **PBXFileSystemSynchronizedRootGroup** — new files under `Atlasboun
 - Persist IDs and mastery fields only — derive geometry
 - Match existing naming: `tileID`, `masteryXP`, `sessionVisitedTileIDs`
 - No third-party deps unless requested
+- Appearance: `AppearancePreference` (`Auto` / `Light` / `Dark`) via `@AppStorage("appearance.preference")`; apply with `.preferredColorScheme` on the app root. Glass chrome/button styles live in `Theme/GlassChrome.swift`.
 
 ## Tests
 
