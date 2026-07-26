@@ -89,6 +89,10 @@ extension ActivityType {
         case .unknown: "Record tiles as you explore"
         }
     }
+
+    var startButtonTitle: String {
+        "Start \(displayName)"
+    }
 }
 
 extension TileState {

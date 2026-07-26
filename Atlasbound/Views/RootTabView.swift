@@ -65,6 +65,27 @@ struct ActivityTabView: View {
                     .padding(.vertical, 4)
                 }
 
+                Section {
+                    ForEach(ActivityType.selectableCases, id: \.self) { type in
+                        Button {
+                            controller.setActivityType(type)
+                        } label: {
+                            ActivityTypeRow(
+                                type: type,
+                                isSelected: controller.recorder.activityType == type
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(controller.isRecording)
+                    }
+                } header: {
+                    Text("Activity type")
+                } footer: {
+                    Text(controller.isRecording
+                          ? "Finish the current session before switching activities."
+                          : "Each activity uses its own reveal grid width.")
+                }
+
                 Section("This atlas") {
                     LabeledContent("Activities completed", value: "\(store.activitiesCompleted)")
                     LabeledContent("Tiles discovered", value: "\(store.discoveredTiles.count)")

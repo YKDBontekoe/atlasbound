@@ -27,9 +27,12 @@ final class WorldController: ObservableObject {
     private var sessionTiles: [String: WorldTile] = [:]
     private var sessionProgress = SessionProgress.empty
 
+    private static let selectedActivityKey = "atlasbound.selectedActivityType"
+
     init(store: TileStore, recorder: ActivityRecorder? = nil) {
         self.store = store
         self.recorder = recorder ?? ActivityRecorder()
+        restoreSelectedActivityType()
         syncRecorderSettings()
 
         self.recorder.onSample = { [weak self] sample in
@@ -87,8 +90,19 @@ final class WorldController: ObservableObject {
     /// Activity selects the reveal grid — players never pick tile size manually.
     func setActivityType(_ type: ActivityType) {
         guard !recorder.isRecording else { return }
+        guard type != .unknown else { return }
         recorder.activityType = type
+        UserDefaults.standard.set(type.rawValue, forKey: Self.selectedActivityKey)
         syncTileSizeToActivity()
+    }
+
+    private func restoreSelectedActivityType() {
+        guard let raw = UserDefaults.standard.string(forKey: Self.selectedActivityKey),
+              let type = ActivityType(rawValue: raw),
+              type != .unknown else {
+            return
+        }
+        recorder.activityType = type
     }
 
     func startActivity() {

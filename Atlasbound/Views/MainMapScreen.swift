@@ -10,6 +10,7 @@ struct MainMapScreen: View {
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var followsUser = true
     @State private var showSettings = false
+    @State private var showActivityPicker = false
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
 
     init(controller: WorldController, store: TileStore) {
@@ -95,6 +96,10 @@ struct MainMapScreen: View {
                 showSimGPSControls: $showSimGPSControls
             )
             .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showActivityPicker) {
+            ActivityPickerSheet(controller: controller)
+                .presentationDetents([.medium, .large])
         }
         .onChange(of: showSimGPSControls) { _, enabled in
             #if DEBUG
@@ -189,23 +194,39 @@ struct MainMapScreen: View {
 
     private var idleBottomSheet: some View {
         HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(AtlasTheme.blue.opacity(0.12))
-                    .frame(width: 48, height: 48)
-                Image(systemName: recorder.activityType.symbolName)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(AtlasTheme.blue)
-            }
+            Button {
+                showActivityPicker = true
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(AtlasTheme.blue.opacity(0.12))
+                            .frame(width: 48, height: 48)
+                        Image(systemName: recorder.activityType.symbolName)
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(AtlasTheme.blue)
+                    }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(recorder.activityType.displayName)
-                    .font(.headline)
-                Text(recorder.activityType.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text(recorder.activityType.displayName)
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                            Image(systemName: "chevron.down")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("\(recorder.activityType.revealWidthLabel) reveal · \(recorder.activityType.tileSize.label)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Activity type")
+            .accessibilityValue(recorder.activityType.displayName)
+            .accessibilityHint("Double tap to change activity")
 
             Spacer(minLength: 8)
 
@@ -213,7 +234,7 @@ struct MainMapScreen: View {
                 controller.startActivity()
                 followsUser = true
             } label: {
-                Text("Start Activity")
+                Text(recorder.activityType.startButtonTitle)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 18)
@@ -482,14 +503,14 @@ struct SettingsSheet: View {
                         get: { controller.recorder.activityType },
                         set: { controller.setActivityType($0) }
                     )) {
-                        ForEach(ActivityType.allCases.filter { $0 != .unknown }, id: \.self) { type in
+                        ForEach(ActivityType.selectableCases, id: \.self) { type in
                             Label(type.displayName, systemImage: type.symbolName).tag(type)
                         }
                     }
                     .disabled(controller.isRecording)
 
                     LabeledContent("Reveal width", value: controller.recorder.activityType.revealWidthLabel)
-                    Text("Tile size follows your activity — narrow for walking and running, medium for cycling, hiking, and transit, wide for driving.")
+                    Text("Tile size follows your activity — narrow for walking and running, medium for cycling, hiking, and transit, wide for driving. You can also change this from the map before starting.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

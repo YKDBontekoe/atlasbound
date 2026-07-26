@@ -37,9 +37,12 @@ Prefer adjusting settings objects over hardcoding magic numbers in the recorder.
 
 ## UI touchpoints
 
-- `MainMapScreen` — start / pause / finish chrome
+- `MainMapScreen` — start / pause / finish chrome; idle sheet opens `ActivityPickerSheet`
+- Activity tab / Settings — same `setActivityType` path (blocked while recording)
 - `ActivitySummaryView` — end-of-activity sheet
 - `DiscoveryMapView` — route polyline + hex overlays
+
+Selection persists in UserDefaults (`atlasbound.selectedActivityType`) and drives `TileStore.tileSize` via `WorldController.syncTileSizeToActivity`.
 
 ## Checklist when changing recording
 

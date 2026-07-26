@@ -39,7 +39,9 @@ Session totals: `SessionProgress` (discovered / revisited / XP splits). Lifetime
 
 ## Activity types
 
-`walk` | `run` | `cycle` | `drive` | `unknown` — stamped on tiles (`activityStamps`).
+`walk` | `run` | `cycle` | `hike` | `drive` | `publicTransport` | `unknown` — stamped on tiles (`activityStamps`).
+
+Players pick an activity before recording (map idle sheet, Activity tab, or Settings). Selection is remembered across launches. Changing activity while recording is blocked; each activity maps to a reveal width (60 / 80 / 100 m).
 
 ## Session extras (UI / soft)
 
