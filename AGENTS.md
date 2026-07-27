@@ -43,13 +43,15 @@ Atlasbound/
     ActivityRecorder.swift     # CLLocation filtering
     TileEngine.swift           # Lat/lon → axial hex
     ProgressionEngine.swift    # Discovery / familiarity XP
-    GeoGuessrEngine.swift      # GeoGuessr scoring + round targets
+    GeoGuessrController.swift  # GeoGuessr game orchestration
+    GeoGuessrScoring.swift     # Distance + score math (Sendable)
+    LookAroundLocationPool.swift # Target location generation (Sendable)
     GameCenterManager.swift    # GameKit auth + leaderboards
   Persistence/                 # JSON save + Codable records
     GeoGuessrStore.swift       # GeoGuessr game history (JSON)
-  Models/                      # WorldTile, activity types
-  Map/                         # DiscoveryMapView (MapKit)
-  Views/                       # MainMapScreen, summary, tabs, GeoGuessrView
+  Models/                      # WorldTile, activity types, GeoGuessrModels
+  Map/                         # DiscoveryMapView, GuessMapView (MapKit)
+  Views/                       # MainMapScreen, summary, tabs, GeoGuessr views
   Theme/                       # AtlasTheme
 AtlasboundTests/               # Unit + chrome snapshot tests
 AtlasboundUITests/             # UI smoke tests

@@ -1,9 +1,10 @@
 import Foundation
 
 /// Persists GeoGuessr game history and high scores as JSON.
+/// Single responsibility: persistence only — no game logic.
 @MainActor
 final class GeoGuessrStore: ObservableObject {
-    @Published private(set) var gameHistory: [GeoGuessrEngine.GameResult] = []
+    @Published private(set) var gameHistory: [GeoGuessrGame] = []
     @Published private(set) var highScore: Int = 0
     @Published private(set) var gamesPlayed: Int = 0
 
@@ -33,7 +34,7 @@ final class GeoGuessrStore: ObservableObject {
         loadFromDisk()
     }
 
-    func record(_ game: GeoGuessrEngine.GameResult) {
+    func record(_ game: GeoGuessrGame) {
         gameHistory.append(game)
         gamesPlayed = gameHistory.count
         if game.totalScore > highScore {
@@ -52,7 +53,7 @@ final class GeoGuessrStore: ObservableObject {
     // MARK: - Disk
 
     private struct SaveFile: Codable {
-        let games: [GeoGuessrEngine.GameResult]
+        let games: [GeoGuessrGame]
         let highScore: Int
     }
 

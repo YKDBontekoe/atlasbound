@@ -4,19 +4,18 @@ import SwiftUI
 struct AtlasboundApp: App {
     @StateObject private var store = TileStore()
     @StateObject private var controllerHolder = ControllerHolder()
-    @StateObject private var geoStore = GeoGuessrStore()
-    @StateObject private var gameCenterManager = GameCenterManager()
+    @StateObject private var geoGuessrHolder = GeoGuessrHolder()
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
 
     var body: some Scene {
         WindowGroup {
             Group {
-                if let controller = controllerHolder.controller {
+                if let controller = controllerHolder.controller,
+                   let geoController = geoGuessrHolder.controller {
                     RootTabView(
                         controller: controller,
                         store: store,
-                        geoStore: geoStore,
-                        gameCenterManager: gameCenterManager
+                        geoGuessrController: geoController
                     )
                 } else {
                     ProgressView("Loading world…")
@@ -27,7 +26,7 @@ struct AtlasboundApp: App {
             )
             .onAppear {
                 controllerHolder.bootstrap(store: store)
-                gameCenterManager.authenticate()
+                geoGuessrHolder.bootstrap()
             }
         }
     }
@@ -40,5 +39,18 @@ final class ControllerHolder: ObservableObject {
     func bootstrap(store: TileStore) {
         guard controller == nil else { return }
         controller = WorldController(store: store)
+    }
+}
+
+@MainActor
+final class GeoGuessrHolder: ObservableObject {
+    @Published var controller: GeoGuessrController?
+
+    func bootstrap() {
+        guard controller == nil else { return }
+        let store = GeoGuessrStore()
+        let gcManager = GameCenterManager()
+        gcManager.authenticate()
+        controller = GeoGuessrController(store: store, gameCenterManager: gcManager)
     }
 }

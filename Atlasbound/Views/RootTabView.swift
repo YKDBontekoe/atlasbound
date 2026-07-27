@@ -3,8 +3,7 @@ import SwiftUI
 struct RootTabView: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
-    @ObservedObject var geoStore: GeoGuessrStore
-    @ObservedObject var gameCenterManager: GameCenterManager
+    @ObservedObject var geoGuessrController: GeoGuessrController
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedTab = 0
@@ -18,7 +17,7 @@ struct RootTabView: View {
                 .accessibilityIdentifier("mapTab")
                 .tag(0)
 
-            GeoGuessrView(geoStore: geoStore, gameCenterManager: gameCenterManager)
+            GeoGuessrView(controller: geoGuessrController)
                 .tabItem {
                     Label("GeoGuessr", systemImage: "globe.americas.fill")
                 }
