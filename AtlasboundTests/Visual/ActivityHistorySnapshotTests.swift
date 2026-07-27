@@ -19,20 +19,27 @@ final class ActivityHistorySnapshotTests: XCTestCase {
     }
 
     func testActivityHistoryRowSnapshot() throws {
-        let session = PersistedActivityRecord(
+        let session = Self.makeRecord(
             id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
-            activityType: .run,
+            activity: .run,
             distanceMeters: 2450,
             duration: 1800,
             tilesDiscovered: 7,
-            totalXP: 785,
+            discoveryXP: 700,
+            familiarityXP: 85,
             tileSizeMeters: 60,
             startedAt: Date(timeIntervalSince1970: 1_700_000_000),
             endedAt: Date(timeIntervalSince1970: 1_700_001_800),
-            frontierPoints: 42,
-            frontierConnectionBonus: 10,
-            frontierCompletionBonus: nil,
-            frontierWeeklyTotal: 120
+            frontier: FrontierSessionContribution(
+                tilePoints: 42,
+                connectionBonus: 10,
+                completionBonus: 0,
+                weeklyTotalAfter: 120,
+                targetTilesDiscovered: 3,
+                targetTilesRequired: 5,
+                didConnectTarget: false,
+                comboPeak: 1.2
+            )
         )
         let view = ActivityHistoryRow(session: session)
             .padding()
@@ -41,20 +48,27 @@ final class ActivityHistorySnapshotTests: XCTestCase {
     }
 
     func testActivitySessionDetailSnapshot() throws {
-        let session = PersistedActivityRecord(
+        let session = Self.makeRecord(
             id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
-            activityType: .drive,
+            activity: .drive,
             distanceMeters: 12_400,
             duration: 900,
             tilesDiscovered: 15,
-            totalXP: 1500,
+            discoveryXP: 1500,
+            familiarityXP: 0,
             tileSizeMeters: 100,
             startedAt: Date(timeIntervalSince1970: 1_700_000_000),
             endedAt: Date(timeIntervalSince1970: 1_700_000_900),
-            frontierPoints: 80,
-            frontierConnectionBonus: 25,
-            frontierCompletionBonus: 50,
-            frontierWeeklyTotal: 340
+            frontier: FrontierSessionContribution(
+                tilePoints: 80,
+                connectionBonus: 25,
+                completionBonus: 50,
+                weeklyTotalAfter: 340,
+                targetTilesDiscovered: 8,
+                targetTilesRequired: 10,
+                didConnectTarget: true,
+                comboPeak: 1.8
+            )
         )
         let view = ActivitySessionDetailView(session: session, onDismiss: {})
         try SnapshotSupport.assertSnapshot(of: view, named: "ActivitySessionDetailView")
@@ -68,36 +82,33 @@ final class ActivityHistorySnapshotTests: XCTestCase {
         .frame(width: 390, height: 700)
         try SnapshotSupport.assertRenders(view, size: CGSize(width: 390, height: 700))
     }
-}
 
-private extension PersistedActivityRecord {
-    init(
+    private static func makeRecord(
         id: UUID,
-        activityType: ActivityType,
+        activity: ActivityType,
         distanceMeters: Double,
         duration: TimeInterval,
         tilesDiscovered: Int,
-        totalXP: Int,
+        discoveryXP: Int,
+        familiarityXP: Int,
         tileSizeMeters: Int,
         startedAt: Date,
         endedAt: Date,
-        frontierPoints: Int?,
-        frontierConnectionBonus: Int?,
-        frontierCompletionBonus: Int?,
-        frontierWeeklyTotal: Int?
-    ) {
-        self.id = id
-        self.activityType = activityType
-        self.distanceMeters = distanceMeters
-        self.duration = duration
-        self.tilesDiscovered = tilesDiscovered
-        self.totalXP = totalXP
-        self.tileSizeMeters = tileSizeMeters
-        self.startedAt = startedAt
-        self.endedAt = endedAt
-        self.frontierPoints = frontierPoints
-        self.frontierConnectionBonus = frontierConnectionBonus
-        self.frontierCompletionBonus = frontierCompletionBonus
-        self.frontierWeeklyTotal = frontierWeeklyTotal
+        frontier: FrontierSessionContribution?
+    ) -> PersistedActivityRecord {
+        let summary = ActivitySummary(
+            id: id,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            distanceMeters: distanceMeters,
+            sampleCount: 120,
+            tilesVisited: tilesDiscovered + 3,
+            tilesDiscovered: tilesDiscovered,
+            discoveryXP: discoveryXP,
+            familiarityXP: familiarityXP,
+            activityType: activity,
+            frontierContribution: frontier
+        )
+        return PersistedActivityRecord(from: summary, tileSizeMeters: tileSizeMeters)
     }
 }
