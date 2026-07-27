@@ -29,12 +29,12 @@ runs:
       run: |
         set -euo pipefail
         chmod +x scripts/ci-run-tests.sh
-        ARGS=()
         if [[ -n "${{ inputs.extra-xcodebuild-args }}" ]]; then
-          # shellcheck disable=SC2206
-          ARGS=(${{ inputs.extra-xcodebuild-args }})
+          # shellcheck disable=SC2086
+          ./scripts/ci-run-tests.sh ${{ inputs.extra-xcodebuild-args }}
+        else
+          ./scripts/ci-run-tests.sh
         fi
-        ./scripts/ci-run-tests.sh "${ARGS[@]}"
 
     - name: Upload test results
       if: inputs.upload-artifact-name != '' && always()
