@@ -12,6 +12,7 @@ struct MainMapScreen: View {
     @State private var followsUser = true
     @State private var showSettings = false
     @State private var showActivityPicker = false
+    @State private var showExpeditionSheet = false
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
 
     init(controller: WorldController, store: TileStore) {
@@ -52,13 +53,13 @@ struct MainMapScreen: View {
 
             mapSideControls
                 .padding(.trailing, 16)
-                .padding(.bottom, controller.isRecording ? 300 : 168)
+                .padding(.bottom, controller.isRecording ? 240 : 100)
 
             #if DEBUG
             if showsSimGPSPad {
                 DebugLocationPad(controller: controller, followsUser: $followsUser)
                     .padding(.leading, 16)
-                    .padding(.bottom, controller.isRecording ? 300 : 168)
+                    .padding(.bottom, controller.isRecording ? 240 : 100)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
             #endif
@@ -77,7 +78,9 @@ struct MainMapScreen: View {
                 if controller.isRecording {
                     activeBottomPanel
                 } else {
-                    IdleExpeditionPanel(controller: controller, store: store)
+                    FrontierMissionBanner(controller: controller, store: store) {
+                        showExpeditionSheet = true
+                    }
                     idleBottomSheet
                 }
             }
@@ -101,6 +104,10 @@ struct MainMapScreen: View {
         }
         .sheet(isPresented: $showActivityPicker) {
             ActivityPickerSheet(controller: controller)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showExpeditionSheet) {
+            ExpeditionSheet(controller: controller, store: store)
                 .presentationDetents([.medium, .large])
         }
         .onChange(of: showSimGPSControls) { _, enabled in
@@ -147,12 +154,19 @@ struct MainMapScreen: View {
                 Button {
                     showSettings = true
                 } label: {
-                    HStack(spacing: 6) {
-                        Text("\(controller.currentSectorName) · \(controller.currentSectorCompletionPercent)% · \(controller.currentGridLabel)")
-                            .font(.subheadline.weight(.semibold))
-                        Image(systemName: "chevron.down")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.secondary)
+                    VStack(spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text("\(controller.currentSectorName) · \(controller.currentSectorCompletionPercent)% · \(controller.currentGridLabel)")
+                                .font(.subheadline.weight(.semibold))
+                            Image(systemName: "chevron.down")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.secondary)
+                        }
+                        if nearbyCount > 0 {
+                            Text("\(nearbyCount) tiles nearby")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 14)
@@ -175,20 +189,6 @@ struct MainMapScreen: View {
                 .accessibilityLabel("Settings")
             }
             .padding(.horizontal, 16)
-
-            HStack(spacing: 6) {
-                HexShape()
-                    .fill(AtlasTheme.teal)
-                    .frame(width: 12, height: 13)
-                Text("\(nearbyCount) tiles nearby")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background {
-                GlassChrome(shape: Capsule(), weight: .ultraThin)
-            }
         }
         .padding(.top, 8)
     }
@@ -315,11 +315,7 @@ struct MainMapScreen: View {
             .padding(.vertical, 14)
             .background(cardBackground)
 
-            if controller.activeExpedition != nil {
-                ActiveFrontierTracker(controller: controller)
-            }
-
-            FrontierComboCard(controller: controller)
+            ActiveFrontierTracker(controller: controller)
 
             HStack(spacing: 14) {
                 Button {

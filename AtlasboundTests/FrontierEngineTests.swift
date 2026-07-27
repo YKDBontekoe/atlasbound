@@ -197,4 +197,12 @@ final class FrontierEngineTests: XCTestCase {
         let date = calendar.date(from: DateComponents(year: 2026, month: 7, day: 27))!
         XCTAssertEqual(FrontierEngine.isoWeekKey(for: date, calendar: calendar), "2026-W31")
     }
+
+    func testFriendlyWeekLabel() {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let label = FrontierEngine.friendlyWeekLabel(for: "2026-W31", calendar: calendar)
+        XCTAssertTrue(label.contains("–"))
+        XCTAssertFalse(label.contains("W31"))
+    }
 }

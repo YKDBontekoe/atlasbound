@@ -7,73 +7,131 @@ struct ExpeditionCard: View {
     let isCompleted: Bool
     let progress: Int
     let onSelect: () -> Void
+    var onAbandon: (() -> Void)?
+
+    @State private var showAbandonConfirmation = false
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(difficultyColor.opacity(0.15))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: offer.difficulty.iconName)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(difficultyColor)
+        Group {
+            if isCompleted || isActive {
+                cardContent
+            } else {
+                Button(action: onSelect) {
+                    cardContent
                 }
+                .buttonStyle(.plain)
+            }
+        }
+        .accessibilityIdentifier("expeditionCard_\(offer.difficulty.rawValue)")
+        .confirmationDialog(
+            "Abandon this expedition?",
+            isPresented: $showAbandonConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Abandon expedition", role: .destructive) {
+                onAbandon?()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Progress on \(sectorName) will be lost. You can pick another offer this week.")
+        }
+    }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(offer.difficulty.displayName)
-                            .font(.subheadline.weight(.bold))
-                        if isActive {
-                            Text("ACTIVE")
-                                .font(.caption2.weight(.bold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(difficultyColor.opacity(0.15), in: Capsule())
-                                .foregroundStyle(difficultyColor)
-                        } else if isCompleted {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.caption)
-                                .foregroundStyle(AtlasTheme.teal)
-                        }
-                    }
+    private var cardContent: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(difficultyColor.opacity(0.15))
+                    .frame(width: 44, height: 44)
+                Image(systemName: offer.difficulty.iconName)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(difficultyColor)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(sectorName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
-                    HStack(spacing: 8) {
-                        Label("\(offer.targetSectorDistance) sectors", systemImage: "arrow.up.forward")
-                        Label("+\(offer.completionBonus)", systemImage: "star.fill")
+
+                    if isActive {
+                        Text("ACTIVE")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(difficultyColor.opacity(0.15), in: Capsule())
+                            .foregroundStyle(difficultyColor)
+                    } else if isCompleted {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(AtlasTheme.teal)
                     }
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
                 }
 
-                Spacer(minLength: 0)
+                Text(difficultySubtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                Label("+\(offer.completionBonus) pts", systemImage: "star.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AtlasTheme.gold)
 
                 if isActive, offer.tilesRequired > 0 {
-                    VStack(spacing: 2) {
-                        Text("\(progress)/\(offer.tilesRequired)")
-                            .font(.caption.weight(.bold).monospacedDigit())
-                        Text("tiles")
-                            .font(.caption2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        ProgressView(
+                            value: Double(progress),
+                            total: Double(max(1, offer.tilesRequired))
+                        )
+                        .tint(difficultyColor)
+
+                        Text("\(progress)/\(offer.tilesRequired) tiles")
+                            .font(.caption.weight(.medium).monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                 }
             }
-            .padding(12)
-            .background {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isActive ? difficultyColor.opacity(0.08) : Color.secondary.opacity(0.06))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(isActive ? difficultyColor.opacity(0.35) : Color.clear, lineWidth: 1.5)
+
+            Spacer(minLength: 0)
+
+            if isActive, onAbandon != nil {
+                Menu {
+                    Button("Abandon expedition", role: .destructive) {
+                        showAbandonConfirmation = true
                     }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                }
+                .accessibilityIdentifier("abandonExpeditionButton")
             }
         }
-        .buttonStyle(.plain)
-        .disabled(isCompleted)
-        .accessibilityIdentifier("expeditionCard_\(offer.difficulty.rawValue)")
+        .padding(12)
+        .background {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(cardFill)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(isActive ? difficultyColor.opacity(0.35) : Color.clear, lineWidth: 1.5)
+                }
+        }
+        .opacity(isCompleted ? 0.65 : 1)
+    }
+
+    private var difficultySubtitle: String {
+        let sectors = offer.targetSectorDistance
+        let sectorLabel = sectors == 1 ? "1 sector away" : "\(sectors) sectors away"
+        return "\(offer.difficulty.displayName) · \(sectorLabel)"
+    }
+
+    private var cardFill: Color {
+        if isCompleted {
+            return Color.secondary.opacity(0.04)
+        }
+        return isActive ? difficultyColor.opacity(0.08) : Color.secondary.opacity(0.06)
     }
 
     private var difficultyColor: Color {
@@ -85,88 +143,255 @@ struct ExpeditionCard: View {
     }
 }
 
-struct IdleExpeditionPanel: View {
+struct ExpeditionMissionList: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
 
     private let sectorEngine = HexSectorEngine()
 
+    private var completedExpeditions: [ExpeditionOffer] {
+        let completed = Set(store.frontierState.completedOfferIDs)
+        return store.frontierState.offers.filter { completed.contains($0.id) }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Frontier Expeditions")
-                        .font(.headline)
-                    Text("Weekly offers · \(store.frontierState.weekKey.isEmpty ? "this week" : store.frontierState.weekKey)")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                weekHeader
+
+                if let active = controller.activeExpedition {
+                    sectionHeader("Active expedition")
+                    ExpeditionCard(
+                        offer: active,
+                        sectorName: sectorName(for: active),
+                        isActive: true,
+                        isCompleted: false,
+                        progress: controller.targetSectorDiscoveredCount,
+                        onSelect: {},
+                        onAbandon: { controller.abandonActiveExpedition() }
+                    )
+                }
+
+                if !controller.availableExpeditions.isEmpty {
+                    sectionHeader("Available this week")
+                    ForEach(controller.availableExpeditions) { offer in
+                        ExpeditionCard(
+                            offer: offer,
+                            sectorName: sectorName(for: offer),
+                            isActive: false,
+                            isCompleted: false,
+                            progress: 0,
+                            onSelect: { controller.selectExpedition(offer) }
+                        )
+                    }
+                }
+
+                if !completedExpeditions.isEmpty {
+                    sectionHeader("Completed")
+                    ForEach(completedExpeditions) { offer in
+                        ExpeditionCard(
+                            offer: offer,
+                            sectorName: sectorName(for: offer),
+                            isActive: false,
+                            isCompleted: true,
+                            progress: offer.tilesRequired,
+                            onSelect: {}
+                        )
+                    }
+                }
+
+                if controller.activeExpedition == nil
+                    && controller.availableExpeditions.isEmpty
+                    && completedExpeditions.isEmpty {
+                    Text("Weekly expeditions will appear here once frontier offers are generated.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(controller.weeklyFrontierScore)")
-                        .font(.title3.weight(.bold).monospacedDigit())
-                        .foregroundStyle(AtlasTheme.gold)
-                    Text("weekly pts")
-                        .font(.caption2)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
+                } else if controller.activeExpedition == nil && controller.availableExpeditions.isEmpty {
+                    Text("All expeditions completed this week — great work!")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+    }
 
-            if let active = controller.activeExpedition {
-                ExpeditionCard(
-                    offer: active,
-                    sectorName: sectorName(for: active),
-                    isActive: true,
-                    isCompleted: false,
-                    progress: controller.targetSectorDiscoveredCount,
-                    onSelect: {}
-                )
-
-                Button("Abandon expedition") {
-                    controller.abandonActiveExpedition()
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            }
-
-            ForEach(controller.availableExpeditions) { offer in
-                ExpeditionCard(
-                    offer: offer,
-                    sectorName: sectorName(for: offer),
-                    isActive: false,
-                    isCompleted: false,
-                    progress: 0,
-                    onSelect: { controller.selectExpedition(offer) }
-                )
-            }
-
-            if controller.activeExpedition == nil && controller.availableExpeditions.isEmpty {
-                Text("All expeditions completed this week — great work!")
+    private var weekHeader: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(FrontierEngine.friendlyWeekLabel(for: store.frontierState.weekKey))
+                    .font(.subheadline.weight(.semibold))
+                Text("Weekly frontier offers")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 8)
             }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(controller.weeklyFrontierScore)")
+                    .font(.title2.weight(.bold).monospacedDigit())
+                    .foregroundStyle(AtlasTheme.gold)
+                Text("weekly pts")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.bottom, 4)
+    }
 
-            Button {
-                controller.showMatchingFrontierLeaderboard()
-            } label: {
-                Label("Frontier leaderboard · \(controller.currentGridLabel)", systemImage: "trophy.fill")
-                    .font(.caption.weight(.semibold))
-                    .frame(maxWidth: .infinity)
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+    }
+
+    private func sectorName(for offer: ExpeditionOffer) -> String {
+        guard let parsed = sectorEngine.parseSectorID(offer.targetSectorID) else { return "Unknown sector" }
+        return sectorEngine.displayName(for: parsed.sector)
+    }
+}
+
+/// Full-screen sheet for browsing and selecting weekly frontier expeditions.
+struct ExpeditionSheet: View {
+    @ObservedObject var controller: WorldController
+    @ObservedObject var store: TileStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ExpeditionMissionList(controller: controller, store: store)
+                .navigationTitle("Frontier Expeditions")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            controller.showMatchingFrontierLeaderboard()
+                        } label: {
+                            Image(systemName: "trophy.fill")
+                        }
+                        .accessibilityLabel("Frontier leaderboard")
+                        .accessibilityIdentifier("frontierLeaderboardButton")
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+        }
+        .accessibilityIdentifier("expeditionSheet")
+    }
+}
+
+/// Compact map banner — tap to open the full expedition sheet.
+struct FrontierMissionBanner: View {
+    @ObservedObject var controller: WorldController
+    @ObservedObject var store: TileStore
+    let onTap: () -> Void
+
+    private let sectorEngine = HexSectorEngine()
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(bannerTint.opacity(0.15))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: bannerIcon)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(bannerTint)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(primaryLabel)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(secondaryLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                if let trailing = trailingBadge {
+                    Text(trailing)
+                        .font(.caption.weight(.bold).monospacedDigit())
+                        .foregroundStyle(AtlasTheme.gold)
+                }
+
+                Image(systemName: "chevron.up")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
             }
-            .buttonStyle(.borderless)
-            .foregroundStyle(AtlasTheme.blue)
-            .accessibilityIdentifier("frontierLeaderboardButton")
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background {
+                GlassChrome(
+                    shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
+                    weight: .regular
+                )
+            }
+            .padding(.horizontal, 12)
         }
-        .padding(14)
-        .background {
-            GlassChrome(
-                shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
-                weight: .regular
-            )
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("frontierMissionBanner")
+        .accessibilityLabel(primaryLabel)
+        .accessibilityHint("Opens weekly frontier expeditions")
+    }
+
+    private var primaryLabel: String {
+        if let active = controller.activeExpedition {
+            return sectorName(for: active)
         }
-        .padding(.horizontal, 12)
+        let count = controller.availableExpeditions.count
+        if count > 0 {
+            return count == 1 ? "1 weekly expedition" : "\(count) weekly expeditions"
+        }
+        return "Week complete"
+    }
+
+    private var secondaryLabel: String {
+        if let active = controller.activeExpedition {
+            return "\(active.difficulty.displayName) · \(controller.targetSectorDiscoveredCount)/\(active.tilesRequired) tiles"
+        }
+        if !controller.availableExpeditions.isEmpty {
+            return "Tap to choose a target sector"
+        }
+        return "\(controller.weeklyFrontierScore) pts this week"
+    }
+
+    private var trailingBadge: String? {
+        if controller.activeExpedition != nil {
+            return nil
+        }
+        if !controller.availableExpeditions.isEmpty {
+            return "\(controller.weeklyFrontierScore) pts"
+        }
+        return nil
+    }
+
+    private var bannerIcon: String {
+        if controller.activeExpedition != nil {
+            return controller.activeExpedition?.difficulty.iconName ?? "flag.fill"
+        }
+        return controller.availableExpeditions.isEmpty ? "checkmark.seal.fill" : "flag.fill"
+    }
+
+    private var bannerTint: Color {
+        if let active = controller.activeExpedition {
+            switch active.difficulty {
+            case .scout: return AtlasTheme.teal
+            case .trailblazer: return AtlasTheme.blue
+            case .pathfinder: return AtlasTheme.gold
+            }
+        }
+        return controller.availableExpeditions.isEmpty ? AtlasTheme.teal : AtlasTheme.gold
     }
 
     private func sectorName(for offer: ExpeditionOffer) -> String {
@@ -179,28 +404,37 @@ struct ActiveFrontierTracker: View {
     @ObservedObject var controller: WorldController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "flag.fill")
-                    .foregroundStyle(AtlasTheme.gold)
-                Text("Frontier")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Text("\(controller.sessionFrontierScore) pts")
-                    .font(.subheadline.weight(.bold).monospacedDigit())
-                    .foregroundStyle(AtlasTheme.gold)
-            }
+    private let sectorEngine = HexSectorEngine()
 
-            if let offer = controller.activeExpedition {
-                HStack(spacing: 8) {
-                    Image(systemName: offer.difficulty.iconName)
-                        .foregroundStyle(AtlasTheme.blue)
-                    Text(offer.difficulty.displayName)
-                        .font(.caption.weight(.semibold))
+    var body: some View {
+        if let offer = controller.activeExpedition {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: "flag.fill")
+                        .foregroundStyle(AtlasTheme.gold)
+                    Text("Frontier")
+                        .font(.subheadline.weight(.semibold))
                     Spacer()
-                    Text("\(controller.targetSectorDiscoveredCount)/\(offer.tilesRequired) target tiles")
-                        .font(.caption.weight(.medium).monospacedDigit())
+                    Text("\(controller.sessionFrontierScore) pts")
+                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .foregroundStyle(AtlasTheme.gold)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Image(systemName: offer.difficulty.iconName)
+                            .foregroundStyle(AtlasTheme.blue)
+                        Text(sectorName(for: offer))
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                        Spacer()
+                        Text("\(controller.targetSectorDiscoveredCount)/\(offer.tilesRequired) tiles")
+                            .font(.caption.weight(.medium).monospacedDigit())
+                    }
+
+                    Text(offer.difficulty.displayName)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
 
                 ProgressView(
@@ -226,60 +460,37 @@ struct ActiveFrontierTracker: View {
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(controller.frontierCombo.isActive ? AtlasTheme.gold : .secondary)
                 }
-            } else {
-                Text("Select an expedition before your next walk to earn frontier points.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(14)
-        .background {
-            GlassChrome(
-                shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
-                weight: .regular
-            )
-        }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: controller.sessionFrontierScore)
-    }
-}
 
-struct FrontierComboCard: View {
-    @ObservedObject var controller: WorldController
+                VStack(alignment: .leading, spacing: 4) {
+                    ProgressView(value: max(0.08, controller.frontierComboProgress))
+                        .tint(AtlasTheme.gold)
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "flame.fill")
-                    .foregroundStyle(AtlasTheme.gold)
-                Text("Frontier combo")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Text(String(format: "x%.1f", controller.frontierComboMultiplier))
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(AtlasTheme.gold)
-            }
-
-            ProgressView(value: max(0.08, controller.frontierComboProgress))
-                .tint(AtlasTheme.gold)
-
-            HStack {
-                Text("Connected frontier tiles boost points")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                TimelineView(.periodic(from: .now, by: 1)) { _ in
-                    Text(controller.frontierComboRemainingLabel)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
+                    HStack {
+                        Text("Combo from connected frontier tiles")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TimelineView(.periodic(from: .now, by: 1)) { _ in
+                            Text(controller.frontierComboRemainingLabel)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
+            .padding(14)
+            .background {
+                GlassChrome(
+                    shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
+                    weight: .regular
+                )
+            }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: controller.sessionFrontierScore)
         }
-        .padding(14)
-        .background {
-            GlassChrome(
-                shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
-                weight: .regular
-            )
-        }
+    }
+
+    private func sectorName(for offer: ExpeditionOffer) -> String {
+        guard let parsed = sectorEngine.parseSectorID(offer.targetSectorID) else { return "Unknown sector" }
+        return sectorEngine.displayName(for: parsed.sector)
     }
 }

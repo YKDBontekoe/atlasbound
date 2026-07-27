@@ -71,21 +71,26 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 12))
         app.tabBars.buttons["Map"].tap()
 
-        let leaderboard = app.buttons["frontierLeaderboardButton"]
-        guard leaderboard.waitForExistence(timeout: 8) else {
-            throw XCTSkip("Frontier panel not visible in this simulator session")
+        let banner = app.buttons["frontierMissionBanner"]
+        guard banner.waitForExistence(timeout: 8) else {
+            throw XCTSkip("Frontier banner not visible in this simulator session")
         }
+        banner.tap()
+
+        XCTAssertTrue(
+            app.otherElements["expeditionSheet"].waitForExistence(timeout: 3)
+                || app.staticTexts["Frontier Expeditions"].waitForExistence(timeout: 3)
+        )
 
         let scoutCard = app.buttons["expeditionCard_scout"]
         if scoutCard.waitForExistence(timeout: 3) {
             scoutCard.tap()
         }
 
-        XCTAssertTrue(
-            app.staticTexts["Frontier Expeditions"].waitForExistence(timeout: 3)
-                || app.staticTexts["ACTIVE"].waitForExistence(timeout: 2)
-        )
-
+        let leaderboard = app.buttons["frontierLeaderboardButton"]
+        guard leaderboard.waitForExistence(timeout: 3) else {
+            throw XCTSkip("Frontier leaderboard control not visible in expedition sheet")
+        }
         leaderboard.tap()
         XCTAssertTrue(app.tabBars.firstMatch.exists)
     }

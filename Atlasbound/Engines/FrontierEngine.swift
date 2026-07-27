@@ -18,6 +18,26 @@ struct FrontierEngine: Sendable {
         return String(format: "%d-W%02d", year, week)
     }
 
+    /// Human-readable range for an ISO week key such as `2026-W31`.
+    static func friendlyWeekLabel(for weekKey: String, calendar: Calendar = .current) -> String {
+        guard !weekKey.isEmpty else { return "This week" }
+        guard let dashRange = weekKey.range(of: "-W"),
+              let year = Int(weekKey[..<dashRange.lowerBound]),
+              let week = Int(weekKey[dashRange.upperBound...]) else {
+            return weekKey
+        }
+
+        var components = DateComponents()
+        components.weekOfYear = week
+        components.yearForWeekOfYear = year
+        guard let start = calendar.date(from: components) else { return weekKey }
+        let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
+
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("MMM d")
+        return "\(formatter.string(from: start)) – \(formatter.string(from: end))"
+    }
+
     // MARK: - Territory
 
     func discoveredTileCoordinates(from tiles: [String: WorldTile]) -> Set<TileCoordinate> {
