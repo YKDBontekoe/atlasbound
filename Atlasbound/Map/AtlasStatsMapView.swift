@@ -7,6 +7,7 @@ enum AtlasStatsMapLayer: String, CaseIterable, Identifiable {
     case activity
     case discoveryAge
     case visitHeat
+    case frontier
     case allGrids
 
     var id: String { rawValue }
@@ -17,6 +18,7 @@ enum AtlasStatsMapLayer: String, CaseIterable, Identifiable {
         case .activity: "Activity"
         case .discoveryAge: "Age"
         case .visitHeat: "Heat"
+        case .frontier: "Frontier"
         case .allGrids: "Grids"
         }
     }
@@ -27,6 +29,7 @@ enum AtlasStatsMapLayer: String, CaseIterable, Identifiable {
         case .activity: "figure.walk"
         case .discoveryAge: "clock.arrow.circlepath"
         case .visitHeat: "flame.fill"
+        case .frontier: "flag.fill"
         case .allGrids: "square.3.layers.3d"
         }
     }
@@ -46,6 +49,7 @@ struct AtlasStatsMapView: View {
     let tilesBySize: [Int: [WorldTile]]
     let currentGridSize: Int
     @Binding var layer: AtlasStatsMapLayer
+    var frontierChargedTileIDs: Set<String> = []
     var interactive: Bool = true
     var height: CGFloat = 220
 
@@ -149,6 +153,8 @@ struct AtlasStatsMapView: View {
             cachedOverlays = buildDiscoveryAgeOverlays()
         case .visitHeat:
             cachedOverlays = buildVisitHeatOverlays()
+        case .frontier:
+            cachedOverlays = buildFrontierOverlays()
         case .allGrids:
             cachedOverlays = buildAllGridsOverlays()
         }
@@ -241,6 +247,25 @@ struct AtlasStatsMapView: View {
         }
     }
 
+    private func buildFrontierOverlays() -> [AtlasStatsTileOverlay] {
+        let tiles = tilesBySize[currentGridSize, default: []].filter(\.isDiscovered)
+        let engine = TileEngine(tileSizeMeters: Double(currentGridSize))
+        let visible = MapOverlayCuller.cullTiles(tiles, engine: engine, visibleRegion: visibleRegion)
+        return visible.map { tile in
+            let charge = tile.weeklyCharge
+            let isCharged = frontierChargedTileIDs.contains(tile.id) || charge > 0
+            let intensity = isCharged ? min(1, 0.25 + Double(max(charge, 1)) * 0.22) : 0.12
+            return AtlasStatsTileOverlay(
+                id: tile.id,
+                coordinate: tile.coordinate,
+                tileSizeMeters: currentGridSize,
+                fill: AtlasTheme.gold.opacity(intensity),
+                stroke: isCharged ? AtlasTheme.gold.opacity(0.9) : AtlasTheme.slate.opacity(0.35),
+                strokeWidth: isCharged ? 1.2 + CGFloat(charge) * 0.3 : 0.6
+            )
+        }
+    }
+
     private func buildAllGridsOverlays() -> [AtlasStatsTileOverlay] {
         var overlays: [AtlasStatsTileOverlay] = []
         for size in TileSizeOption.allCases.map(\.rawValue).sorted() {
@@ -277,6 +302,7 @@ struct AtlasExplorerMapScreen: View {
     let tilesBySize: [Int: [WorldTile]]
     let currentGridSize: Int
     @Binding var layer: AtlasStatsMapLayer
+    var frontierChargedTileIDs: Set<String> = []
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
 
@@ -286,6 +312,7 @@ struct AtlasExplorerMapScreen: View {
                 tilesBySize: tilesBySize,
                 currentGridSize: currentGridSize,
                 layer: $layer,
+                frontierChargedTileIDs: frontierChargedTileIDs,
                 interactive: true,
                 height: UIScreen.main.bounds.height - 160
             )

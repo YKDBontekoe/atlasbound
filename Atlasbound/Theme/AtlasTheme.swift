@@ -221,6 +221,13 @@ extension TileState {
         isFreshDiscovery ? mapFillFresh : mapFill
     }
 
+    func mapFill(isFreshDiscovery: Bool, weeklyCharge: Int) -> Color {
+        let base = mapFill(isFreshDiscovery: isFreshDiscovery)
+        guard weeklyCharge > 0 else { return base }
+        let intensity = min(3, weeklyCharge)
+        return base.opacity(min(1, 0.65 + Double(intensity) * 0.12))
+    }
+
     func mapStroke(isFreshDiscovery: Bool) -> Color {
         isFreshDiscovery ? mapStrokeFresh : mapStroke
     }

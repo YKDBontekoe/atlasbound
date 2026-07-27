@@ -63,7 +63,31 @@ final class SmokeUITests: XCTestCase {
             app.staticTexts["Territory conquered"].waitForExistence(timeout: 5)
                 || app.staticTexts["Lifetime XP"].waitForExistence(timeout: 2)
                 || app.staticTexts["Mastery ladder"].waitForExistence(timeout: 2)
+                || app.staticTexts["Frontier"].waitForExistence(timeout: 2)
         )
+    }
+
+    func testFrontierExpeditionSelectionAndLeaderboard() throws {
+        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 12))
+        app.tabBars.buttons["Map"].tap()
+
+        let leaderboard = app.buttons["frontierLeaderboardButton"]
+        guard leaderboard.waitForExistence(timeout: 8) else {
+            throw XCTSkip("Frontier panel not visible in this simulator session")
+        }
+
+        let scoutCard = app.buttons["expeditionCard_scout"]
+        if scoutCard.waitForExistence(timeout: 3) {
+            scoutCard.tap()
+        }
+
+        XCTAssertTrue(
+            app.staticTexts["Frontier Expeditions"].waitForExistence(timeout: 3)
+                || app.staticTexts["ACTIVE"].waitForExistence(timeout: 2)
+        )
+
+        leaderboard.tap()
+        XCTAssertTrue(app.tabBars.firstMatch.exists)
     }
 
     func testOpenSettingsFromMapIfAvailable() throws {

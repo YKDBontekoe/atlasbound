@@ -8,7 +8,11 @@ final class GameCenterManager: ObservableObject {
     @Published private(set) var localPlayerName: String = ""
     @Published private(set) var authError: String?
 
-    static let leaderboardID = "com.atlasbound.geoguessr.highscore"
+    static let pinpointLeaderboardID = "com.atlasbound.geoguessr.highscore"
+
+    static func frontierLeaderboardID(for tileSize: TileSizeOption) -> String {
+        "com.atlasbound.frontier.weekly.\(tileSize.rawValue)"
+    }
 
     func authenticate() {
         authError = nil
@@ -42,7 +46,7 @@ final class GameCenterManager: ObservableObject {
                 score,
                 context: 0,
                 player: GKLocalPlayer.local,
-                leaderboardIDs: [Self.leaderboardID]
+                leaderboardIDs: [Self.pinpointLeaderboardID]
             )
         } catch {
             if !Self.isExpectedUnauthenticatedError(error) {
@@ -51,13 +55,35 @@ final class GameCenterManager: ObservableObject {
         }
     }
 
+    func submitFrontierScore(_ score: Int, tileSize: TileSizeOption) async {
+        guard isAuthenticated, score > 0 else { return }
+        do {
+            try await GKLeaderboard.submitScore(
+                score,
+                context: 0,
+                player: GKLocalPlayer.local,
+                leaderboardIDs: [Self.frontierLeaderboardID(for: tileSize)]
+            )
+        } catch {
+            authError = "Failed to submit frontier score: \(error.localizedDescription)"
+        }
+    }
+
     func showLeaderboard() {
+        showLeaderboard(id: Self.pinpointLeaderboardID)
+    }
+
+    func showFrontierLeaderboard(tileSize: TileSizeOption) {
+        showLeaderboard(id: Self.frontierLeaderboardID(for: tileSize))
+    }
+
+    private func showLeaderboard(id: String) {
         guard isAuthenticated else { return }
 
         let viewController = GKGameCenterViewController(
-            leaderboardID: Self.leaderboardID,
+            leaderboardID: id,
             playerScope: .global,
-            timeScope: .allTime
+            timeScope: .week
         )
         viewController.gameCenterDelegate = GameCenterDismissHandler.shared
         present(viewController)

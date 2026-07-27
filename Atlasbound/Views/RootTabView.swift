@@ -36,7 +36,8 @@ struct RootTabView: View {
             ProgressTabView(
                 store: store,
                 activityHistory: activityHistory,
-                pinpointStore: pinpointController.store
+                pinpointStore: pinpointController.store,
+                controller: controller
             )
                 .tabItem {
                     Label("Progress", systemImage: "flag.fill")
@@ -129,6 +130,7 @@ struct ProgressTabView: View {
     @ObservedObject var store: TileStore
     @ObservedObject var activityHistory: ActivityHistoryStore
     @ObservedObject var pinpointStore: PinpointStore
+    @ObservedObject var controller: WorldController
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var mapLayer: AtlasStatsMapLayer = .mastery
@@ -167,6 +169,7 @@ struct ProgressTabView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     territoryCard
+                    frontierStatsCard
                     personalRecordsCard
                     if !activityFootprint.isEmpty {
                         activityFootprintCard
@@ -187,7 +190,8 @@ struct ProgressTabView: View {
                 AtlasExplorerMapScreen(
                     tilesBySize: tilesBySize,
                     currentGridSize: store.tileSize.rawValue,
-                    layer: $mapLayer
+                    layer: $mapLayer,
+                    frontierChargedTileIDs: Set(store.frontierState.chargedTileIDs)
                 )
             }
         }
@@ -248,6 +252,49 @@ struct ProgressTabView: View {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // MARK: - Frontier
+
+    private var frontierStatsCard: some View {
+        let state = store.frontierState
+        return StatSectionCard {
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Frontier")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "flag.2.crossed.fill")
+                        .foregroundStyle(AtlasTheme.gold.opacity(0.6))
+                }
+
+                HStack(spacing: 0) {
+                    StatKPI(value: "\(state.weeklyScore)", caption: "This week", accent: AtlasTheme.gold)
+                    StatKPI(value: "\(state.completedOfferIDs.count)", caption: "Completed")
+                    StatKPI(value: "\(max(state.bestWeekScore, state.weeklyScore))", caption: "Best week")
+                }
+
+                if !state.weekKey.isEmpty {
+                    NerdStat(label: "Week", value: state.weekKey, icon: "calendar")
+                }
+                NerdStat(
+                    label: "Lifetime expeditions",
+                    value: "\(state.lifetimeCompletedExpeditions)",
+                    icon: "map.fill"
+                )
+
+                Button {
+                    controller.showMatchingFrontierLeaderboard()
+                } label: {
+                    Label("Leaderboard · \(store.tileSize.label) grid", systemImage: "trophy.fill")
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(AtlasTheme.blue)
+                .accessibilityIdentifier("progressFrontierLeaderboard")
             }
         }
     }
@@ -400,6 +447,7 @@ struct ProgressTabView: View {
                         tilesBySize: tilesBySize,
                         currentGridSize: store.tileSize.rawValue,
                         layer: $mapLayer,
+                        frontierChargedTileIDs: Set(store.frontierState.chargedTileIDs),
                         interactive: true,
                         height: 220
                     )
