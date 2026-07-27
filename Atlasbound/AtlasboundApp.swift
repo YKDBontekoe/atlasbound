@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct AtlasboundApp: App {
     @StateObject private var store = TileStore()
+    @StateObject private var activityHistory = ActivityHistoryStore()
     @StateObject private var controllerHolder = ControllerHolder()
     @StateObject private var geoGuessrHolder = GeoGuessrHolder()
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
@@ -15,6 +16,7 @@ struct AtlasboundApp: App {
                     RootTabView(
                         controller: controller,
                         store: store,
+                        activityHistory: activityHistory,
                         geoGuessrController: geoController
                     )
                 } else {
@@ -25,7 +27,7 @@ struct AtlasboundApp: App {
                 AppearancePreference(rawValue: appearanceRaw)?.preferredColorScheme
             )
             .onAppear {
-                controllerHolder.bootstrap(store: store)
+                controllerHolder.bootstrap(store: store, activityHistory: activityHistory)
                 geoGuessrHolder.bootstrap()
             }
         }
@@ -36,9 +38,9 @@ struct AtlasboundApp: App {
 final class ControllerHolder: ObservableObject {
     @Published var controller: WorldController?
 
-    func bootstrap(store: TileStore) {
+    func bootstrap(store: TileStore, activityHistory: ActivityHistoryStore) {
         guard controller == nil else { return }
-        controller = WorldController(store: store)
+        controller = WorldController(store: store, activityHistory: activityHistory)
     }
 }
 

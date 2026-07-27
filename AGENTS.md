@@ -11,7 +11,7 @@ Guidance for AI agents and contributors working in this repo.
 | Platform | iOS 17+, Xcode 16+ |
 | Bundle ID | `com.atlasbound.app` |
 | Scheme | `Atlasbound` |
-| Persistence | `Documents/atlasbound-world.json` + `atlasbound-geoguessr.json` + UserDefaults tile size |
+| Persistence | `Documents/atlasbound-world.json` + `atlasbound-geoguessr.json` + `atlasbound-activities.json` + UserDefaults tile size |
 | Distribution | Unsigned IPA → GitHub Releases + Pages AltStore source |
 
 ## Read first
@@ -44,14 +44,16 @@ Atlasbound/
     ActivityRecorder.swift     # CLLocation filtering
     TileEngine.swift           # Lat/lon → axial hex
     ProgressionEngine.swift    # Discovery / familiarity XP
+    StatsEngine.swift          # Territory area, footprints, explorer metrics
     GeoGuessrController.swift  # GeoGuessr game orchestration
     GeoGuessrScoring.swift     # Distance + score math (Sendable)
     LookAroundLocationPool.swift # Target location generation (Sendable)
     GameCenterManager.swift    # GameKit auth + leaderboards
   Persistence/                 # JSON save + Codable records
     GeoGuessrStore.swift       # GeoGuessr game history (JSON)
+    ActivityHistoryStore.swift # Activity session history + per-type records
   Models/                      # WorldTile, activity types, GeoGuessrModels
-  Map/                         # DiscoveryMapView, GuessMapView (MapKit)
+  Map/                         # DiscoveryMapView, AtlasStatsMapView, GuessMapView (MapKit)
   Views/                       # MainMapScreen, summary, tabs, GeoGuessr views
   Theme/                       # AtlasTheme
 AtlasboundTests/               # Unit + chrome snapshot tests

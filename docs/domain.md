@@ -51,3 +51,15 @@ Players pick an activity before recording (map idle sheet, Activity tab, or Sett
 ## Multi-size progress
 
 `TileStore` keeps `allTilesBySize` and `progressBySize`. Changing size mid-record is blocked. Switching size loads another grid. Clearing progress clears only the **current** size.
+
+## Activity history & territory stats
+
+Finished sessions are persisted in `Documents/atlasbound-activities.json` (`ActivityHistoryStore`): distance, duration, activity type, and rolling per-activity bests/totals (longest session distance, lifetime km, session counts).
+
+**Unlocked area** is derived at runtime — never stored. Per hex tile (flat-to-flat width `W` meters):
+
+```
+areaPerTile = (√3 / 2) × W²   // square meters
+```
+
+`StatsEngine.totalUnlockedArea` sums discovered tile counts across all three grids (60 / 80 / 100 m). The Progress tab ("Atlas Stats") shows km² totals, personal records per activity, activity footprint from tile stamps, and a layered exploration map.

@@ -215,4 +215,38 @@ enum StatsFormat {
         if pct < 1 && part > 0 { return "<1%" }
         return String(format: "%.0f%%", pct)
     }
+
+    static func areaSquareKilometers(_ squareMeters: Double) -> String {
+        let km2 = squareMeters / 1_000_000
+        if km2 < 0.01 {
+            return String(format: "%.0f m²", squareMeters)
+        }
+        if km2 < 1 {
+            return String(format: "%.2f km²", km2)
+        }
+        return String(format: "%.1f km²", km2)
+    }
+
+    /// Playful comparison for unlocked territory.
+    static func areaComparison(_ squareKilometers: Double) -> String? {
+        guard squareKilometers > 0.001 else { return nil }
+        let footballPitchKm2 = 0.00714
+        let pitches = Int((squareKilometers / footballPitchKm2).rounded())
+        if pitches >= 2 {
+            return "≈ \(pitches) football pitches"
+        }
+        let cityBlockKm2 = 0.01
+        if squareKilometers >= cityBlockKm2 * 0.5 {
+            return "≈ \(max(1, Int((squareKilometers / cityBlockKm2).rounded()))) city blocks"
+        }
+        return nil
+    }
+
+    static func shortDate(_ date: Date?) -> String {
+        guard let date else { return "—" }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
+    }
 }

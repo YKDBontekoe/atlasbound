@@ -42,6 +42,18 @@ final class TileStore: ObservableObject {
             .sorted { ($0.firstVisitedAt ?? .distantPast) < ($1.firstVisitedAt ?? .distantPast) }
     }
 
+    /// All discovered tiles grouped by grid size (60 / 80 / 100 m).
+    var allDiscoveredTilesBySize: [Int: [WorldTile]] {
+        var result: [Int: [WorldTile]] = [:]
+        for (size, map) in allTilesBySize {
+            let discovered = map.values.filter(\.isDiscovered)
+            if !discovered.isEmpty {
+                result[size] = Array(discovered)
+            }
+        }
+        return result
+    }
+
     init(fileURL: URL? = nil) {
         if let fileURL {
             self.fileURL = fileURL
