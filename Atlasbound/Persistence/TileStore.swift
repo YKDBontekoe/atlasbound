@@ -212,6 +212,7 @@ final class TileStore: ObservableObject {
     // MARK: - Disk
 
     private func loadFromDisk() {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
         guard let save = JSONFileStore.load(WorldSaveFile.self, from: fileURL) else {
             allTilesBySize = [:]
             progressBySize = [:]

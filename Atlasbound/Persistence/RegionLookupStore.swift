@@ -99,6 +99,7 @@ final class RegionLookupStore: ObservableObject {
     }
 
     private func loadFromDisk() {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
         guard let save = JSONFileStore.load(SaveFile.self, from: fileURL) else {
             cells = [:]
             return
