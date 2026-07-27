@@ -21,6 +21,7 @@ struct LookAroundGuessView: View {
     @State private var secondsRemaining: Int
     @State private var timerActive = false
     @State private var showQuitConfirmation = false
+    @State private var useInteractiveFallback = false
 
     init(
         target: CLLocationCoordinate2D,
@@ -52,8 +53,19 @@ struct LookAroundGuessView: View {
             } else if sceneUnavailable {
                 unavailableView
             } else if let scene = lookAroundScene {
-                PinpointLookAroundView(scene: scene)
-                .ignoresSafeArea()
+                if useInteractiveFallback {
+                    PinpointLookAroundView(scene: scene)
+                        .ignoresSafeArea()
+                } else {
+                    LookAroundSnapshotViewer(scene: scene) {
+                        useInteractiveFallback = true
+                    }
+                    .ignoresSafeArea()
+                }
+
+                if useInteractiveFallback {
+                    spoilerGuardOverlay
+                }
             }
 
             VStack(spacing: 0) {
@@ -201,6 +213,25 @@ struct LookAroundGuessView: View {
         .background(Color(.systemBackground))
     }
 
+    private var spoilerGuardOverlay: some View {
+        VStack {
+            Spacer()
+            HStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .background {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.black.opacity(0.55))
+                    }
+                    .frame(width: 150, height: 88)
+                    .padding(.leading, 8)
+                Spacer()
+            }
+            .padding(.bottom, 44)
+        }
+        .allowsHitTesting(false)
+    }
+
     private var bottomControls: some View {
         VStack(spacing: 9) {
             HStack(spacing: 7) {
@@ -330,6 +361,7 @@ struct LookAroundGuessView: View {
         isLoadingScene = true
         sceneUnavailable = false
         lookAroundScene = nil
+        useInteractiveFallback = false
         showGuessMap = false
         guessCoordinate = nil
         secondsRemaining = roundSeconds
