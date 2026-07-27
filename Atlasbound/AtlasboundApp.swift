@@ -4,6 +4,7 @@ import SwiftUI
 struct AtlasboundApp: App {
     @StateObject private var store = TileStore()
     @StateObject private var activityHistory = ActivityHistoryStore()
+    @StateObject private var regionLookup = RegionLookupStore()
     @StateObject private var controllerHolder = ControllerHolder()
     @StateObject private var pinpointHolder = PinpointHolder()
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
@@ -17,6 +18,7 @@ struct AtlasboundApp: App {
                         controller: controller,
                         store: store,
                         activityHistory: activityHistory,
+                        regionLookup: regionLookup,
                         pinpointController: pinpointController
                     )
                 } else {
@@ -27,7 +29,11 @@ struct AtlasboundApp: App {
                 AppearancePreference(rawValue: appearanceRaw)?.preferredColorScheme
             )
             .onAppear {
-                controllerHolder.bootstrap(store: store, activityHistory: activityHistory)
+                controllerHolder.bootstrap(
+                    store: store,
+                    activityHistory: activityHistory,
+                    regionLookup: regionLookup
+                )
                 pinpointHolder.bootstrap(tileStore: store)
             }
         }
@@ -39,7 +45,11 @@ final class ControllerHolder: ObservableObject {
     @Published var controller: WorldController?
     private var gameCenterManager: GameCenterManager?
 
-    func bootstrap(store: TileStore, activityHistory: ActivityHistoryStore) {
+    func bootstrap(
+        store: TileStore,
+        activityHistory: ActivityHistoryStore,
+        regionLookup: RegionLookupStore
+    ) {
         guard controller == nil else { return }
         let gcManager = gameCenterManager ?? GameCenterManager()
         gameCenterManager = gcManager
@@ -47,6 +57,7 @@ final class ControllerHolder: ObservableObject {
         controller = WorldController(
             store: store,
             activityHistory: activityHistory,
+            regionLookup: regionLookup,
             gameCenterManager: gcManager
         )
     }

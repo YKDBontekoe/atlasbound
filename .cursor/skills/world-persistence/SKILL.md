@@ -13,8 +13,9 @@ description: >-
 | What | Where |
 |------|--------|
 | World JSON | `Documents/atlasbound-world.json` |
+| Regions JSON | `Documents/atlasbound-regions.json` (place labels only) |
 | Tile size pref | UserDefaults `atlasbound.tileSizeMeters` |
-| Types | `Persistence/PersistedModels.swift`, `TileStore.swift` |
+| Types | `Persistence/PersistedModels.swift`, `TileStore.swift`, `RegionLookupStore.swift` |
 
 ## Save shape (`WorldSaveFile`)
 

@@ -43,7 +43,8 @@ AtlasboundApp
 - Primary chrome: `MainMapScreen` + settings sheet.
 - Map: `DiscoveryMapView` (MapKit polygons / polyline / user annotation).
 - Discovered markers are capped (~80 highest-ranked) for performance.
-- Stubs: `regionName = "Dordrecht"` + discovered tile count in the header — not real geo regions / % coverage.
+- Map header uses procedural hex **sectors** (`HexSectorEngine`), not political geography.
+- Atlas Stats **Places visited** uses reverse-geocoded country / province / city labels from a coarse-cell cache (`RegionLookupStore`).
 
 ## Pinpoint mode
 
@@ -65,6 +66,5 @@ Persistence: `Documents/atlasbound-pinpoint.json`. Leaderboard ID: `com.atlasbou
 
 ## Extension points
 
-- Region Engine (replace stub `regionName` / tile-count header with real geo regions)
-- Background Always + passive drive path (`enableBackgroundRecordingIfAuthorized` wired via Settings toggle)
+- Region Engine (map-header sector names → richer geo coverage UI; stats already use reverse-geocode places)
 - CloudKit integration
