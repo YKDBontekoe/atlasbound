@@ -13,16 +13,6 @@ final class PinpointController: ObservableObject {
         case playing
         case roundResult
         case gameOver
-
-        static func == (lhs: GamePhase, rhs: GamePhase) -> Bool {
-            switch (lhs, rhs) {
-            case (.lobby, .lobby), (.preparing, .preparing), (.playing, .playing),
-                 (.roundResult, .roundResult), (.gameOver, .gameOver):
-                return true
-            default:
-                return false
-            }
-        }
     }
 
     @Published private(set) var phase: GamePhase = .lobby
@@ -187,5 +177,3 @@ final class PinpointController: ObservableObject {
         preparationError = nil
     }
 }
-
-import MapKit

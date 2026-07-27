@@ -162,11 +162,38 @@ struct NerdStat: View {
 // MARK: - Formatters
 
 enum StatsFormat {
+    private static let shortDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
+    private static let sessionTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
     static func distance(_ meters: Double) -> String {
+        "\(distanceValue(meters)) \(distanceUnit(meters))"
+    }
+
+    static func distanceValue(_ meters: Double) -> String {
         if meters >= 1000 {
-            return String(format: "%.2f km", meters / 1000)
+            return String(format: "%.2f", meters / 1000)
         }
-        return String(format: "%.0f m", meters)
+        return String(format: "%.0f", meters)
+    }
+
+    static func distanceUnit(_ meters: Double) -> String {
+        meters >= 1000 ? "km" : "m"
+    }
+
+    /// Compact Pinpoint-style distance (1 decimal km).
+    static func distanceCompact(_ meters: Double) -> String {
+        PinpointScoring.formatDistance(meters)
     }
 
     static func duration(_ interval: TimeInterval) -> String {
@@ -177,6 +204,15 @@ enum StatsFormat {
             return String(format: "%dh %02dm", minutes / 60, minutes % 60)
         }
         return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    /// Live session clock `HH:MM:SS`.
+    static func clockDuration(_ interval: TimeInterval) -> String {
+        let total = Int(interval)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let seconds = total % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
     static func pace(_ meters: Double, duration: TimeInterval) -> String? {
@@ -244,9 +280,10 @@ enum StatsFormat {
 
     static func shortDate(_ date: Date?) -> String {
         guard let date else { return "—" }
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+        return shortDateFormatter.string(from: date)
+    }
+
+    static func sessionTimestamp(_ date: Date) -> String {
+        sessionTimestampFormatter.string(from: date)
     }
 }

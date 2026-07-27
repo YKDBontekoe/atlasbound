@@ -113,7 +113,17 @@ struct StatsEngine: Sendable {
 
     // MARK: - Explorer metrics
 
-    static func boundingRegion(tileCenters: [CLLocationCoordinate2D]) -> MKCoordinateRegion? {
+    enum BoundingPadding: Sendable {
+        /// Scale span by factor with a minimum delta (atlas stats map framing).
+        case multiplicative(factor: Double, minDelta: Double)
+        /// Add absolute padding with a minimum delta (Home Turf guess map).
+        case additive(padding: Double, minDelta: Double)
+    }
+
+    static func boundingRegion(
+        tileCenters: [CLLocationCoordinate2D],
+        padding: BoundingPadding = .multiplicative(factor: 1.35, minDelta: 0.002)
+    ) -> MKCoordinateRegion? {
         guard let first = tileCenters.first else { return nil }
         var minLat = first.latitude
         var maxLat = first.latitude
@@ -127,14 +137,23 @@ struct StatsEngine: Sendable {
             maxLon = max(maxLon, center.longitude)
         }
 
-        let latDelta = max(0.002, (maxLat - minLat) * 1.35)
-        let lonDelta = max(0.002, (maxLon - minLon) * 1.35)
+        let latSpan: Double
+        let lonSpan: Double
+        switch padding {
+        case .multiplicative(let factor, let minDelta):
+            latSpan = max(minDelta, (maxLat - minLat) * factor)
+            lonSpan = max(minDelta, (maxLon - minLon) * factor)
+        case .additive(let pad, let minDelta):
+            latSpan = max(minDelta, maxLat - minLat + pad)
+            lonSpan = max(minDelta, maxLon - minLon + pad)
+        }
+
         return MKCoordinateRegion(
             center: CLLocationCoordinate2D(
                 latitude: (minLat + maxLat) / 2,
                 longitude: (minLon + maxLon) / 2
             ),
-            span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
+            span: MKCoordinateSpan(latitudeDelta: latSpan, longitudeDelta: lonSpan)
         )
     }
 

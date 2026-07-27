@@ -57,6 +57,11 @@ enum ExpeditionDifficulty: String, Codable, Sendable, CaseIterable {
     }
 }
 
+enum FrontierConstants {
+    /// Cap on per-tile weekly charge used for map intensity.
+    static let maxWeeklyCharge = 3
+}
+
 /// A weekly frontier expedition offer — IDs and sector refs only, no geometry.
 struct ExpeditionOffer: Codable, Hashable, Sendable, Identifiable {
     let id: String

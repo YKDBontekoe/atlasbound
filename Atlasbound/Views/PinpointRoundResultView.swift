@@ -118,9 +118,6 @@ struct PinpointRoundResultView: View {
     }
 
     private var scoreColor: Color {
-        if result.score >= 4500 { return AtlasTheme.gold }
-        if result.score >= 3000 { return AtlasTheme.teal }
-        if result.score >= 1000 { return AtlasTheme.blue }
-        return AtlasTheme.finishRed
+        PinpointScoreStyle.color(for: result.score)
     }
 }

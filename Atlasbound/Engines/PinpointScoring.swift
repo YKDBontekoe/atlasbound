@@ -18,20 +18,17 @@ struct PinpointScoring: Sendable {
 
     /// Flat-top hex area from flat-to-flat width in meters.
     static func hexAreaSquareMeters(tileSizeMeters: Double) -> Double {
-        (sqrt(3.0) / 2.0) * tileSizeMeters * tileSizeMeters
+        StatsEngine.areaSquareMeters(tileCount: 1, flatToFlatMeters: tileSizeMeters)
     }
 
     static func unlockedAreaM2(discoveredCount: Int, tileSizeMeters: Double) -> Double {
-        Double(discoveredCount) * hexAreaSquareMeters(tileSizeMeters: tileSizeMeters)
+        StatsEngine.areaSquareMeters(tileCount: discoveredCount, flatToFlatMeters: tileSizeMeters)
     }
 
     static func formatArea(_ squareMeters: Double) -> String {
         let km2 = squareMeters / 1_000_000
         if km2 >= 10 {
             return String(format: "%.1f km²", km2)
-        }
-        if km2 >= 1 {
-            return String(format: "%.2f km²", km2)
         }
         return String(format: "%.2f km²", km2)
     }
@@ -67,7 +64,7 @@ struct PinpointScoring: Sendable {
         return max(0, Int(round(raw)))
     }
 
-    /// Format distance for display.
+    /// Format distance for display (1 decimal km).
     static func formatDistance(_ meters: Double) -> String {
         if meters >= 1000 {
             return String(format: "%.1f km", meters / 1000)

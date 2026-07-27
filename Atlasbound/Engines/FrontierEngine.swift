@@ -33,10 +33,14 @@ struct FrontierEngine: Sendable {
         guard let start = calendar.date(from: components) else { return weekKey }
         let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
 
+        return "\(weekRangeFormatter.string(from: start)) – \(weekRangeFormatter.string(from: end))"
+    }
+
+    private static let weekRangeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.setLocalizedDateFormatFromTemplate("MMM d")
-        return "\(formatter.string(from: start)) – \(formatter.string(from: end))"
-    }
+        return formatter
+    }()
 
     // MARK: - Territory
 
@@ -100,14 +104,6 @@ struct FrontierEngine: Sendable {
             }
         }
         return frontier
-    }
-
-    func isConnectedToTerritory(
-        tile: TileCoordinate,
-        territory: Set<TileCoordinate>,
-        discovered: Set<TileCoordinate>
-    ) -> Bool {
-        tilesConnectedToTerritory(territory: territory, discovered: discovered).contains(tile)
     }
 
     /// Discovered tiles reachable from the territory anchor through contiguous discovered hexes.

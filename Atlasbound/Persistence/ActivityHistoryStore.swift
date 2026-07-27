@@ -13,28 +13,11 @@ final class ActivityHistoryStore: ObservableObject {
     @Published private(set) var sessionCountByActivity: [ActivityType: Int] = [:]
 
     private let fileURL: URL
-    private let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return encoder
-    }()
-    private let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
 
     private static let fileName = "atlasbound-activities.json"
 
     init(fileURL: URL? = nil) {
-        if let fileURL {
-            self.fileURL = fileURL
-        } else {
-            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-                ?? FileManager.default.temporaryDirectory
-            self.fileURL = docs.appendingPathComponent(Self.fileName)
-        }
+        self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: Self.fileName)
         loadFromDisk()
     }
 
@@ -78,21 +61,19 @@ final class ActivityHistoryStore: ObservableObject {
 
     private func loadFromDisk() {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        do {
-            let data = try Data(contentsOf: fileURL)
-            let save = try decoder.decode(SaveFile.self, from: data)
-            sessions = save.sessions
-            longestDistanceByActivity = Self.decodeActivityMap(save.longestDistanceByActivity)
-            totalDistanceByActivity = Self.decodeActivityMap(save.totalDistanceByActivity)
-            totalDurationByActivity = Self.decodeActivityMap(save.totalDurationByActivity)
-            sessionCountByActivity = Self.decodeActivityCountMap(save.sessionCountByActivity)
-        } catch {
+        guard let save = JSONFileStore.load(SaveFile.self, from: fileURL) else {
             sessions = []
             longestDistanceByActivity = [:]
             totalDistanceByActivity = [:]
             totalDurationByActivity = [:]
             sessionCountByActivity = [:]
+            return
         }
+        sessions = save.sessions
+        longestDistanceByActivity = Self.decodeActivityMap(save.longestDistanceByActivity)
+        totalDistanceByActivity = Self.decodeActivityMap(save.totalDistanceByActivity)
+        totalDurationByActivity = Self.decodeActivityMap(save.totalDurationByActivity)
+        sessionCountByActivity = Self.decodeActivityMap(save.sessionCountByActivity)
     }
 
     private func persistToDisk() {
@@ -101,14 +82,9 @@ final class ActivityHistoryStore: ObservableObject {
             longestDistanceByActivity: Self.encodeActivityMap(longestDistanceByActivity),
             totalDistanceByActivity: Self.encodeActivityMap(totalDistanceByActivity),
             totalDurationByActivity: Self.encodeActivityMap(totalDurationByActivity),
-            sessionCountByActivity: Self.encodeActivityCountMap(sessionCountByActivity)
+            sessionCountByActivity: Self.encodeActivityMap(sessionCountByActivity)
         )
-        do {
-            let data = try encoder.encode(save)
-            try data.write(to: fileURL, options: [.atomic])
-        } catch {
-            // Keep in-memory state on write failure.
-        }
+        JSONFileStore.save(save, to: fileURL)
     }
 
     private static func encodeActivityMap<T>(_ map: [ActivityType: T]) -> [String: T] {
@@ -123,13 +99,5 @@ final class ActivityHistoryStore: ObservableObject {
             }
         }
         return result
-    }
-
-    private static func encodeActivityCountMap(_ map: [ActivityType: Int]) -> [String: Int] {
-        encodeActivityMap(map)
-    }
-
-    private static func decodeActivityCountMap(_ map: [String: Int]) -> [ActivityType: Int] {
-        decodeActivityMap(map)
     }
 }

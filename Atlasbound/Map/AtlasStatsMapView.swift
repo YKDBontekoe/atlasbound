@@ -56,7 +56,6 @@ struct AtlasStatsMapView: View {
     @State private var position: MapCameraPosition = .automatic
     @State private var visibleRegion: MKCoordinateRegion?
     @State private var cachedOverlays: [AtlasStatsTileOverlay] = []
-    @State private var didFitCamera = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -85,7 +84,7 @@ struct AtlasStatsMapView: View {
                 refreshOverlays()
             }
             .onAppear {
-                fitCameraIfNeeded()
+                fitCamera()
                 refreshOverlays()
             }
             .onChange(of: layer) { _, _ in
@@ -124,7 +123,7 @@ struct AtlasStatsMapView: View {
         }
     }
 
-    func fitCameraIfNeeded() {
+    private func fitCamera() {
         let allTiles = StatsEngine.allDiscoveredTiles(from: tilesBySize)
         guard !allTiles.isEmpty else { return }
 
@@ -135,12 +134,6 @@ struct AtlasStatsMapView: View {
         guard let region = StatsEngine.boundingRegion(tileCenters: centers) else { return }
         position = .region(region)
         visibleRegion = region
-        didFitCamera = true
-    }
-
-    func fitCamera() {
-        didFitCamera = false
-        fitCameraIfNeeded()
     }
 
     private func refreshOverlays() {
@@ -160,11 +153,14 @@ struct AtlasStatsMapView: View {
         }
     }
 
-    private func buildMasteryOverlays() -> [AtlasStatsTileOverlay] {
+    private func cullCurrentGrid() -> [WorldTile] {
         let tiles = tilesBySize[currentGridSize, default: []].filter(\.isDiscovered)
         let engine = TileEngine(tileSizeMeters: Double(currentGridSize))
-        let visible = MapOverlayCuller.cullTiles(tiles, engine: engine, visibleRegion: visibleRegion)
-        return visible.map { tile in
+        return MapOverlayCuller.cullTiles(tiles, engine: engine, visibleRegion: visibleRegion)
+    }
+
+    private func buildMasteryOverlays() -> [AtlasStatsTileOverlay] {
+        cullCurrentGrid().map { tile in
             AtlasStatsTileOverlay(
                 id: tile.id,
                 coordinate: tile.coordinate,
@@ -177,10 +173,7 @@ struct AtlasStatsMapView: View {
     }
 
     private func buildActivityOverlays() -> [AtlasStatsTileOverlay] {
-        let tiles = tilesBySize[currentGridSize, default: []].filter(\.isDiscovered)
-        let engine = TileEngine(tileSizeMeters: Double(currentGridSize))
-        let visible = MapOverlayCuller.cullTiles(tiles, engine: engine, visibleRegion: visibleRegion)
-        return visible.map { tile in
+        cullCurrentGrid().map { tile in
             let activity = StatsEngine.dominantActivity(for: tile) ?? .unknown
             let color = activity.statsMapColor
             return AtlasStatsTileOverlay(
@@ -195,9 +188,7 @@ struct AtlasStatsMapView: View {
     }
 
     private func buildDiscoveryAgeOverlays() -> [AtlasStatsTileOverlay] {
-        let tiles = tilesBySize[currentGridSize, default: []].filter(\.isDiscovered)
-        let engine = TileEngine(tileSizeMeters: Double(currentGridSize))
-        let visible = MapOverlayCuller.cullTiles(tiles, engine: engine, visibleRegion: visibleRegion)
+        let visible = cullCurrentGrid()
         let dates = visible.compactMap(\.firstVisitedAt)
         let minDate = dates.min() ?? .now
         let maxDate = dates.max() ?? .now
@@ -229,9 +220,7 @@ struct AtlasStatsMapView: View {
     }
 
     private func buildVisitHeatOverlays() -> [AtlasStatsTileOverlay] {
-        let tiles = tilesBySize[currentGridSize, default: []].filter(\.isDiscovered)
-        let engine = TileEngine(tileSizeMeters: Double(currentGridSize))
-        let visible = MapOverlayCuller.cullTiles(tiles, engine: engine, visibleRegion: visibleRegion)
+        let visible = cullCurrentGrid()
         let maxVisits = max(visible.map(\.visitCount).max() ?? 1, 1)
 
         return visible.map { tile in
@@ -248,10 +237,7 @@ struct AtlasStatsMapView: View {
     }
 
     private func buildFrontierOverlays() -> [AtlasStatsTileOverlay] {
-        let tiles = tilesBySize[currentGridSize, default: []].filter(\.isDiscovered)
-        let engine = TileEngine(tileSizeMeters: Double(currentGridSize))
-        let visible = MapOverlayCuller.cullTiles(tiles, engine: engine, visibleRegion: visibleRegion)
-        return visible.map { tile in
+        cullCurrentGrid().map { tile in
             let charge = tile.weeklyCharge
             let isCharged = frontierChargedTileIDs.contains(tile.id) || charge > 0
             let intensity = isCharged ? min(1, 0.25 + Double(max(charge, 1)) * 0.22) : 0.12

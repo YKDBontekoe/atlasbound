@@ -6,6 +6,14 @@ struct ProgressionEngine: Sendable {
 
     /// Base familiarity XP before diminishing returns.
     static let baseFamiliarityXP: Int = 25
+    static let familiarityXPFloor: Int = 5
+    /// Diminishing revisit awards after discovery (index 0 = first revisit).
+    static let familiarityXPTable: [Int] = [baseFamiliarityXP, 20, 16, 12, 10]
+
+    static let exploredMasteryXP: Int = 150
+    static let surveyedMasteryXP: Int = 200
+    static let masteredMasteryXP: Int = 300
+    static let legendaryMasteryXP: Int = 500
 
     func processVisit(
         tile: inout WorldTile,
@@ -85,27 +93,27 @@ struct ProgressionEngine: Sendable {
         return VisitResult(kind: .familiarity, xpAwarded: xp, tileID: tile.id)
     }
 
-    /// Diminishing familiarity: 25, 20, 16, 12, 10, then floor of 5.
+    /// Diminishing familiarity from `familiarityXPTable`, then `familiarityXPFloor`.
     /// `existingVisits` is the visit count before this revisit (at least 1 after discovery).
     func familiarityXP(forVisitCount existingVisits: Int) -> Int {
         let revisitIndex = max(existingVisits, 1)
-        let table = [25, 20, 16, 12, 10]
+        let table = Self.familiarityXPTable
         if revisitIndex - 1 < table.count {
             return table[revisitIndex - 1]
         }
-        return 5
+        return Self.familiarityXPFloor
     }
 
     private func advanceStateIfNeeded(_ tile: inout WorldTile) {
         // Lightweight thresholds — skill tree can layer on top.
         switch tile.masteryXP {
-        case 500...:
+        case Self.legendaryMasteryXP...:
             if tile.state.rawValue < TileState.legendary.rawValue { tile.state = .legendary }
-        case 300..<500:
+        case Self.masteredMasteryXP..<Self.legendaryMasteryXP:
             if tile.state.rawValue < TileState.mastered.rawValue { tile.state = .mastered }
-        case 200..<300:
+        case Self.surveyedMasteryXP..<Self.masteredMasteryXP:
             if tile.state.rawValue < TileState.surveyed.rawValue { tile.state = .surveyed }
-        case 150..<200:
+        case Self.exploredMasteryXP..<Self.surveyedMasteryXP:
             if tile.state.rawValue < TileState.explored.rawValue { tile.state = .explored }
         default:
             break

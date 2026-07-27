@@ -5,6 +5,7 @@ struct AtlasboundApp: App {
     @StateObject private var store = TileStore()
     @StateObject private var activityHistory = ActivityHistoryStore()
     @StateObject private var regionLookup = RegionLookupStore()
+    @StateObject private var gameCenterManager = GameCenterManager()
     @StateObject private var controllerHolder = ControllerHolder()
     @StateObject private var pinpointHolder = PinpointHolder()
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
@@ -29,12 +30,14 @@ struct AtlasboundApp: App {
                 AppearancePreference(rawValue: appearanceRaw)?.preferredColorScheme
             )
             .onAppear {
+                gameCenterManager.authenticate()
                 controllerHolder.bootstrap(
                     store: store,
                     activityHistory: activityHistory,
-                    regionLookup: regionLookup
+                    regionLookup: regionLookup,
+                    gameCenterManager: gameCenterManager
                 )
-                pinpointHolder.bootstrap(tileStore: store)
+                pinpointHolder.bootstrap(tileStore: store, gameCenterManager: gameCenterManager)
             }
         }
     }
@@ -43,22 +46,19 @@ struct AtlasboundApp: App {
 @MainActor
 final class ControllerHolder: ObservableObject {
     @Published var controller: WorldController?
-    private var gameCenterManager: GameCenterManager?
 
     func bootstrap(
         store: TileStore,
         activityHistory: ActivityHistoryStore,
-        regionLookup: RegionLookupStore
+        regionLookup: RegionLookupStore,
+        gameCenterManager: GameCenterManager
     ) {
         guard controller == nil else { return }
-        let gcManager = gameCenterManager ?? GameCenterManager()
-        gameCenterManager = gcManager
-        gcManager.authenticate()
         controller = WorldController(
             store: store,
             activityHistory: activityHistory,
             regionLookup: regionLookup,
-            gameCenterManager: gcManager
+            gameCenterManager: gameCenterManager
         )
     }
 }
@@ -67,11 +67,9 @@ final class ControllerHolder: ObservableObject {
 final class PinpointHolder: ObservableObject {
     @Published var controller: PinpointController?
 
-    func bootstrap(tileStore: TileStore) {
+    func bootstrap(tileStore: TileStore, gameCenterManager: GameCenterManager) {
         guard controller == nil else { return }
         let store = PinpointStore()
-        let gcManager = GameCenterManager()
-        gcManager.authenticate()
-        controller = PinpointController(store: store, tileStore: tileStore, gameCenterManager: gcManager)
+        controller = PinpointController(store: store, tileStore: tileStore, gameCenterManager: gameCenterManager)
     }
 }
