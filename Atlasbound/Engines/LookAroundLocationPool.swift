@@ -26,7 +26,7 @@ struct LookAroundLocationPool: Sendable {
     static func generateWorldwideTargets(count: Int = PinpointConstants.roundsPerGame) async throws -> [CLLocationCoordinate2D] {
         var targets: [CLLocationCoordinate2D] = []
         for _ in 0..<count {
-            guard let coordinate = await findWorldwideCoordinate(maxAttempts: 20) else {
+            guard let coordinate = await findWorldwideCoordinate(maxAttempts: 40) else {
                 throw GenerationError.worldwideGenerationFailed
             }
             targets.append(coordinate)
@@ -98,26 +98,34 @@ struct LookAroundLocationPool: Sendable {
     private static func findWorldwideCoordinate(maxAttempts: Int) async -> CLLocationCoordinate2D? {
         for _ in 0..<maxAttempts {
             let probe = randomLandCoordinate()
-            guard let anchor = await urbanAnchor(near: probe) else { continue }
-            if let coordinate = await findLookAroundNear(anchor) {
+
+            if let coordinate = await findLookAroundFromMappedPlaces(center: probe, radius: 25_000) {
+                return coordinate
+            }
+
+            guard let placemark = await reverseGeocodePlacemark(at: probe),
+                  isLikelyUrban(placemark),
+                  let anchor = placemark.location?.coordinate else {
+                continue
+            }
+
+            if let coordinate = await findLookAroundNear(anchor, placemark: placemark) {
                 return coordinate
             }
         }
         return nil
     }
 
-    /// Reverse-geocode a random probe and keep it only when it lands in a populated area.
-    private static func urbanAnchor(near coordinate: CLLocationCoordinate2D) async -> CLLocationCoordinate2D? {
-        guard let placemark = await reverseGeocodePlacemark(at: coordinate),
-              isLikelyUrban(placemark),
-              let anchor = placemark.location?.coordinate else {
-            return nil
+    /// Try mapped places first, then the anchor, then nearby street offsets.
+    private static func findLookAroundNear(
+        _ anchor: CLLocationCoordinate2D,
+        placemark: CLPlacemark? = nil
+    ) async -> CLLocationCoordinate2D? {
+        let mapItems = await nearbyMappedPlaces(anchor: anchor, placemark: placemark)
+        if let coordinate = await firstLookAroundMapItemMatch(in: mapItems) {
+            return coordinate
         }
-        return anchor
-    }
 
-    /// Try the anchor, nearby street offsets, then nearby mapped places.
-    private static func findLookAroundNear(_ anchor: CLLocationCoordinate2D) async -> CLLocationCoordinate2D? {
         if await hasLookAround(at: anchor) {
             return anchor
         }
@@ -126,32 +134,47 @@ struct LookAroundLocationPool: Sendable {
             return coordinate
         }
 
-        let mapItems = await nearbyMappedPlaces(anchor: anchor)
-        for item in mapItems {
-            if await hasLookAround(mapItem: item) {
-                return item.placemark.coordinate
-            }
-        }
-
         return nil
     }
 
-    private static func nearbyMappedPlaces(anchor: CLLocationCoordinate2D) async -> [MKMapItem] {
+    /// Search Apple Maps for POIs near a probe — avoids geocoder rate limits.
+    private static func findLookAroundFromMappedPlaces(
+        center: CLLocationCoordinate2D,
+        radius: CLLocationDistance
+    ) async -> CLLocationCoordinate2D? {
+        let poiRequest = MKLocalPointsOfInterestRequest(center: center, radius: radius)
+        guard let response = try? await MKLocalSearch(request: poiRequest).start(),
+              !response.mapItems.isEmpty else {
+            return nil
+        }
+        return await firstLookAroundMapItemMatch(in: response.mapItems)
+    }
+
+    private static func nearbyMappedPlaces(
+        anchor: CLLocationCoordinate2D,
+        placemark: CLPlacemark? = nil
+    ) async -> [MKMapItem] {
         var items: [MKMapItem] = []
 
-        let poiRequest = MKLocalPointsOfInterestRequest(center: anchor, radius: 2_000)
+        let poiRequest = MKLocalPointsOfInterestRequest(center: anchor, radius: 5_000)
         if let response = try? await MKLocalSearch(request: poiRequest).start() {
             items.append(contentsOf: response.mapItems)
         }
 
-        if let placemark = await reverseGeocodePlacemark(at: anchor),
-           let query = localitySearchQuery(from: placemark) {
+        let resolvedPlacemark: CLPlacemark?
+        if let placemark {
+            resolvedPlacemark = placemark
+        } else {
+            resolvedPlacemark = await reverseGeocodePlacemark(at: anchor)
+        }
+        if let resolvedPlacemark,
+           let query = localitySearchQuery(from: resolvedPlacemark) {
             let request = MKLocalSearch.Request()
             request.naturalLanguageQuery = query
             request.region = MKCoordinateRegion(
                 center: anchor,
-                latitudinalMeters: 5_000,
-                longitudinalMeters: 5_000
+                latitudinalMeters: 8_000,
+                longitudinalMeters: 8_000
             )
             request.resultTypes = [.address, .pointOfInterest]
             if let response = try? await MKLocalSearch(request: request).start() {
@@ -184,15 +207,7 @@ struct LookAroundLocationPool: Sendable {
     }
 
     private static func reverseGeocodePlacemark(at coordinate: CLLocationCoordinate2D) async -> CLPlacemark? {
-        let geocoder = CLGeocoder()
-        do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(
-                CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-            )
-            return placemarks.first
-        } catch {
-            return nil
-        }
+        await GeocodeLimiter.shared.reverseGeocode(at: coordinate)
     }
 
     private static func hasLookAround(at coordinate: CLLocationCoordinate2D) async -> Bool {
@@ -215,8 +230,36 @@ struct LookAroundLocationPool: Sendable {
         }
     }
 
+    private static func firstLookAroundMapItemMatch(in items: [MKMapItem]) async -> CLLocationCoordinate2D? {
+        let batchSize = 2
+        var index = 0
+        let candidates = items.shuffled()
+
+        while index < candidates.count {
+            let end = min(index + batchSize, candidates.count)
+            let batch = Array(candidates[index..<end])
+
+            if let match = await firstLookAroundMapItemMatchBatch(batch) {
+                return match
+            }
+
+            index = end
+        }
+
+        return nil
+    }
+
+    private static func firstLookAroundMapItemMatchBatch(_ items: [MKMapItem]) async -> CLLocationCoordinate2D? {
+        for item in items {
+            if await hasLookAround(mapItem: item) {
+                return item.placemark.coordinate
+            }
+        }
+        return nil
+    }
+
     private static func firstLookAroundMatch(in candidates: [CLLocationCoordinate2D]) async -> CLLocationCoordinate2D? {
-        let batchSize = 6
+        let batchSize = 2
         var index = 0
 
         while index < candidates.count {
@@ -234,20 +277,12 @@ struct LookAroundLocationPool: Sendable {
     }
 
     private static func firstLookAroundMatchBatch(_ candidates: [CLLocationCoordinate2D]) async -> CLLocationCoordinate2D? {
-        await withTaskGroup(of: CLLocationCoordinate2D?.self) { group in
-            for coordinate in candidates {
-                group.addTask {
-                    await hasLookAround(at: coordinate) ? coordinate : nil
-                }
+        for coordinate in candidates {
+            if await hasLookAround(at: coordinate) {
+                return coordinate
             }
-
-            for await result in group {
-                if let result {
-                    return result
-                }
-            }
-            return nil
         }
+        return nil
     }
 
     /// Land-biased random coordinate (avoids poles and open ocean more often than uniform sampling).
@@ -260,7 +295,7 @@ struct LookAroundLocationPool: Sendable {
 
     /// Small offsets (~0.5–2 km) around an urban anchor to hit nearby mapped streets.
     private static func nearbyProbeCoordinates(around anchor: CLLocationCoordinate2D) -> [CLLocationCoordinate2D] {
-        let deltas = [-0.015, -0.01, -0.005, 0.005, 0.01, 0.015]
+        let deltas = [-0.02, -0.015, -0.01, -0.005, 0.005, 0.01, 0.015, 0.02]
         var candidates: [CLLocationCoordinate2D] = []
 
         for deltaLat in deltas {
@@ -294,10 +329,39 @@ struct LookAroundLocationPool: Sendable {
             let key = String(format: "%.4f,%.4f", coordinate.latitude, coordinate.longitude)
             guard seen.insert(key).inserted else { continue }
             unique.append(item)
-            if unique.count >= 12 { break }
+            if unique.count >= 20 { break }
         }
 
         return unique
+    }
+}
+
+// MARK: - Geocode rate limiting
+
+/// CLGeocoder is rate-limited; serialize requests to avoid silent failures during Pinpoint prep.
+private actor GeocodeLimiter {
+    static let shared = GeocodeLimiter()
+
+    private var lastRequest = Date.distantPast
+    private let minimumInterval: TimeInterval = 0.15
+
+    func reverseGeocode(at coordinate: CLLocationCoordinate2D) async -> CLPlacemark? {
+        let elapsed = Date().timeIntervalSince(lastRequest)
+        if elapsed < minimumInterval {
+            let delay = minimumInterval - elapsed
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        }
+        lastRequest = Date()
+
+        let geocoder = CLGeocoder()
+        do {
+            let placemarks = try await geocoder.reverseGeocodeLocation(
+                CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            )
+            return placemarks.first
+        } catch {
+            return nil
+        }
     }
 }
 

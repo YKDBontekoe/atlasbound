@@ -1,4 +1,5 @@
 import GameKit
+import UIKit
 
 /// Handles Game Center authentication and leaderboard submission.
 @MainActor
@@ -14,15 +15,21 @@ final class GameCenterManager: ObservableObject {
     }
 
     func authenticate() {
+        authError = nil
         GKLocalPlayer.local.authenticateHandler = { [weak self] viewController, error in
             Task { @MainActor in
                 guard let self else { return }
-                if let error {
-                    self.authError = error.localizedDescription
-                    self.isAuthenticated = false
+                if let viewController {
+                    self.present(viewController)
                     return
                 }
-                if viewController != nil {
+                if let error {
+                    if Self.isExpectedUnauthenticatedError(error) {
+                        self.isAuthenticated = false
+                        return
+                    }
+                    self.authError = error.localizedDescription
+                    self.isAuthenticated = false
                     return
                 }
                 self.isAuthenticated = GKLocalPlayer.local.isAuthenticated
@@ -42,7 +49,9 @@ final class GameCenterManager: ObservableObject {
                 leaderboardIDs: [Self.pinpointLeaderboardID]
             )
         } catch {
-            authError = "Failed to submit score: \(error.localizedDescription)"
+            if !Self.isExpectedUnauthenticatedError(error) {
+                authError = "Failed to submit score: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -70,9 +79,6 @@ final class GameCenterManager: ObservableObject {
 
     private func showLeaderboard(id: String) {
         guard isAuthenticated else { return }
-        guard let windowScene = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first else { return }
 
         let viewController = GKGameCenterViewController(
             leaderboardID: id,
@@ -80,8 +86,25 @@ final class GameCenterManager: ObservableObject {
             timeScope: .week
         )
         viewController.gameCenterDelegate = GameCenterDismissHandler.shared
+        present(viewController)
+    }
 
-        windowScene.windows.first?.rootViewController?.present(viewController, animated: true)
+    private func present(_ viewController: UIViewController) {
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            return
+        }
+        rootViewController.present(viewController, animated: true)
+    }
+
+    private static func isExpectedUnauthenticatedError(_ error: Error) -> Bool {
+        if let gkError = error as? GKError, gkError.code == .notAuthenticated {
+            return true
+        }
+        let message = error.localizedDescription.lowercased()
+        return message.contains("not been authenticated") || message.contains("not authenticated")
     }
 }
 
