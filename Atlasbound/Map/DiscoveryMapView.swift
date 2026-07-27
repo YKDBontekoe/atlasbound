@@ -19,6 +19,7 @@ struct DiscoveryMapView: View {
     @State private var cachedMarkers: [WorldTile] = []
     @State private var cachedFrontierEdge: [TileCoordinate] = []
     @State private var cachedTargetBoundary: [TileCoordinate] = []
+    @State private var cachedPerimeterIDs: Set<String> = []
 
     private var engine: TileEngine { store.tileEngine }
 
@@ -46,21 +47,22 @@ struct DiscoveryMapView: View {
                 if vertices.count >= 3 {
                     let fresh = controller.sessionDiscoveredIDs.contains(tile.id)
                     let charge = tile.weeklyCharge
+                    let perimeter = cachedPerimeterIDs.contains(tile.id)
                     MapPolygon(coordinates: vertices)
                         .foregroundStyle(tile.state.mapFill(isFreshDiscovery: fresh, weeklyCharge: charge))
                         .stroke(
-                            strokeColor(for: tile, fresh: fresh),
-                            lineWidth: strokeWidth(for: tile, fresh: fresh)
+                            tile.state.mapStroke(isFreshDiscovery: fresh, isPerimeter: perimeter),
+                            lineWidth: tile.state.mapStrokeWidth(isFreshDiscovery: fresh, isPerimeter: perimeter)
                         )
                 }
             }
 
+            // Soft gold wash on undiscovered frontier neighbors — fill only to avoid double edges.
             ForEach(cachedFrontierEdge, id: \.self) { axial in
                 let vertices = engine.polygon(for: axial)
                 if vertices.count >= 3 {
                     MapPolygon(coordinates: vertices)
-                        .foregroundStyle(AtlasTheme.gold.opacity(0.12))
-                        .stroke(AtlasTheme.gold.opacity(0.75), lineWidth: 1.4)
+                        .foregroundStyle(AtlasTheme.frontierWashFill)
                 }
             }
 
@@ -69,7 +71,7 @@ struct DiscoveryMapView: View {
                 if vertices.count >= 3 {
                     MapPolygon(coordinates: vertices)
                         .foregroundStyle(Color.clear)
-                        .stroke(AtlasTheme.blue.opacity(0.9), lineWidth: 2.2)
+                        .stroke(AtlasTheme.targetBoundaryStroke, lineWidth: AtlasTheme.targetBoundaryStrokeWidth)
                 }
             }
 
@@ -154,7 +156,9 @@ struct DiscoveryMapView: View {
     private func refreshOverlays() {
         let engine = store.tileEngine
         let discovered = cullDiscovered(engine: engine)
+        let discoveredIDs = store.discoveredTileIDs
         cachedDiscovered = discovered
+        cachedPerimeterIDs = engine.territoryPerimeterIDs(among: discovered, discoveredIDs: discoveredIDs)
         cachedFog = buildFog(engine: engine)
         cachedFrontierEdge = controller.frontierEdgeTileIDs.compactMap { engine.parseTileID($0) }
         cachedTargetBoundary = controller.targetSectorBoundaryTileIDs.compactMap { engine.parseTileID($0) }
@@ -166,20 +170,6 @@ struct DiscoveryMapView: View {
                     .prefix(AtlasTheme.maxVisibleMarkers)
               )
             : []
-    }
-
-    private func strokeColor(for tile: WorldTile, fresh: Bool) -> Color {
-        if controller.frontierEdgeTileIDs.contains(tile.id) {
-            return AtlasTheme.gold.opacity(0.85)
-        }
-        return tile.state.mapStroke(isFreshDiscovery: fresh)
-    }
-
-    private func strokeWidth(for tile: WorldTile, fresh: Bool) -> CGFloat {
-        if controller.frontierEdgeTileIDs.contains(tile.id) {
-            return 1.6
-        }
-        return tile.state.mapStrokeWidth(isFreshDiscovery: fresh)
     }
 
     private func cullDiscovered(engine: TileEngine) -> [WorldTile] {

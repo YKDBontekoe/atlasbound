@@ -84,4 +84,47 @@ final class TileEngineTests: XCTestCase {
         let polygon = engine.polygon(for: TileCoordinate(q: 1, r: -1))
         XCTAssertEqual(polygon.count, 6)
     }
+
+    func testIsolatedTileIsTerritoryPerimeter() {
+        let center = TileCoordinate(q: 0, r: 0)
+        let id = TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 80)
+        XCTAssertTrue(engine.isTerritoryPerimeter(center, discoveredIDs: [id]))
+    }
+
+    func testInteriorHexOfClusterIsNotPerimeter() {
+        let center = TileCoordinate(q: 0, r: 0)
+        var discovered = Set(engine.neighbors(of: center).map {
+            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: 80)
+        })
+        discovered.insert(TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 80))
+
+        XCTAssertFalse(engine.isTerritoryPerimeter(center, discoveredIDs: discovered))
+        for neighbor in engine.neighbors(of: center) {
+            XCTAssertTrue(
+                engine.isTerritoryPerimeter(neighbor, discoveredIDs: discovered),
+                "Ring tiles should form the territory silhouette"
+            )
+        }
+    }
+
+    func testTerritoryPerimeterIDsUsesFullDiscoveredSet() {
+        let center = TileCoordinate(q: 0, r: 0)
+        let ring = engine.neighbors(of: center)
+        let tiles = ([center] + ring).map { axial in
+            WorldTile(
+                id: TileEngine.makeTileID(q: axial.q, r: axial.r, sizeMeters: 80),
+                coordinate: axial,
+                state: .discovered,
+                masteryXP: 10,
+                visitCount: 1,
+                firstVisitedAt: .now,
+                lastVisitedAt: .now
+            )
+        }
+        let discoveredIDs = Set(tiles.map(\.id))
+        // Viewport might only show the center — perimeter must still use the full ID set.
+        let visible = tiles.filter { $0.coordinate == center }
+        let perimeter = engine.territoryPerimeterIDs(among: visible, discoveredIDs: discoveredIDs)
+        XCTAssertTrue(perimeter.isEmpty)
+    }
 }

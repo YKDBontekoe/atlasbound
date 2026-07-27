@@ -90,6 +90,26 @@ struct TileEngine: Sendable {
         Self.neighborOffsets.map { TileCoordinate(q: axial.q + $0.0, r: axial.r + $0.1) }
     }
 
+    /// True when any neighbor is outside the discovered set — the outer rim of claimed territory.
+    func isTerritoryPerimeter(_ axial: TileCoordinate, discoveredIDs: Set<String>) -> Bool {
+        neighbors(of: axial).contains { neighbor in
+            let id = Self.makeTileID(q: neighbor.q, r: neighbor.r, sizeMeters: tileSizeMeters)
+            return !discoveredIDs.contains(id)
+        }
+    }
+
+    /// Perimeter tile IDs among `tiles` (uses the full `discoveredIDs` set so viewport culls stay accurate).
+    func territoryPerimeterIDs<S: Sequence>(
+        among tiles: S,
+        discoveredIDs: Set<String>
+    ) -> Set<String> where S.Element == WorldTile {
+        Set(
+            tiles.compactMap { tile in
+                isTerritoryPerimeter(tile.coordinate, discoveredIDs: discoveredIDs) ? tile.id : nil
+            }
+        )
+    }
+
     /// All axial coordinates within `radius` (inclusive) of `center`.
     func ring(around center: TileCoordinate, radius: Int) -> [TileCoordinate] {
         guard radius > 0 else { return [center] }
