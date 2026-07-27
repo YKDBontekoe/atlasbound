@@ -208,7 +208,7 @@ struct ProgressTabView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                MasteryDistributionBar(counts: snap.orderedCounts, height: 12)
+                MasteryDistributionBar(counts: snap.orderedCounts.map { (state: $0.state, count: $0.count) }, height: 12)
 
                 VStack(spacing: 6) {
                     ForEach(snap.orderedCounts, id: \.state) { entry in
