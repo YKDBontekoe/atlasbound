@@ -4,18 +4,18 @@ import SwiftUI
 struct AtlasboundApp: App {
     @StateObject private var store = TileStore()
     @StateObject private var controllerHolder = ControllerHolder()
-    @StateObject private var geoGuessrHolder = GeoGuessrHolder()
+    @StateObject private var pinpointHolder = PinpointHolder()
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
 
     var body: some Scene {
         WindowGroup {
             Group {
                 if let controller = controllerHolder.controller,
-                   let geoController = geoGuessrHolder.controller {
+                   let pinpointController = pinpointHolder.controller {
                     RootTabView(
                         controller: controller,
                         store: store,
-                        geoGuessrController: geoController
+                        pinpointController: pinpointController
                     )
                 } else {
                     ProgressView("Loading world…")
@@ -26,7 +26,7 @@ struct AtlasboundApp: App {
             )
             .onAppear {
                 controllerHolder.bootstrap(store: store)
-                geoGuessrHolder.bootstrap()
+                pinpointHolder.bootstrap(tileStore: store)
             }
         }
     }
@@ -43,14 +43,14 @@ final class ControllerHolder: ObservableObject {
 }
 
 @MainActor
-final class GeoGuessrHolder: ObservableObject {
-    @Published var controller: GeoGuessrController?
+final class PinpointHolder: ObservableObject {
+    @Published var controller: PinpointController?
 
-    func bootstrap() {
+    func bootstrap(tileStore: TileStore) {
         guard controller == nil else { return }
-        let store = GeoGuessrStore()
+        let store = PinpointStore()
         let gcManager = GameCenterManager()
         gcManager.authenticate()
-        controller = GeoGuessrController(store: store, gameCenterManager: gcManager)
+        controller = PinpointController(store: store, tileStore: tileStore, gameCenterManager: gcManager)
     }
 }

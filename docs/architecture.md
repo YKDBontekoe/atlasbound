@@ -45,21 +45,23 @@ AtlasboundApp
 - Discovered markers are capped (~80 highest-ranked) for performance.
 - Stubs: `regionName = "Dordrecht"` + discovered tile count in the header — not real geo regions / % coverage.
 
-## GeoGuessr mode
+## Pinpoint mode
 
-A GeoGuessr-style guessing game alongside the tile discovery mode.
+A location-guessing game alongside the tile discovery mode.
 
 | Type | Role | Threading |
 |------|------|-----------|
-| `GeoGuessrEngine` | Pure scoring, round targets, distance calc | `Sendable` value type |
-| `GeoGuessrStore` | Game history + high scores (JSON) | `@MainActor` |
+| `PinpointScoring` | Pure scoring, area metrics, distance calc | `Sendable` value type |
+| `LookAroundLocationPool` | Worldwide + Home Turf target generation | `Sendable` value type |
+| `PinpointStore` | Game history + per-mode high scores (JSON) | `@MainActor` |
+| `PinpointController` | Game orchestration + tile XP awards | `@MainActor` |
 | `GameCenterManager` | GameKit auth + leaderboard submission | `@MainActor` |
-| `GeoGuessrView` | Lobby, active game, round result, game over | SwiftUI |
-| `LookAroundGuessView` | MKLookAroundScene + tappable guess map | SwiftUI |
+| `PinpointView` | Lobby, active game, round result, game over | SwiftUI |
+| `LookAroundGuessView` | MKLookAroundScene + timed guess map | SwiftUI |
 
-Flow: lobby → 5 rounds (Look Around scene → tap world map to guess → score) → game over → submit to Game Center leaderboard.
+Flow: lobby (Worldwide or Home Turf) → 5 rounds (Look Around + timer → tap map to guess → score) → game over → submit to Game Center leaderboard.
 
-Persistence: `Documents/atlasbound-geoguessr.json`. Leaderboard ID: `com.atlasbound.geoguessr.highscore`.
+Persistence: `Documents/atlasbound-pinpoint.json`. Leaderboard ID: `com.atlasbound.geoguessr.highscore`.
 
 ## Extension points
 

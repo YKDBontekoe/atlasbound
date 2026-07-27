@@ -1,18 +1,23 @@
 import SwiftUI
 
 /// End-of-game screen: total score, per-round breakdown, leaderboard, play again.
-struct GeoGuessrGameOverView: View {
-    let game: GeoGuessrGame
-    @ObservedObject var controller: GeoGuessrController
+struct PinpointGameOverView: View {
+    let game: PinpointGame
+    @ObservedObject var controller: PinpointController
 
     private var isNewHighScore: Bool {
-        game.totalScore >= controller.store.highScore
+        game.totalScore >= controller.store.highScore(for: game.mode)
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
                 VStack(spacing: 8) {
+                    Text(game.mode.displayName)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+
                     if isNewHighScore {
                         Text("New High Score!")
                             .font(.title3.weight(.bold))
@@ -20,9 +25,15 @@ struct GeoGuessrGameOverView: View {
                     }
                     Text("\(game.totalScore)")
                         .font(.system(size: 56, weight: .bold, design: .rounded).monospacedDigit())
-                    Text("out of \(GeoGuessrConstants.maxPossibleScore)")
+                    Text("out of \(PinpointConstants.maxPossibleScore)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+
+                    if game.totalFamiliarityXPAwarded > 0 {
+                        Text("+\(game.totalFamiliarityXPAwarded) familiarity XP earned")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AtlasTheme.gold)
+                    }
                 }
                 .padding(.top, 32)
 
@@ -40,8 +51,13 @@ struct GeoGuessrGameOverView: View {
                 HStack {
                     Text("Round \(round.roundIndex + 1)")
                         .font(.subheadline)
+                    if round.hitExactTile {
+                        Image(systemName: "hexagon.fill")
+                            .font(.caption2)
+                            .foregroundStyle(AtlasTheme.gold)
+                    }
                     Spacer()
-                    Text(GeoGuessrScoring.formatDistance(round.distanceMeters))
+                    Text(PinpointScoring.formatDistance(round.distanceMeters))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text("\(round.score) pts")
@@ -63,7 +79,7 @@ struct GeoGuessrGameOverView: View {
     private var actionButtons: some View {
         VStack(spacing: 12) {
             Button {
-                controller.startNewGame()
+                controller.startNewGame(mode: game.mode)
             } label: {
                 HStack {
                     Image(systemName: "arrow.counterclockwise")

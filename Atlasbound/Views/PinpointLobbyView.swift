@@ -1,0 +1,283 @@
+import SwiftUI
+
+/// Lobby screen: mode picker, stats, Game Center sign-in, recent games.
+struct PinpointLobbyView: View {
+    @ObservedObject var controller: PinpointController
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                heroSection
+                modePicker
+                statsCard
+                gameCenterSection
+
+                if let error = controller.preparationError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(AtlasTheme.finishRed)
+                        .multilineTextAlignment(.center)
+                }
+
+                if let error = controller.gameCenterManager.authError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(AtlasTheme.finishRed)
+                }
+
+                if !controller.store.gameHistory.isEmpty {
+                    recentGamesSection
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 40)
+        }
+        .overlay {
+            if controller.phase == .preparing {
+                preparingOverlay
+            }
+        }
+    }
+
+    private var heroSection: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "scope")
+                .font(.system(size: 64))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [AtlasTheme.blue, AtlasTheme.teal],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            Text("Pinpoint")
+                .font(.largeTitle.bold())
+            Text("Guess your location from Look Around")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.top, 40)
+    }
+
+    private var modePicker: some View {
+        VStack(spacing: 12) {
+            modeCard(
+                mode: .worldwide,
+                highScore: controller.store.highScore(for: .worldwide),
+                enabled: true,
+                footer: nil
+            ) {
+                controller.startNewGame(mode: .worldwide)
+            }
+
+            modeCard(
+                mode: .homeTurf,
+                highScore: controller.store.highScore(for: .homeTurf),
+                enabled: controller.homeTurfUnlocked,
+                footer: { homeTurfFooter }
+            ) {
+                controller.startNewGame(mode: .homeTurf)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var homeTurfFooter: some View {
+        if controller.homeTurfUnlocked {
+            let area = controller.unlockedAreaM2
+            let tier = PinpointAtlasTier.tier(for: area)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(PinpointScoring.formatArea(area))
+                        .font(.caption.weight(.semibold))
+                    Text("unlocked")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(tier.displayName)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(AtlasTheme.gold)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(AtlasTheme.gold.opacity(0.12), in: Capsule())
+                }
+                Text("Stricter scoring — improves as your atlas grows.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            Text("Discover \(controller.homeTurfTilesNeeded) more tiles to unlock.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func modeCard(
+        mode: PinpointGameMode,
+        highScore: Int,
+        enabled: Bool,
+        footer: (() -> some View)?,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(mode.displayName)
+                        .font(.headline)
+                    Text(mode.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(highScore)")
+                        .font(.subheadline.weight(.bold).monospacedDigit())
+                    Text("best")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let footer {
+                footer()
+            }
+
+            Button(action: action) {
+                HStack {
+                    Image(systemName: "play.fill")
+                    Text("Play \(mode.displayName)")
+                        .font(.headline.weight(.bold))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+            }
+            .buttonStyle(TintedGlassButtonStyle(tint: mode == .homeTurf ? AtlasTheme.gold : AtlasTheme.blue, shape: .capsule))
+            .disabled(!enabled || controller.phase == .preparing)
+            .opacity(enabled ? 1 : 0.55)
+        }
+        .padding(16)
+        .background {
+            GlassChrome(
+                shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
+                weight: .regular
+            )
+        }
+    }
+
+    private var statsCard: some View {
+        VStack(spacing: 12) {
+            statsRow(icon: "gamecontroller.fill", label: "Games Played",
+                     value: "\(controller.store.gamesPlayed)",
+                     tint: AtlasTheme.blue)
+            statsRow(icon: "hexagon.fill", label: "Exact Tile Hits",
+                     value: "\(controller.store.exactTileHits)",
+                     tint: AtlasTheme.teal)
+        }
+        .padding(16)
+        .background {
+            GlassChrome(
+                shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
+                weight: .regular
+            )
+        }
+    }
+
+    private func statsRow(icon: String, label: String, value: String, tint: Color) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 36, height: 36)
+                .background(tint.opacity(0.12), in: Circle())
+            Text(label)
+                .font(.subheadline.weight(.medium))
+            Spacer()
+            Text(value)
+                .font(.subheadline.weight(.bold).monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var gameCenterSection: some View {
+        if controller.gameCenterManager.isAuthenticated {
+            Button {
+                controller.gameCenterManager.showLeaderboard()
+            } label: {
+                HStack {
+                    Image(systemName: "trophy.fill")
+                    Text("Leaderboard")
+                        .font(.headline.weight(.bold))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+            }
+            .buttonStyle(GlassButtonStyle(shape: .capsule))
+        } else {
+            Button {
+                controller.gameCenterManager.authenticate()
+            } label: {
+                HStack {
+                    Image(systemName: "person.badge.plus")
+                    Text("Sign in to Game Center")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+            }
+            .buttonStyle(GlassButtonStyle(shape: .capsule))
+        }
+    }
+
+    private var recentGamesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Recent Games")
+                .font(.headline)
+            ForEach(controller.store.gameHistory.suffix(5).reversed()) { game in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text("\(game.totalScore) pts")
+                                .font(.subheadline.weight(.bold).monospacedDigit())
+                            Text(game.mode.displayName)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(game.completedAt, style: .relative)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    ForEach(game.rounds) { round in
+                        RoundScoreDot(score: round.score)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .padding(16)
+        .background {
+            GlassChrome(
+                shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
+                weight: .regular
+            )
+        }
+    }
+
+    private var preparingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.35).ignoresSafeArea()
+            VStack(spacing: 16) {
+                ProgressView()
+                    .scaleEffect(1.3)
+                    .tint(.white)
+                Text("Finding locations…")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+            }
+            .padding(28)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+    }
+}
