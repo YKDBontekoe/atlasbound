@@ -24,8 +24,11 @@ struct PinpointView: View {
     @ViewBuilder
     private var phaseContent: some View {
         switch controller.phase {
-        case .lobby, .preparing:
+        case .lobby:
             PinpointLobbyView(controller: controller)
+
+        case .preparing:
+            PinpointPreparingView(controller: controller)
 
         case .playing:
             if controller.currentRound < controller.targets.count {

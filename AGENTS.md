@@ -49,7 +49,8 @@ Atlasbound/
     GeocodeLimiter.swift       # Shared throttled CLGeocoder
     PinpointController.swift   # Pinpoint game orchestration
     PinpointScoring.swift      # Distance + score math (Sendable)
-    LookAroundLocationPool.swift # Target location generation (Sendable)
+    LookAroundLocationPool.swift # Coverage-region + Home Turf targets (Sendable)
+    LookAroundSnapshotEngine.swift # Spoiler-free Look Around gallery snapshots
     GameCenterManager.swift    # GameKit auth + leaderboards
   Persistence/                 # JSON save + Codable records
     RegionLookupStore.swift    # Reverse-geocode place cache (JSON)
@@ -57,7 +58,7 @@ Atlasbound/
     ActivityHistoryStore.swift # Activity session history + per-type records
   Models/                      # WorldTile, activity types, PinpointModels
   Map/                         # DiscoveryMapView, AtlasStatsMapView, GuessMapView (MapKit)
-  Views/                       # MainMapScreen, summary, tabs, Pinpoint views
+  Views/                       # MainMapScreen, summary, tabs, Pinpoint + preparing views
   Theme/                       # AtlasTheme
 AtlasboundTests/               # Unit + chrome snapshot tests
 AtlasboundUITests/             # UI smoke tests
