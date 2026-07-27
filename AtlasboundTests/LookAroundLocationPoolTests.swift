@@ -5,12 +5,27 @@ import MapKit
 
 final class LookAroundLocationPoolTests: XCTestCase {
 
-    func testSeedsCoverAtLeastOneRoundPerGame() {
-        XCTAssertGreaterThanOrEqual(
-            LookAroundLocationPool.seeds.count,
-            PinpointConstants.roundsPerGame,
-            "Need enough seed cities to pick distinct worldwide rounds"
+    func testIsLikelyUrbanRecognizesCityPlacemark() {
+        let placemark = MKPlacemark(
+            coordinate: CLLocationCoordinate2D(latitude: 51.5074, longitude: -0.1278),
+            addressDictionary: [
+                kCLPlacemarkLocalityKey as String: "London",
+                kCLPlacemarkAdministrativeAreaKey as String: "England",
+            ]
         )
+
+        XCTAssertTrue(LookAroundLocationPool.isLikelyUrban(placemark))
+    }
+
+    func testIsLikelyUrbanRejectsSparsePlacemark() {
+        let placemark = MKPlacemark(
+            coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            addressDictionary: [
+                kCLPlacemarkOceanKey as String: "Atlantic Ocean",
+            ]
+        )
+
+        XCTAssertFalse(LookAroundLocationPool.isLikelyUrban(placemark))
     }
 
     func testAtlasRegionReturnsNilForEmptyTiles() {
