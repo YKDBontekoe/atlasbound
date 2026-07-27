@@ -64,8 +64,7 @@ struct PinpointLobbyView: View {
             modeCard(
                 mode: .worldwide,
                 highScore: controller.store.highScore(for: .worldwide),
-                enabled: true,
-                footer: nil
+                enabled: true
             ) {
                 controller.startNewGame(mode: .worldwide)
             }
@@ -112,11 +111,11 @@ struct PinpointLobbyView: View {
         }
     }
 
-    private func modeCard(
+    private func modeCard<Footer: View>(
         mode: PinpointGameMode,
         highScore: Int,
         enabled: Bool,
-        footer: (() -> some View)?,
+        @ViewBuilder footer: () -> Footer = { EmptyView() },
         action: @escaping () -> Void
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -139,9 +138,7 @@ struct PinpointLobbyView: View {
                 }
             }
 
-            if let footer {
-                footer()
-            }
+            footer()
 
             Button(action: action) {
                 HStack {
