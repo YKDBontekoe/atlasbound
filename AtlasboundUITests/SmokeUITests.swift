@@ -56,13 +56,13 @@ final class SmokeUITests: XCTestCase {
         progressTab.tap()
 
         XCTAssertTrue(
-            app.navigationBars["Progress"].waitForExistence(timeout: 8)
-                || app.staticTexts["Progress"].waitForExistence(timeout: 2)
+            app.navigationBars["Atlas Stats"].waitForExistence(timeout: 8)
+                || app.staticTexts["Atlas Stats"].waitForExistence(timeout: 2)
         )
         XCTAssertTrue(
-            app.staticTexts["Lifetime XP"].waitForExistence(timeout: 5)
+            app.staticTexts["Territory conquered"].waitForExistence(timeout: 5)
+                || app.staticTexts["Lifetime XP"].waitForExistence(timeout: 2)
                 || app.staticTexts["Mastery ladder"].waitForExistence(timeout: 2)
-                || app.staticTexts["Discovery"].waitForExistence(timeout: 2)
         )
     }
 

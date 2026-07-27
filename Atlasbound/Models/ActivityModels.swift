@@ -47,6 +47,31 @@ struct ActivitySummary: Identifiable, Sendable {
     var totalXP: Int { discoveryXP + familiarityXP }
 }
 
+/// Persisted session record for lifetime activity statistics.
+struct PersistedActivityRecord: Codable, Identifiable, Sendable, Hashable {
+    let id: UUID
+    let activityType: ActivityType
+    let distanceMeters: Double
+    let duration: TimeInterval
+    let tilesDiscovered: Int
+    let totalXP: Int
+    let tileSizeMeters: Int
+    let startedAt: Date
+    let endedAt: Date
+
+    init(from summary: ActivitySummary, tileSizeMeters: Int) {
+        self.id = summary.id
+        self.activityType = summary.activityType
+        self.distanceMeters = summary.distanceMeters
+        self.duration = summary.duration
+        self.tilesDiscovered = summary.tilesDiscovered
+        self.totalXP = summary.totalXP
+        self.tileSizeMeters = tileSizeMeters
+        self.startedAt = summary.startedAt
+        self.endedAt = summary.endedAt
+    }
+}
+
 struct LocationSample: Sendable {
     let coordinate: CLLocationCoordinate2D
     let timestamp: Date
