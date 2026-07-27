@@ -24,7 +24,7 @@ Between consecutive GPS samples, walk intermediate hexes with `hexLine` (`tileID
 | `mastered` | ≥ 300 |
 | `legendary` | ≥ 500 |
 
-Thresholds live in `ProgressionEngine.advanceStateIfNeeded` — Phase 1 lightweight; full skill tree later.
+Thresholds live in `ProgressionEngine.advanceStateIfNeeded`. These are intentionally simple; a skill tree can layer on top.
 
 ## XP
 

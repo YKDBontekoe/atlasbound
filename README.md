@@ -4,16 +4,14 @@ Location-based exploration RPG prototype for iPhone. Walk, run, cycle, or drive 
 
 **Docs:** [docs/](docs/) · **Agents:** [AGENTS.md](AGENTS.md)
 
-## Phase 1 (this prototype)
+## Current capabilities
 
 - SwiftUI app shell with MapKit + user location
-- Foreground activity recording via Core Location (Info.plist structured for background later)
-- Hex tile engine (~60 / **80** / 100 m flat-to-flat, configurable)
+- Foreground activity recording via Core Location (Info.plist structured for background)
+- Hex tile engine (~60 / **80** / 100 m flat-to-flat, configurable per activity)
 - Fog vs discovered tile overlay on the map
 - Local persistence of discovered tiles + XP totals (JSON in Documents via FileManager; tile size preference in UserDefaults)
 - Discovery vs familiarity progression and an end-of-activity summary
-
-**Not in Phase 1:** Game Center, CloudKit, skill tree, social, StoreKit, Watch, challenges, widgets, Live Activities.
 
 ## Open & run
 
@@ -61,7 +59,7 @@ Deeper write-ups: [docs/architecture.md](docs/architecture.md), [docs/domain.md]
 
 ## Privacy
 
-Location is used on-device for tile discovery. Usage strings live in `Atlasbound/Info.plist`. Background mode is declared for a future passive-driving path; Phase 1 records primarily in the foreground (`When In Use`).
+Location is used on-device for tile discovery. Usage strings live in `Atlasbound/Info.plist`. Background mode is declared but recording currently defaults to foreground (`When In Use`).
 
 ## Requirements
 

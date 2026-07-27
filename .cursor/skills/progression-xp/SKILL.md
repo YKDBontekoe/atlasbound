@@ -8,7 +8,7 @@ description: >-
 
 # Progression XP
 
-## Rules (Phase 1)
+## Rules
 
 | Event | XP | State effect |
 |-------|-----|----------------|
@@ -42,7 +42,7 @@ Only advance forward; discovery sets discovered without jumping the ladder.
 ## Do not
 
 - Wire streak multiplier into XP until product asks (UI-only today: `streakMultiplier`)
-- Add skill-tree / Game Center hooks (out of Phase 1)
+- Add skill-tree / Game Center hooks without verifying integration
 - Award discovery twice for the same tile ID
 
 ## See also
