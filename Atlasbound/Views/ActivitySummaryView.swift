@@ -6,34 +6,17 @@ struct ActivitySummaryView: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
+    private var revisited: Int { max(0, summary.tilesVisited - summary.tilesDiscovered) }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    header
-
-                    HStack(spacing: 0) {
-                        summaryStat(title: "Distance", value: formatDistance(summary.distanceMeters))
-                        summaryStat(title: "Duration", value: formatDuration(summary.duration))
-                        summaryStat(title: "New tiles", value: "\(summary.tilesDiscovered)")
-                    }
-                    .padding(.vertical, 8)
-                    .background(card)
-
-                    VStack(spacing: 12) {
-                        row("Visited tiles", "\(summary.tilesVisited)")
-                        row("Revisited", "\(max(0, summary.tilesVisited - summary.tilesDiscovered))")
-                        row("Discovery XP", "+\(summary.discoveryXP)")
-                        row("Familiarity XP", "+\(summary.familiarityXP)")
-                    }
-                    .padding(16)
-                    .background(card)
-
-                    Text("New tiles provide discovery. Existing tiles provide mastery.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 4)
+                VStack(spacing: 14) {
+                    heroHeader
+                    kpiBand
+                    tileCompositionCard
+                    xpBreakdownCard
+                    nerdStrip
                 }
                 .padding(20)
             }
@@ -49,75 +32,177 @@ struct ActivitySummaryView: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(AtlasTheme.blue.opacity(0.12))
-                    .frame(width: 56, height: 56)
-                Image(systemName: summary.activityType.symbolName)
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(AtlasTheme.blue)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(summary.activityType.activeTitle)
-                    .font(.title3.weight(.bold))
-                Text("+\(summary.totalXP) XP earned")
-                    .font(.subheadline.weight(.semibold))
+    // MARK: - Hero
+
+    private var heroHeader: some View {
+        StatSectionCard {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(AtlasTheme.blue.opacity(0.12))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: summary.activityType.symbolName)
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(AtlasTheme.blue)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(summary.activityType.activeTitle)
+                        .font(.title3.weight(.bold))
+                    HStack(spacing: 4) {
+                        Text("+\(summary.totalXP)")
+                            .font(.system(.subheadline, design: .rounded, weight: .bold))
+                        Text("XP earned")
+                            .font(.subheadline)
+                    }
                     .foregroundStyle(AtlasTheme.teal)
+                }
+                Spacer()
             }
-            Spacer()
         }
-        .padding(16)
-        .background(card)
     }
 
-    private var card: some View {
-        RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous)
-            .fill(AtlasTheme.chromeFill(for: colorScheme))
-            .overlay {
-                RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous)
-                    .strokeBorder(AtlasTheme.chromeStroke(for: colorScheme), lineWidth: 1)
+    // MARK: - KPI Band
+
+    private var kpiBand: some View {
+        StatSectionCard {
+            HStack(spacing: 0) {
+                StatKPI(
+                    value: StatsFormat.distance(summary.distanceMeters),
+                    caption: "Distance"
+                )
+                divider
+                StatKPI(
+                    value: StatsFormat.duration(summary.duration),
+                    caption: "Duration"
+                )
+                divider
+                StatKPI(
+                    value: "\(summary.tilesDiscovered)",
+                    caption: "New tiles",
+                    accent: AtlasTheme.teal
+                )
             }
-            .shadow(color: AtlasTheme.cardShadow(for: colorScheme), radius: 10, y: 3)
+            .padding(.vertical, 4)
+        }
     }
 
-    private func summaryStat(title: String, value: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-            Text(title)
-                .font(.caption)
+    private var divider: some View {
+        Rectangle()
+            .fill(AtlasTheme.divider(for: colorScheme))
+            .frame(width: 1, height: 32)
+    }
+
+    // MARK: - Tile composition
+
+    private var tileCompositionCard: some View {
+        StatSectionCard {
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Tile composition")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("\(summary.tilesVisited) visited")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+
+                SegmentedBar(segments: [
+                    (color: AtlasTheme.teal, value: Double(summary.tilesDiscovered)),
+                    (color: AtlasTheme.slate, value: Double(revisited))
+                ], height: 10)
+
+                HStack(spacing: 16) {
+                    legendDot(color: AtlasTheme.teal,
+                              label: "New",
+                              value: "\(summary.tilesDiscovered)",
+                              pct: StatsFormat.percent(summary.tilesDiscovered, of: summary.tilesVisited))
+                    legendDot(color: AtlasTheme.slate,
+                              label: "Revisited",
+                              value: "\(revisited)",
+                              pct: StatsFormat.percent(revisited, of: summary.tilesVisited))
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    private func legendDot(color: Color, label: String, value: String, pct: String) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(label)
+                .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func row(_ title: String, _ value: String) -> some View {
-        HStack {
-            Text(title)
-                .foregroundStyle(.secondary)
-            Spacer()
             Text(value)
-                .fontWeight(.semibold)
+                .font(.caption.weight(.bold).monospacedDigit())
+            Text(pct)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
-        .font(.subheadline)
     }
 
-    private func formatDuration(_ interval: TimeInterval) -> String {
-        let total = Int(interval)
-        let minutes = total / 60
-        let seconds = total % 60
-        if minutes >= 60 {
-            return String(format: "%dh %02dm", minutes / 60, minutes % 60)
+    // MARK: - XP breakdown
+
+    private var xpBreakdownCard: some View {
+        StatSectionCard {
+            HStack(spacing: 16) {
+                XPSplitArc(discovery: summary.discoveryXP, familiarity: summary.familiarityXP)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    xpRow(label: "Discovery",
+                          value: summary.discoveryXP,
+                          color: AtlasTheme.teal,
+                          pct: StatsFormat.percent(summary.discoveryXP, of: summary.totalXP))
+                    xpRow(label: "Familiarity",
+                          value: summary.familiarityXP,
+                          color: AtlasTheme.gold,
+                          pct: StatsFormat.percent(summary.familiarityXP, of: summary.totalXP))
+                }
+                Spacer(minLength: 0)
+            }
         }
-        return String(format: "%d:%02d", minutes, seconds)
     }
 
-    private func formatDistance(_ meters: Double) -> String {
-        if meters >= 1000 {
-            return String(format: "%.2f km", meters / 1000)
+    private func xpRow(label: String, value: Int, color: Color, pct: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Circle().fill(color).frame(width: 8, height: 8)
+                Text(label)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("+\(value)")
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                Text(pct)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
-        return String(format: "%.0f m", meters)
+    }
+
+    // MARK: - Nerd strip
+
+    private var nerdStrip: some View {
+        StatSectionCard {
+            VStack(spacing: 8) {
+                if let xpKm = StatsFormat.xpPerKm(summary.totalXP, meters: summary.distanceMeters) {
+                    NerdStat(label: "XP density", value: xpKm, icon: "bolt.fill")
+                }
+                if let rate = StatsFormat.rate(summary.tilesDiscovered, duration: summary.duration) {
+                    NerdStat(label: "Discovery rate", value: rate, icon: "hexagon.fill")
+                }
+                if let pace = StatsFormat.pace(summary.distanceMeters, duration: summary.duration) {
+                    NerdStat(label: "Avg pace", value: pace, icon: "speedometer")
+                }
+                if summary.totalXP > 0 {
+                    NerdStat(
+                        label: "Discovery share",
+                        value: StatsFormat.percent(summary.discoveryXP, of: summary.totalXP),
+                        icon: "chart.pie.fill"
+                    )
+                }
+                NerdStat(label: "GPS samples", value: "\(summary.sampleCount)", icon: "location.fill")
+            }
+        }
     }
 }

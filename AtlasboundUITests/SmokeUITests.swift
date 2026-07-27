@@ -60,8 +60,9 @@ final class SmokeUITests: XCTestCase {
                 || app.staticTexts["Progress"].waitForExistence(timeout: 2)
         )
         XCTAssertTrue(
-            app.staticTexts["Discovery XP"].waitForExistence(timeout: 5)
-                || app.staticTexts["Explorer"].waitForExistence(timeout: 2)
+            app.staticTexts["Lifetime XP"].waitForExistence(timeout: 5)
+                || app.staticTexts["Mastery ladder"].waitForExistence(timeout: 2)
+                || app.staticTexts["Discovery"].waitForExistence(timeout: 2)
         )
     }
 
