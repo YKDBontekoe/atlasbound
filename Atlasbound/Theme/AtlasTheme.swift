@@ -130,6 +130,19 @@ extension ActivityType {
         }
     }
 
+    /// Distinct hue for stats map activity layer.
+    var statsMapColor: Color {
+        switch self {
+        case .walk: AtlasTheme.teal
+        case .run: Color(red: 0.25, green: 0.72, blue: 0.55)
+        case .cycle: AtlasTheme.blue
+        case .hike: Color(red: 0.55, green: 0.45, blue: 0.82)
+        case .drive: AtlasTheme.slate
+        case .publicTransport: Color(red: 0.92, green: 0.55, blue: 0.22)
+        case .unknown: Color.secondary
+        }
+    }
+
     var startButtonTitle: String {
         "Start \(displayName)"
     }

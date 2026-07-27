@@ -122,37 +122,10 @@ struct DiscoveryMapView: View {
     }
 
     private func cullDiscovered(engine: TileEngine) -> [WorldTile] {
-        let all = store.discoveredTiles
-        guard let region = visibleRegion else {
-            return Array(all.prefix(AtlasTheme.maxVisiblePolygons))
-        }
-
-        let padded = region.padded(byFraction: AtlasTheme.viewportPaddingFraction)
-        let center = region.center
-        var inView: [WorldTile] = []
-        inView.reserveCapacity(min(all.count, AtlasTheme.maxVisiblePolygons * 2))
-
-        for tile in all {
-            let coord = engine.centerCoordinate(for: tile.coordinate)
-            guard padded.contains(coord) else { continue }
-            inView.append(tile)
-        }
-
-        if inView.count <= AtlasTheme.maxVisiblePolygons {
-            return inView
-        }
-
-        return Array(
-            inView
-                .sorted { lhs, rhs in
-                    let d0 = Self.approxDistanceSquared(lhs.coordinate, to: center, engine: engine)
-                    let d1 = Self.approxDistanceSquared(rhs.coordinate, to: center, engine: engine)
-                    if abs(d0 - d1) < 1e-14 {
-                        return lhs.state.rawValue > rhs.state.rawValue
-                    }
-                    return d0 < d1
-                }
-                .prefix(AtlasTheme.maxVisiblePolygons)
+        MapOverlayCuller.cullTiles(
+            store.discoveredTiles,
+            engine: engine,
+            visibleRegion: visibleRegion
         )
     }
 
@@ -167,17 +140,6 @@ struct DiscoveryMapView: View {
         return Array(tiles.prefix(AtlasTheme.maxFogPolygons))
     }
 
-    /// Cheap lat/lon delta for nearest-first soft capping (not geodesic-accurate).
-    private static func approxDistanceSquared(
-        _ axial: TileCoordinate,
-        to center: CLLocationCoordinate2D,
-        engine: TileEngine
-    ) -> Double {
-        let c = engine.centerCoordinate(for: axial)
-        let dLat = c.latitude - center.latitude
-        let dLon = c.longitude - center.longitude
-        return dLat * dLat + dLon * dLon
-    }
 }
 
 struct TileMarkerView: View {
@@ -230,24 +192,5 @@ struct HexShape: Shape {
         path.addLine(to: CGPoint(x: 0, y: h * 0.25))
         path.closeSubpath()
         return path
-    }
-}
-
-private extension MKCoordinateRegion {
-    func padded(byFraction fraction: Double) -> MKCoordinateRegion {
-        MKCoordinateRegion(
-            center: center,
-            span: MKCoordinateSpan(
-                latitudeDelta: span.latitudeDelta * (1 + fraction * 2),
-                longitudeDelta: span.longitudeDelta * (1 + fraction * 2)
-            )
-        )
-    }
-
-    func contains(_ coordinate: CLLocationCoordinate2D) -> Bool {
-        let halfLat = span.latitudeDelta / 2
-        let halfLon = span.longitudeDelta / 2
-        return abs(coordinate.latitude - center.latitude) <= halfLat
-            && abs(coordinate.longitude - center.longitude) <= halfLon
     }
 }

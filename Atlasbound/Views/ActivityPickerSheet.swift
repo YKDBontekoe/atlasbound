@@ -79,5 +79,10 @@ struct ActivityTypeRow: View {
 }
 
 #Preview {
-    ActivityPickerSheet(controller: WorldController(store: TileStore()))
+    ActivityPickerSheet(
+        controller: WorldController(
+            store: TileStore(),
+            activityHistory: ActivityHistoryStore()
+        )
+    )
 }

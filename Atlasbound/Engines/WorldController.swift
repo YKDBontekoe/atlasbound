@@ -21,6 +21,7 @@ final class WorldController: ObservableObject {
 
     let recorder: ActivityRecorder
     let store: TileStore
+    let activityHistory: ActivityHistoryStore
     private let progression = ProgressionEngine()
 
     /// Tiles mutated during the active session (merged into store on stop).
@@ -29,8 +30,9 @@ final class WorldController: ObservableObject {
 
     private static let selectedActivityKey = "atlasbound.selectedActivityType"
 
-    init(store: TileStore, recorder: ActivityRecorder? = nil) {
+    init(store: TileStore, activityHistory: ActivityHistoryStore, recorder: ActivityRecorder? = nil) {
         self.store = store
+        self.activityHistory = activityHistory
         self.recorder = recorder ?? ActivityRecorder()
         restoreSelectedActivityType()
         syncRecorderSettings()
@@ -162,6 +164,7 @@ final class WorldController: ObservableObject {
             familiarityXP: sessionProgress.familiarityXP,
             activityType: recorder.activityType
         )
+        activityHistory.record(summary, tileSizeMeters: store.tileSize.rawValue)
         lastSummary = summary
         showSummary = true
         discoveryStreak = 0
