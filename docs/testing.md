@@ -1,15 +1,17 @@
 # Testing
 
-CI on pull requests runs three parallel jobs: **static validation**, **unit + visual + UI tests**, and **unsigned IPA** build. Releases gate on the same validate + test suite before publishing.
+CI on pull requests runs three parallel jobs: **static validation**, **unit + visual + UI tests**, and **unsigned IPA** build. Releases gate IPA publish on validate + test before publishing.
+
+Shared macOS test steps live in [`scripts/ci-run-tests.sh`](../scripts/ci-run-tests.sh) and [`.github/actions/ios-test`](../.github/actions/ios-test) (simulator boot, snapshot bootstrap, `xcodebuild test`).
 
 ## Automated suite
 
 | Layer | Where | What |
 |-------|--------|------|
-| Static | `./scripts/validate-pr.sh` | Privacy/AltStore alignment, `apps.json` JSON, Python script unit tests |
+| Static | `./scripts/validate-pr.sh` | Privacy/AltStore alignment, `apps.json` JSON, Python script unit tests, CI shell syntax |
 | Unit | `AtlasboundTests` | `TileEngine`, `ProgressionEngine`, `TileStore`, persistence (no geometry) |
-| Visual | `AtlasboundTests/Visual` | Non-map chrome snapshots (`ActivitySummaryView`, `ActivityTypeRow`) + theme color samples |
-| UI smoke | `AtlasboundUITests` | Launch, activity picker, settings, Activity tab |
+| Visual | `AtlasboundTests/Visual` | Non-map chrome snapshots (`ActivitySummaryView`, `ActivityTypeRow`) |
+| UI smoke | `AtlasboundUITests` | Launch, activity picker, Progress tab, settings (when map chrome available) |
 | Package | `./scripts/build-ipa.sh` | Unsigned IPA archive (PR artifact / release) |
 
 ### Local commands
@@ -18,7 +20,10 @@ CI on pull requests runs three parallel jobs: **static validation**, **unit + vi
 # Static checks (no Xcode)
 ./scripts/validate-pr.sh
 
-# Unit + visual + UI tests (simulator)
+# Unit + visual + UI tests (simulator; same entry point as CI)
+./scripts/ci-run-tests.sh
+
+# Or invoke xcodebuild directly
 xcodebuild test \
   -project Atlasbound.xcodeproj \
   -scheme Atlasbound \

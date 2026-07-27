@@ -1,0 +1,17 @@
+name: Select Xcode
+description: Select the newest Xcode 16/26 on GitHub-hosted macOS runners.
+
+runs:
+  using: composite
+  steps:
+    - name: Select Xcode
+      shell: bash
+      run: |
+        set -euo pipefail
+        CANDIDATE="$(ls -d /Applications/Xcode_16*.app /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)"
+        if [[ -z "$CANDIDATE" ]]; then
+          CANDIDATE="/Applications/Xcode.app"
+        fi
+        echo "Using $CANDIDATE"
+        sudo xcode-select -s "$CANDIDATE"
+        xcodebuild -version

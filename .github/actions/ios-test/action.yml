@@ -1,0 +1,48 @@
+name: iOS test suite
+description: Boot simulator, bootstrap snapshots if needed, and run xcodebuild test.
+
+inputs:
+  result-bundle:
+    description: Path for the xcresult bundle
+    required: false
+    default: TestResults.xcresult
+  upload-artifact-name:
+    description: Artifact name for test results and snapshots; empty skips upload
+    required: false
+    default: atlasbound-test-results
+  artifact-retention-days:
+    description: Artifact retention in days
+    required: false
+    default: "7"
+  extra-xcodebuild-args:
+    description: Extra arguments passed to xcodebuild test
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Run tests
+      shell: bash
+      env:
+        RESULT_BUNDLE: ${{ inputs.result-bundle }}
+      run: |
+        set -euo pipefail
+        chmod +x scripts/ci-run-tests.sh
+        ARGS=()
+        if [[ -n "${{ inputs.extra-xcodebuild-args }}" ]]; then
+          # shellcheck disable=SC2206
+          ARGS=(${{ inputs.extra-xcodebuild-args }})
+        fi
+        ./scripts/ci-run-tests.sh "${ARGS[@]}"
+
+    - name: Upload test results
+      if: inputs.upload-artifact-name != '' && always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.upload-artifact-name }}
+        path: |
+          ${{ inputs.result-bundle }}
+          AtlasboundTests/Visual/__Snapshots__
+        if-no-files-found: warn
+        retention-days: ${{ inputs.artifact-retention-days }}

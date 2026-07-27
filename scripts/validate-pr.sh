@@ -14,4 +14,8 @@ python3 -m json.tool altstore/apps.json > /dev/null
 echo "==> Python script unit tests"
 python3 -m unittest discover -s scripts/tests -v
 
+echo "==> CI shell script syntax"
+bash -n scripts/ci-run-tests.sh
+bash -n scripts/build-ipa.sh
+
 echo "==> PR static validation passed"

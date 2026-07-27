@@ -58,68 +58,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: |
-          CANDIDATE="$(ls -d /Applications/Xcode_16*.app /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)"
-          if [[ -z "$CANDIDATE" ]]; then
-            CANDIDATE="/Applications/Xcode.app"
-          fi
-          echo "Using $CANDIDATE"
-          sudo xcode-select -s "$CANDIDATE"
-          xcodebuild -version
+        uses: ./.github/actions/xcode-select
 
-      - name: Resolve simulator destination
-        id: sim
-        run: |
-          set -euo pipefail
-          NAME="$(xcrun simctl list devices available -j | python3 -c '
-          import json, sys
-          data = json.load(sys.stdin)
-          devices = []
-          for runtime, items in data.get("devices", {}).items():
-              if "iOS" not in runtime:
-                  continue
-              for device in items:
-                  if device.get("isAvailable") and str(device.get("name", "")).startswith("iPhone"):
-                      devices.append(device["name"])
-          preferred = ["iPhone 16", "iPhone 16 Pro", "iPhone 15", "iPhone 15 Pro"]
-          for name in preferred:
-              if name in devices:
-                  print(name)
-                  raise SystemExit(0)
-          if not devices:
-              raise SystemExit("No available iPhone simulators")
-          print(devices[0])
-          ')"
-          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
-          echo "Using simulator: ${NAME}"
-
-      - name: Boot simulator and grant location
-        run: |
-          set -euo pipefail
-          NAME="${{ steps.sim.outputs.name }}"
-          xcrun simctl boot "$NAME" 2>/dev/null || true
-          xcrun simctl bootstatus "$NAME" -b
-          xcrun simctl privacy "$NAME" grant location-always com.atlasbound.app || true
-          xcrun simctl privacy "$NAME" grant location com.atlasbound.app || true
-
-      - name: Run tests
-        run: |
-          set -euo pipefail
-          DEST="platform=iOS Simulator,name=${{ steps.sim.outputs.name }}"
-          xcodebuild test \
-            -project Atlasbound.xcodeproj \
-            -scheme Atlasbound \
-            -destination "$DEST" \
-            -resultBundlePath TestResults.xcresult
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Run iOS tests
+        uses: ./.github/actions/ios-test
         with:
-          name: atlasbound-release-test-results
-          path: TestResults.xcresult
-          if-no-files-found: warn
-          retention-days: 14
+          upload-artifact-name: atlasbound-release-test-results
+          artifact-retention-days: "14"
 
   build:
     name: Build unsigned IPA
@@ -140,14 +85,7 @@ jobs:
           fetch-depth: 0
 
       - name: Select Xcode
-        run: |
-          CANDIDATE="$(ls -d /Applications/Xcode_16*.app /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)"
-          if [[ -z "$CANDIDATE" ]]; then
-            CANDIDATE="/Applications/Xcode.app"
-          fi
-          echo "Using $CANDIDATE"
-          sudo xcode-select -s "$CANDIDATE"
-          xcodebuild -version
+        uses: ./.github/actions/xcode-select
 
       - name: Compute automatic version
         id: version
