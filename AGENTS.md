@@ -11,7 +11,7 @@ Guidance for AI agents and contributors working in this repo.
 | Platform | iOS 17+, Xcode 16+ |
 | Bundle ID | `com.atlasbound.app` |
 | Scheme | `Atlasbound` |
-| Persistence | `Documents/atlasbound-world.json` + UserDefaults tile size |
+| Persistence | `Documents/atlasbound-world.json` + `atlasbound-geoguessr.json` + UserDefaults tile size |
 | Distribution | Unsigned IPA → GitHub Releases + Pages AltStore source |
 
 ## Read first
@@ -32,6 +32,7 @@ Guidance for AI agents and contributors working in this repo.
 5. **`@MainActor` + `ObservableObject`** for `TileStore`, `WorldController`, `ActivityRecorder`; pure math stays `Sendable` structs.
 6. **Folder-synced Xcode project** — files under `Atlasbound/` are picked up automatically; avoid manual pbxproj file lists.
 7. **Conventional commits** — `feat:` bumps minor on `main`; every push to `main` can publish a release.
+8. **SOLID principles** — every type has a single responsibility. Models are plain data, engines are pure logic (`Sendable`), controllers orchestrate state (`@MainActor`), stores own persistence, and views only render + forward actions. Do not mix concerns into a single file; split when a type serves more than one role.
 
 ## Source map
 
@@ -43,10 +44,15 @@ Atlasbound/
     ActivityRecorder.swift     # CLLocation filtering
     TileEngine.swift           # Lat/lon → axial hex
     ProgressionEngine.swift    # Discovery / familiarity XP
+    GeoGuessrController.swift  # GeoGuessr game orchestration
+    GeoGuessrScoring.swift     # Distance + score math (Sendable)
+    LookAroundLocationPool.swift # Target location generation (Sendable)
+    GameCenterManager.swift    # GameKit auth + leaderboards
   Persistence/                 # JSON save + Codable records
-  Models/                      # WorldTile, activity types
-  Map/                         # DiscoveryMapView (MapKit)
-  Views/                       # MainMapScreen, summary, tabs
+    GeoGuessrStore.swift       # GeoGuessr game history (JSON)
+  Models/                      # WorldTile, activity types, GeoGuessrModels
+  Map/                         # DiscoveryMapView, GuessMapView (MapKit)
+  Views/                       # MainMapScreen, summary, tabs, GeoGuessr views
   Theme/                       # AtlasTheme
 AtlasboundTests/               # Unit + chrome snapshot tests
 AtlasboundUITests/             # UI smoke tests

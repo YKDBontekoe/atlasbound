@@ -45,9 +45,25 @@ AtlasboundApp
 - Discovered markers are capped (~80 highest-ranked) for performance.
 - Stubs: `regionName = "Dordrecht"` + discovered tile count in the header — not real geo regions / % coverage.
 
+## GeoGuessr mode
+
+A GeoGuessr-style guessing game alongside the tile discovery mode.
+
+| Type | Role | Threading |
+|------|------|-----------|
+| `GeoGuessrEngine` | Pure scoring, round targets, distance calc | `Sendable` value type |
+| `GeoGuessrStore` | Game history + high scores (JSON) | `@MainActor` |
+| `GameCenterManager` | GameKit auth + leaderboard submission | `@MainActor` |
+| `GeoGuessrView` | Lobby, active game, round result, game over | SwiftUI |
+| `LookAroundGuessView` | MKLookAroundScene + tappable guess map | SwiftUI |
+
+Flow: lobby → 5 rounds (Look Around scene → tap world map to guess → score) → game over → submit to Game Center leaderboard.
+
+Persistence: `Documents/atlasbound-geoguessr.json`. Leaderboard ID: `com.atlasbound.geoguessr.highscore`.
+
 ## Extension points
 
 - Region Engine (replace stub `regionName` / tile-count header with real geo regions)
 - Background Always + passive drive path (`enableBackgroundRecordingIfAuthorized` exists; currently When In Use)
 - Streak multiplier wired into XP (UI-only today)
-- Skill tree / Game Center / CloudKit integration
+- CloudKit integration
