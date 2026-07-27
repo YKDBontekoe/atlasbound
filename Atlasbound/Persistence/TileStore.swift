@@ -8,6 +8,7 @@ final class TileStore: ObservableObject {
     @Published private(set) var discoveryXPTotal: Int = 0
     @Published private(set) var familiarityXPTotal: Int = 0
     @Published private(set) var activitiesCompleted: Int = 0
+    @Published private(set) var frontierState: FrontierState = .empty
     /// Active reveal grid — always driven by the current activity type, never a user preference.
     @Published var tileSize: TileSizeOption = .default {
         didSet {
@@ -19,7 +20,9 @@ final class TileStore: ObservableObject {
 
     private var allTilesBySize: [Int: [String: WorldTile]] = [:]
     private var progressBySize: [Int: PersistedProgressRecord] = [:]
+    private var frontierBySize: [Int: FrontierState] = [:]
     private let fileURL: URL
+    private let installationID: String
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -33,6 +36,7 @@ final class TileStore: ObservableObject {
     }()
 
     private static let saveFileName = "atlasbound-world.json"
+    private static let installationIDKey = "atlasbound.installationID"
 
     var tileEngine: TileEngine { TileEngine(option: tileSize) }
 
@@ -40,6 +44,10 @@ final class TileStore: ObservableObject {
         tiles.values
             .filter(\.isDiscovered)
             .sorted { ($0.firstVisitedAt ?? .distantPast) < ($1.firstVisitedAt ?? .distantPast) }
+    }
+
+    var discoveredTileIDs: Set<String> {
+        Set(discoveredTiles.map(\.id))
     }
 
     /// All discovered tiles grouped by grid size (60 / 80 / 100 m).
@@ -54,7 +62,11 @@ final class TileStore: ObservableObject {
         return result
     }
 
-    init(fileURL: URL? = nil) {
+    func frontierState(for size: Int) -> FrontierState {
+        frontierBySize[size] ?? .empty
+    }
+
+    init(fileURL: URL? = nil, installationID: String? = nil) {
         if let fileURL {
             self.fileURL = fileURL
         } else {
@@ -63,7 +75,16 @@ final class TileStore: ObservableObject {
             self.fileURL = docs.appendingPathComponent(Self.saveFileName)
         }
 
-        // Start on the walking grid; WorldController syncs to the selected activity.
+        if let installationID {
+            self.installationID = installationID
+        } else if let stored = UserDefaults.standard.string(forKey: Self.installationIDKey) {
+            self.installationID = stored
+        } else {
+            let generated = UUID().uuidString
+            UserDefaults.standard.set(generated, forKey: Self.installationIDKey)
+            self.installationID = generated
+        }
+
         tileSize = ActivityType.walk.tileSize
         loadFromDisk()
         loadForCurrentTileSize()
@@ -112,12 +133,63 @@ final class TileStore: ObservableObject {
         persistToDisk()
     }
 
+    func updateFrontierState(_ transform: (FrontierState) -> FrontierState, playerTile: TileCoordinate?) {
+        let engine = FrontierEngine()
+        var state = frontierState
+        state = engine.ensureWeeklyState(
+            state: state,
+            playerTile: playerTile,
+            discoveredTileIDs: discoveredTileIDs,
+            tiles: tiles,
+            tileEngine: tileEngine,
+            installationID: installationID
+        )
+        state = transform(state)
+        frontierState = state
+        frontierBySize[tileSize.rawValue] = state
+        persistToDisk()
+    }
+
+    func refreshFrontierState(playerTile: TileCoordinate?) {
+        updateFrontierState({ $0 }, playerTile: playerTile)
+    }
+
+    func applyWeeklyChargeResetIfNeeded() {
+        let weekKey = FrontierEngine.isoWeekKey()
+        guard frontierState.weekKey != weekKey else { return }
+
+        var updatedTiles = tiles
+        for (id, var tile) in updatedTiles where tile.weeklyCharge > 0 {
+            tile.weeklyCharge = 0
+            updatedTiles[id] = tile
+        }
+        tiles = updatedTiles
+        allTilesBySize[tileSize.rawValue] = updatedTiles
+
+        updateFrontierState({ state in
+            var next = state
+            if next.weeklyScore > next.bestWeekScore {
+                next.bestWeekScore = next.weeklyScore
+            }
+            next.weekKey = weekKey
+            next.offers = []
+            next.activeOfferID = nil
+            next.completedOfferIDs = []
+            next.weeklyScore = 0
+            next.connectionBonusesAwarded = []
+            next.chargedTileIDs = []
+            return next
+        }, playerTile: nil)
+    }
+
     func clearCurrentGrid() {
         tiles = [:]
         allTilesBySize[tileSize.rawValue] = [:]
         discoveryXPTotal = 0
         familiarityXPTotal = 0
         activitiesCompleted = 0
+        frontierState = .empty
+        frontierBySize[tileSize.rawValue] = .empty
         progressBySize[tileSize.rawValue] = PersistedProgressRecord(
             discoveryXPTotal: 0,
             familiarityXPTotal: 0,
@@ -150,9 +222,20 @@ final class TileStore: ObservableObject {
                 }
             }
             progressBySize = progress
+
+            var frontier: [Int: FrontierState] = [:]
+            if let frontierPayload = save.frontierBySize {
+                for (key, value) in frontierPayload {
+                    if let size = Int(key) {
+                        frontier[size] = value.asFrontierState()
+                    }
+                }
+            }
+            frontierBySize = frontier
         } catch {
             allTilesBySize = [:]
             progressBySize = [:]
+            frontierBySize = [:]
         }
     }
 
@@ -168,10 +251,12 @@ final class TileStore: ObservableObject {
             familiarityXPTotal = 0
             activitiesCompleted = 0
         }
+        frontierState = frontierBySize[size] ?? .empty
     }
 
     private func persistToDisk() {
         allTilesBySize[tileSize.rawValue] = tiles
+        frontierBySize[tileSize.rawValue] = frontierState
 
         var records: [PersistedTileRecord] = []
         for (size, map) in allTilesBySize {
@@ -185,7 +270,16 @@ final class TileStore: ObservableObject {
             progressPayload[String(size)] = record
         }
 
-        let save = WorldSaveFile(tiles: records, progressBySize: progressPayload)
+        var frontierPayload: [String: PersistedFrontierRecord] = [:]
+        for (size, state) in frontierBySize where !state.offers.isEmpty || state.weeklyScore > 0 || state.lifetimeCompletedExpeditions > 0 {
+            frontierPayload[String(size)] = PersistedFrontierRecord(from: state)
+        }
+
+        let save = WorldSaveFile(
+            tiles: records,
+            progressBySize: progressPayload,
+            frontierBySize: frontierPayload.isEmpty ? nil : frontierPayload
+        )
         do {
             let data = try encoder.encode(save)
             try data.write(to: fileURL, options: [.atomic])

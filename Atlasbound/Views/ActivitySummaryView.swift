@@ -14,6 +14,9 @@ struct ActivitySummaryView: View {
                 VStack(spacing: 14) {
                     heroHeader
                     kpiBand
+                    if let frontier = summary.frontierContribution, frontier.sessionTotal > 0 {
+                        frontierCard(frontier)
+                    }
                     tileCompositionCard
                     xpBreakdownCard
                     nerdStrip
@@ -90,6 +93,60 @@ struct ActivitySummaryView: View {
         Rectangle()
             .fill(AtlasTheme.divider(for: colorScheme))
             .frame(width: 1, height: 32)
+    }
+
+    // MARK: - Frontier
+
+    private func frontierCard(_ frontier: FrontierSessionContribution) -> some View {
+        StatSectionCard {
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Frontier contribution")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("+\(frontier.sessionTotal)")
+                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .foregroundStyle(AtlasTheme.gold)
+                }
+
+                HStack(spacing: 0) {
+                    StatKPI(value: "+\(frontier.tilePoints)", caption: "Tile pts", accent: AtlasTheme.gold)
+                    divider
+                    StatKPI(
+                        value: frontier.connectionBonus > 0 ? "+\(frontier.connectionBonus)" : "—",
+                        caption: "Connection"
+                    )
+                    divider
+                    StatKPI(
+                        value: frontier.completionBonus > 0 ? "+\(frontier.completionBonus)" : "—",
+                        caption: "Complete"
+                    )
+                }
+
+                if frontier.targetTilesRequired > 0 {
+                    NerdStat(
+                        label: "Target sector",
+                        value: "\(frontier.targetTilesDiscovered)/\(frontier.targetTilesRequired) tiles",
+                        icon: "scope"
+                    )
+                }
+                if frontier.didConnectTarget {
+                    NerdStat(label: "Sector link", value: "Connected", icon: "link")
+                }
+                NerdStat(
+                    label: "Weekly total",
+                    value: "\(frontier.weeklyTotalAfter) pts",
+                    icon: "calendar"
+                )
+                if frontier.comboPeak > 1 {
+                    NerdStat(
+                        label: "Peak combo",
+                        value: String(format: "x%.1f", frontier.comboPeak),
+                        icon: "flame.fill"
+                    )
+                }
+            }
+        }
     }
 
     // MARK: - Tile composition

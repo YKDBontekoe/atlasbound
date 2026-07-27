@@ -57,7 +57,57 @@ struct PersistedProgressRecord: Codable, Hashable, Sendable {
     var tileSizeMeters: Int
 }
 
+/// Optional per-grid frontier state — IDs and counters only, no geometry.
+struct PersistedFrontierRecord: Codable, Hashable, Sendable {
+    var weekKey: String
+    var offers: [ExpeditionOffer]
+    var activeOfferID: String?
+    var completedOfferIDs: [String]
+    var weeklyScore: Int
+    var connectionBonusesAwarded: [String]
+    var chargedTileIDs: [String]
+    var bestWeekScore: Int
+    var lifetimeCompletedExpeditions: Int
+
+    init(from state: FrontierState) {
+        weekKey = state.weekKey
+        offers = state.offers
+        activeOfferID = state.activeOfferID
+        completedOfferIDs = state.completedOfferIDs
+        weeklyScore = state.weeklyScore
+        connectionBonusesAwarded = state.connectionBonusesAwarded
+        chargedTileIDs = state.chargedTileIDs
+        bestWeekScore = state.bestWeekScore
+        lifetimeCompletedExpeditions = state.lifetimeCompletedExpeditions
+    }
+
+    func asFrontierState() -> FrontierState {
+        FrontierState(
+            weekKey: weekKey,
+            offers: offers,
+            activeOfferID: activeOfferID,
+            completedOfferIDs: completedOfferIDs,
+            weeklyScore: weeklyScore,
+            connectionBonusesAwarded: connectionBonusesAwarded,
+            chargedTileIDs: chargedTileIDs,
+            bestWeekScore: bestWeekScore,
+            lifetimeCompletedExpeditions: lifetimeCompletedExpeditions
+        )
+    }
+}
+
 struct WorldSaveFile: Codable, Sendable {
     var tiles: [PersistedTileRecord]
     var progressBySize: [String: PersistedProgressRecord]
+    var frontierBySize: [String: PersistedFrontierRecord]?
+
+    init(
+        tiles: [PersistedTileRecord],
+        progressBySize: [String: PersistedProgressRecord],
+        frontierBySize: [String: PersistedFrontierRecord]? = nil
+    ) {
+        self.tiles = tiles
+        self.progressBySize = progressBySize
+        self.frontierBySize = frontierBySize
+    }
 }

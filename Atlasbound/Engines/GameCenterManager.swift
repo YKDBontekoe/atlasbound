@@ -7,7 +7,11 @@ final class GameCenterManager: ObservableObject {
     @Published private(set) var localPlayerName: String = ""
     @Published private(set) var authError: String?
 
-    static let leaderboardID = "com.atlasbound.geoguessr.highscore"
+    static let pinpointLeaderboardID = "com.atlasbound.geoguessr.highscore"
+
+    static func frontierLeaderboardID(for tileSize: TileSizeOption) -> String {
+        "com.atlasbound.frontier.weekly.\(tileSize.rawValue)"
+    }
 
     func authenticate() {
         GKLocalPlayer.local.authenticateHandler = { [weak self] viewController, error in
@@ -19,7 +23,6 @@ final class GameCenterManager: ObservableObject {
                     return
                 }
                 if viewController != nil {
-                    // System presents the Game Center login UI automatically.
                     return
                 }
                 self.isAuthenticated = GKLocalPlayer.local.isAuthenticated
@@ -36,23 +39,45 @@ final class GameCenterManager: ObservableObject {
                 score,
                 context: 0,
                 player: GKLocalPlayer.local,
-                leaderboardIDs: [Self.leaderboardID]
+                leaderboardIDs: [Self.pinpointLeaderboardID]
             )
         } catch {
             authError = "Failed to submit score: \(error.localizedDescription)"
         }
     }
 
+    func submitFrontierScore(_ score: Int, tileSize: TileSizeOption) async {
+        guard isAuthenticated, score > 0 else { return }
+        do {
+            try await GKLeaderboard.submitScore(
+                score,
+                context: 0,
+                player: GKLocalPlayer.local,
+                leaderboardIDs: [Self.frontierLeaderboardID(for: tileSize)]
+            )
+        } catch {
+            authError = "Failed to submit frontier score: \(error.localizedDescription)"
+        }
+    }
+
     func showLeaderboard() {
+        showLeaderboard(id: Self.pinpointLeaderboardID)
+    }
+
+    func showFrontierLeaderboard(tileSize: TileSizeOption) {
+        showLeaderboard(id: Self.frontierLeaderboardID(for: tileSize))
+    }
+
+    private func showLeaderboard(id: String) {
         guard isAuthenticated else { return }
         guard let windowScene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first else { return }
 
         let viewController = GKGameCenterViewController(
-            leaderboardID: Self.leaderboardID,
+            leaderboardID: id,
             playerScope: .global,
-            timeScope: .allTime
+            timeScope: .week
         )
         viewController.gameCenterDelegate = GameCenterDismissHandler.shared
 

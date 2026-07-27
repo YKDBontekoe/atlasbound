@@ -41,6 +41,7 @@ struct ActivitySummary: Identifiable, Sendable {
     let discoveryXP: Int
     let familiarityXP: Int
     let activityType: ActivityType
+    var frontierContribution: FrontierSessionContribution?
 
     var duration: TimeInterval { endedAt.timeIntervalSince(startedAt) }
 
@@ -58,6 +59,10 @@ struct PersistedActivityRecord: Codable, Identifiable, Sendable, Hashable {
     let tileSizeMeters: Int
     let startedAt: Date
     let endedAt: Date
+    var frontierPoints: Int?
+    var frontierConnectionBonus: Int?
+    var frontierCompletionBonus: Int?
+    var frontierWeeklyTotal: Int?
 
     init(from summary: ActivitySummary, tileSizeMeters: Int) {
         self.id = summary.id
@@ -69,6 +74,12 @@ struct PersistedActivityRecord: Codable, Identifiable, Sendable, Hashable {
         self.tileSizeMeters = tileSizeMeters
         self.startedAt = summary.startedAt
         self.endedAt = summary.endedAt
+        if let frontier = summary.frontierContribution, frontier.sessionTotal > 0 {
+            self.frontierPoints = frontier.tilePoints
+            self.frontierConnectionBonus = frontier.connectionBonus > 0 ? frontier.connectionBonus : nil
+            self.frontierCompletionBonus = frontier.completionBonus > 0 ? frontier.completionBonus : nil
+            self.frontierWeeklyTotal = frontier.weeklyTotalAfter
+        }
     }
 }
 
