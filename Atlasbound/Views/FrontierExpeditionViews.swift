@@ -402,13 +402,14 @@ struct FrontierMissionBanner: View {
 
 struct ActiveFrontierTracker: View {
     @ObservedObject var controller: WorldController
+    var compact = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let sectorEngine = HexSectorEngine()
 
     var body: some View {
         if let offer = controller.activeExpedition {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: compact ? 6 : 10) {
                 HStack {
                     Image(systemName: "flag.fill")
                         .foregroundStyle(AtlasTheme.gold)
@@ -432,9 +433,11 @@ struct ActiveFrontierTracker: View {
                             .font(.caption.weight(.medium).monospacedDigit())
                     }
 
-                    Text(offer.difficulty.displayName)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    if !compact {
+                        Text(offer.difficulty.displayName)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 ProgressView(
@@ -443,7 +446,8 @@ struct ActiveFrontierTracker: View {
                 )
                 .tint(AtlasTheme.blue)
 
-                HStack(spacing: 12) {
+                if !compact {
+                    HStack(spacing: 12) {
                     Label(
                         controller.targetSectorConnected ? "Connected" : "Not connected",
                         systemImage: controller.targetSectorConnected ? "link" : "link.badge.plus"
@@ -459,9 +463,9 @@ struct ActiveFrontierTracker: View {
                     )
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(controller.frontierCombo.isActive ? AtlasTheme.gold : .secondary)
-                }
+                    }
 
-                VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 4) {
                     ProgressView(value: max(0.08, controller.frontierComboProgress))
                         .tint(AtlasTheme.gold)
 
@@ -476,9 +480,10 @@ struct ActiveFrontierTracker: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    }
                 }
             }
-            .padding(14)
+            .padding(compact ? 10 : 14)
             .background {
                 GlassChrome(
                     shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),

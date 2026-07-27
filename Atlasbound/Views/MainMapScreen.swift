@@ -126,6 +126,11 @@ struct MainMapScreen: View {
             }
             #endif
         }
+        .task(id: recorder.lastErrorMessage) {
+            guard recorder.lastErrorMessage != nil else { return }
+            try? await Task.sleep(for: .seconds(5))
+            recorder.clearError()
+        }
     }
 
     // MARK: - Idle chrome
@@ -291,7 +296,7 @@ struct MainMapScreen: View {
     }
 
     private var activeBottomPanel: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             HStack(spacing: 0) {
                 liveStat(
                     icon: "mappin.and.ellipse",
@@ -315,7 +320,7 @@ struct MainMapScreen: View {
             .padding(.vertical, 14)
             .background(cardBackground)
 
-            ActiveFrontierTracker(controller: controller)
+            ActiveFrontierTracker(controller: controller, compact: true)
 
             HStack(spacing: 14) {
                 Button {
@@ -324,7 +329,7 @@ struct MainMapScreen: View {
                     Image(systemName: controller.isPaused ? "play.fill" : "pause.fill")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(AtlasTheme.blue)
-                        .frame(width: 56, height: 56)
+                        .frame(width: 48, height: 48)
                 }
                 .buttonStyle(GlassButtonStyle(shape: .circle, weight: .regular))
 
@@ -334,12 +339,13 @@ struct MainMapScreen: View {
                     Text("Finish")
                         .font(.headline.weight(.bold))
                         .frame(maxWidth: .infinity)
-                        .frame(height: 56)
+                        .frame(height: 50)
                 }
                 .buttonStyle(TintedGlassButtonStyle(tint: AtlasTheme.finishRed, shape: .capsule))
             }
         }
         .padding(.horizontal, 12)
+        .padding(.bottom, 2)
     }
 
     private var mapSideControls: some View {

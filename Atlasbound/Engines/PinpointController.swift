@@ -40,9 +40,16 @@ final class PinpointController: ObservableObject {
     let store: PinpointStore
     let tileStore: TileStore
     let gameCenterManager: GameCenterManager
+    private var preparationTask: Task<Void, Never>?
+    private var preparationID: UUID?
 
     var runningScore: Int {
         roundResults.reduce(0) { $0 + $1.score }
+    }
+
+    /// Active Pinpoint uses a focused, full-screen presentation.
+    var isGameInProgress: Bool {
+        phase == .preparing || phase == .playing || phase == .roundResult
     }
 
     var unlockedAreaM2: Double {
@@ -69,6 +76,9 @@ final class PinpointController: ObservableObject {
     func startNewGame(mode: PinpointGameMode) {
         guard mode != .homeTurf || homeTurfUnlocked else { return }
 
+        preparationTask?.cancel()
+        let preparationID = UUID()
+        self.preparationID = preparationID
         phase = .preparing
         preparationError = nil
         currentMode = mode
@@ -78,7 +88,8 @@ final class PinpointController: ObservableObject {
             ? LookAroundLocationPool.atlasRegion(for: tileStore.discoveredTiles, engine: tileStore.tileEngine)
             : nil
 
-        Task {
+        preparationTask = Task { [weak self] in
+            guard let self else { return }
             do {
                 let newTargets: [CLLocationCoordinate2D]
                 switch mode {
@@ -91,6 +102,9 @@ final class PinpointController: ObservableObject {
                     )
                 }
 
+                try Task.checkCancellation()
+                guard self.preparationID == preparationID else { return }
+
                 targets = newTargets
                 roundResults = []
                 currentRound = 0
@@ -98,10 +112,25 @@ final class PinpointController: ObservableObject {
                 lastGameResult = nil
                 phase = .playing
             } catch {
+                guard !Task.isCancelled else { return }
+                guard self.preparationID == preparationID else { return }
                 preparationError = error.localizedDescription
                 phase = .lobby
             }
+            if self.preparationID == preparationID {
+                preparationTask = nil
+                self.preparationID = nil
+            }
         }
+    }
+
+    /// Returns immediately to the lobby so a slow Maps request never traps the player.
+    func cancelPreparation() {
+        guard phase == .preparing else { return }
+        preparationTask?.cancel()
+        preparationTask = nil
+        preparationID = nil
+        phase = .lobby
     }
 
     func submitGuess(_ guess: CLLocationCoordinate2D) {

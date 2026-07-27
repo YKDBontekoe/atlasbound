@@ -11,15 +11,16 @@ struct LookAroundGuessView: View {
     let roundSeconds: Int
     let regionConstraint: MKCoordinateRegion?
     let onGuess: (CLLocationCoordinate2D) -> Void
+    let onQuit: () -> Void
 
     @State private var lookAroundScene: MKLookAroundScene?
     @State private var isLoadingScene = true
     @State private var sceneUnavailable = false
     @State private var showGuessMap = false
-    @State private var showLookAroundViewer = false
     @State private var guessCoordinate: CLLocationCoordinate2D?
     @State private var secondsRemaining: Int
     @State private var timerActive = false
+    @State private var showQuitConfirmation = false
 
     init(
         target: CLLocationCoordinate2D,
@@ -29,7 +30,8 @@ struct LookAroundGuessView: View {
         currentScore: Int,
         roundSeconds: Int,
         regionConstraint: MKCoordinateRegion? = nil,
-        onGuess: @escaping (CLLocationCoordinate2D) -> Void
+        onGuess: @escaping (CLLocationCoordinate2D) -> Void,
+        onQuit: @escaping () -> Void
     ) {
         self.target = target
         self.mode = mode
@@ -39,6 +41,7 @@ struct LookAroundGuessView: View {
         self.roundSeconds = roundSeconds
         self.regionConstraint = regionConstraint
         self.onGuess = onGuess
+        self.onQuit = onQuit
         _secondsRemaining = State(initialValue: roundSeconds)
     }
 
@@ -49,18 +52,8 @@ struct LookAroundGuessView: View {
             } else if sceneUnavailable {
                 unavailableView
             } else if let scene = lookAroundScene {
-                LookAroundPreview(
-                    initialScene: scene,
-                    allowsNavigation: true,
-                    showsRoadLabels: false
-                )
+                PinpointLookAroundView(scene: scene)
                 .ignoresSafeArea()
-                .lookAroundViewer(
-                    isPresented: $showLookAroundViewer,
-                    initialScene: scene,
-                    allowsNavigation: true,
-                    showsRoadLabels: false
-                )
             }
 
             VStack(spacing: 0) {
@@ -73,7 +66,13 @@ struct LookAroundGuessView: View {
                 }
             }
         }
-        .task { await loadScene() }
+        .confirmationDialog("Leave this game?", isPresented: $showQuitConfirmation, titleVisibility: .visible) {
+            Button("Leave Game", role: .destructive, action: onQuit)
+            Button("Keep Playing", role: .cancel) { }
+        } message: {
+            Text("Your current round progress will be lost.")
+        }
+        .task(id: sceneRequestID) { await prepareRound() }
         .onChange(of: isLoadingScene) { _, loading in
             if !loading, !sceneUnavailable {
                 timerActive = true
@@ -94,10 +93,25 @@ struct LookAroundGuessView: View {
     }
 
     private var roundHeader: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
+            Button {
+                showQuitConfirmation = true
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.subheadline.weight(.bold))
+                    .frame(width: 34, height: 34)
+                    .background(.black.opacity(0.08), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Leave Pinpoint game")
+
             VStack(alignment: .leading, spacing: 4) {
-                Text("Round \(roundIndex + 1)/\(totalRounds)")
-                    .font(.headline.weight(.bold))
+                Text("ROUND \(roundIndex + 1) · \(totalRounds)")
+                    .font(.caption.weight(.bold))
+                    .tracking(0.8)
+                    .foregroundStyle(.secondary)
+                Text("Find your bearings")
+                    .font(.subheadline.weight(.semibold))
                 if mode == .homeTurf {
                     Text("Home Turf")
                         .font(.caption2.weight(.semibold))
@@ -109,13 +123,25 @@ struct LookAroundGuessView: View {
             }
             Spacer()
             timerRing
-            Text("\(currentScore) pts")
-                .font(.subheadline.weight(.bold).monospacedDigit())
-                .foregroundStyle(AtlasTheme.teal)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("SCORE")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
+                Text("\(currentScore)")
+                    .font(.subheadline.weight(.bold).monospacedDigit())
+                    .foregroundStyle(AtlasTheme.teal)
+            }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .background {
+            GlassChrome(
+                shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
+                weight: .regular
+            )
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
     }
 
     private var timerRing: some View {
@@ -176,39 +202,46 @@ struct LookAroundGuessView: View {
     }
 
     private var bottomControls: some View {
-        VStack(spacing: 10) {
-            if lookAroundScene != nil {
-                Button {
-                    showLookAroundViewer = true
-                } label: {
-                    HStack {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        Text("Explore Street View")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                }
-                .buttonStyle(GlassButtonStyle(shape: .capsule))
-                .padding(.horizontal, 20)
+        VStack(spacing: 9) {
+            HStack(spacing: 7) {
+                Image(systemName: "scope")
+                Text("Lock in your best estimate")
             }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.white.opacity(0.86))
 
             Button {
                 withAnimation(.spring(response: 0.35)) {
                     showGuessMap = true
                 }
             } label: {
-                HStack {
-                    Image(systemName: "map.fill")
-                    Text("Place Guess")
-                        .font(.headline.weight(.bold))
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
+                Label("Place Guess", systemImage: "mappin.and.ellipse")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
             }
-            .buttonStyle(TintedGlassButtonStyle(tint: AtlasTheme.blue, shape: .capsule))
-            .padding(.horizontal, 20)
-            .padding(.bottom, 16)
+            .buttonStyle(.plain)
+            .background {
+                GlassChrome(
+                    shape: Capsule(),
+                    weight: .regular,
+                    tint: Color.black,
+                    tintOpacity: 0.42
+                )
+            }
+            .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
+        }
+        .padding(.horizontal, 20)
+        // Leave clear space for MapKit's required Apple Maps attribution.
+        .padding(.bottom, 52)
+        .background {
+            LinearGradient(
+                colors: [.clear, Color.black.opacity(0.45)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea(edges: .bottom)
         }
     }
 
@@ -281,5 +314,26 @@ struct LookAroundGuessView: View {
                 self.isLoadingScene = false
             }
         }
+    }
+
+    /// Reuse the view between rounds so MapKit can release its previous preview
+    /// before requesting the next scene. Recreating the entire preview hierarchy
+    /// during the result-to-round transition can make the simulator return to the
+    /// app root instead of presenting the next round.
+    private var sceneRequestID: String {
+        "\(roundIndex):\(target.latitude):\(target.longitude)"
+    }
+
+    @MainActor
+    private func prepareRound() async {
+        timerActive = false
+        isLoadingScene = true
+        sceneUnavailable = false
+        lookAroundScene = nil
+        showGuessMap = false
+        guessCoordinate = nil
+        secondsRemaining = roundSeconds
+        await Task.yield()
+        await loadScene()
     }
 }

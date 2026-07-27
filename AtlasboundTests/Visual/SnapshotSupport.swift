@@ -12,7 +12,10 @@ enum SnapshotSupport {
     static let maxDifferentPixelFraction: Double = 0.015
 
     static var isRecording: Bool {
-        envFlag("RECORD_SNAPSHOTS") || envFlag("BOOTSTRAP_SNAPSHOTS")
+        envFlag("RECORD_SNAPSHOTS")
+            || envFlag("BOOTSTRAP_SNAPSHOTS")
+            || envFlag("TEST_RUNNER_RECORD_SNAPSHOTS")
+            || envFlag("TEST_RUNNER_BOOTSTRAP_SNAPSHOTS")
     }
 
     private static func envFlag(_ key: String) -> Bool {

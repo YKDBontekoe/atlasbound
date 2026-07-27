@@ -21,7 +21,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
             applyCoreLocationActivityType()
         }
     }
-    @Published var lastErrorMessage: String?
+    @Published private(set) var lastErrorMessage: String?
 
     private let manager = CLLocationManager()
     private var settings: ActivitySettings
@@ -96,7 +96,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
     }
 
     func start() {
-        lastErrorMessage = nil
+        clearError()
         requestAuthorization()
 
         let status = manager.authorizationStatus
@@ -204,7 +204,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
         if active {
             manager.stopUpdatingLocation()
             manager.allowsBackgroundLocationUpdates = false
-            lastErrorMessage = nil
+            clearError()
         } else if isRecording, !isPaused {
             manager.startUpdatingLocation()
         } else if !isRecording {
@@ -235,6 +235,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
 
         lastAcceptedLocation = location
         lastLocation = location
+        clearError()
 
         let sample = LocationSample(
             coordinate: location.coordinate,
@@ -244,6 +245,28 @@ final class ActivityRecorder: NSObject, ObservableObject {
         )
         samples.append(sample)
         onSample?(sample)
+    }
+
+    func clearError() {
+        lastErrorMessage = nil
+    }
+
+    nonisolated static func presentableMessage(for error: Error) -> String? {
+        guard let locationError = error as? CLError else {
+            return "Location updates are temporarily unavailable. We'll keep trying."
+        }
+
+        switch locationError.code {
+        case .locationUnknown:
+            // Core Location reports this transient condition while it seeks a fix.
+            return nil
+        case .denied:
+            return "Location access is off. Enable it in Settings to record an activity."
+        case .network:
+            return "Couldn't reach location services. We'll keep trying."
+        default:
+            return "Location updates are temporarily unavailable. We'll keep trying."
+        }
     }
 }
 
@@ -273,7 +296,7 @@ extension ActivityRecorder: CLLocationManagerDelegate {
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor in
-            self.lastErrorMessage = error.localizedDescription
+            self.lastErrorMessage = Self.presentableMessage(for: error)
         }
     }
 }

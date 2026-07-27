@@ -25,11 +25,18 @@ struct LookAroundLocationPool: Sendable {
     /// Generate round targets anywhere on Earth with Look Around validation.
     static func generateWorldwideTargets(count: Int = PinpointConstants.roundsPerGame) async throws -> [CLLocationCoordinate2D] {
         var targets: [CLLocationCoordinate2D] = []
-        for _ in 0..<count {
-            guard let coordinate = await findWorldwideCoordinate(maxAttempts: 40) else {
-                throw GenerationError.worldwideGenerationFailed
+        var unusedCandidates = worldwideCandidateCoordinates().shuffled()
+
+        while targets.count < count, !unusedCandidates.isEmpty {
+            try Task.checkCancellation()
+            let candidate = unusedCandidates.removeFirst()
+            if await hasLookAround(at: candidate) {
+                targets.append(candidate)
             }
-            targets.append(coordinate)
+        }
+
+        guard targets.count == count else {
+            throw GenerationError.worldwideGenerationFailed
         }
         return targets
     }
@@ -51,11 +58,12 @@ struct LookAroundLocationPool: Sendable {
         let shuffled = discoveredTiles.shuffled()
 
         for _ in 0..<count {
+            try Task.checkCancellation()
             guard let coordinate = await findHomeTurfCoordinate(
                 tiles: shuffled,
                 engine: engine,
                 usedTileIDs: &usedTileIDs,
-                maxAttempts: 40
+                maxAttempts: 12
             ) else {
                 throw GenerationError.insufficientHomeTurfCoverage
             }
@@ -97,6 +105,7 @@ struct LookAroundLocationPool: Sendable {
 
     private static func findWorldwideCoordinate(maxAttempts: Int) async -> CLLocationCoordinate2D? {
         for _ in 0..<maxAttempts {
+            guard !Task.isCancelled else { return nil }
             let probe = randomLandCoordinate()
 
             if let coordinate = await findLookAroundFromMappedPlaces(center: probe, radius: 25_000) {
@@ -291,6 +300,25 @@ struct LookAroundLocationPool: Sendable {
             latitude: Double.random(in: -55...55),
             longitude: Double.random(in: -180...180)
         )
+    }
+
+    /// Dense urban street locations. Every candidate is still validated with
+    /// `MKLookAroundSceneRequest`; no round begins without a real Look Around scene.
+    private static func worldwideCandidateCoordinates() -> [CLLocationCoordinate2D] {
+        [
+            CLLocationCoordinate2D(latitude: 52.3728, longitude: 4.8936),   // Amsterdam, Damrak
+            CLLocationCoordinate2D(latitude: 51.5074, longitude: -0.1278),  // London, Whitehall
+            CLLocationCoordinate2D(latitude: 48.8584, longitude: 2.2945),   // Paris, Eiffel Tower
+            CLLocationCoordinate2D(latitude: 40.7580, longitude: -73.9855), // New York, Times Square
+            CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),// San Francisco
+            CLLocationCoordinate2D(latitude: 35.6595, longitude: 139.7005), // Tokyo, Shibuya
+            CLLocationCoordinate2D(latitude: 1.2903, longitude: 103.8519),  // Singapore, Marina Bay
+            CLLocationCoordinate2D(latitude: -33.8688, longitude: 151.2093),// Sydney CBD
+            CLLocationCoordinate2D(latitude: 41.9028, longitude: 12.4964),  // Rome
+            CLLocationCoordinate2D(latitude: 52.5200, longitude: 13.4050),  // Berlin
+            CLLocationCoordinate2D(latitude: 41.3851, longitude: 2.1734),   // Barcelona
+            CLLocationCoordinate2D(latitude: 43.6532, longitude: -79.3832)  // Toronto
+        ]
     }
 
     /// Small offsets (~0.5–2 km) around an urban anchor to hit nearby mapped streets.

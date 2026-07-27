@@ -13,10 +13,16 @@ struct PinpointLobbyView: View {
                 gameCenterSection
 
                 if let error = controller.preparationError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(AtlasTheme.finishRed)
-                        .multilineTextAlignment(.center)
+                    VStack(spacing: 8) {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(AtlasTheme.finishRed)
+                            .multilineTextAlignment(.center)
+                        Button("Try Worldwide again") {
+                            controller.startNewGame(mode: .worldwide)
+                        }
+                        .font(.caption.weight(.semibold))
+                    }
                 }
 
                 if let error = controller.gameCenterManager.authError {
@@ -142,8 +148,8 @@ struct PinpointLobbyView: View {
 
             Button(action: action) {
                 HStack {
-                    Image(systemName: "play.fill")
-                    Text("Play \(mode.displayName)")
+                    Image(systemName: enabled ? "play.fill" : "lock.fill")
+                    Text(enabled ? "Play \(mode.displayName)" : "\(mode.displayName) locked")
                         .font(.headline.weight(.bold))
                 }
                 .frame(maxWidth: .infinity)
@@ -151,7 +157,8 @@ struct PinpointLobbyView: View {
             }
             .buttonStyle(TintedGlassButtonStyle(tint: mode == .homeTurf ? AtlasTheme.gold : AtlasTheme.blue, shape: .capsule))
             .disabled(!enabled || controller.phase == .preparing)
-            .opacity(enabled ? 1 : 0.55)
+            .opacity(enabled ? 1 : 0.45)
+            .accessibilityValue(enabled ? "Available" : "Locked")
         }
         .padding(16)
         .background {
@@ -272,6 +279,14 @@ struct PinpointLobbyView: View {
                 Text("Finding locations…")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
+                Button("Cancel") {
+                    controller.cancelPreparation()
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(.white.opacity(0.16), in: Capsule())
             }
             .padding(28)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
