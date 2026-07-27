@@ -23,14 +23,15 @@ struct StaggeredAppear: ViewModifier {
     let index: Int
     var baseDelay: Double = 0.05
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.atlasForceSettledMotion) private var forceSettled
     @State private var visible = false
 
     func body(content: Content) -> some View {
         content
-            .opacity(visible || reduceMotion ? 1 : 0)
-            .offset(y: visible || reduceMotion ? 0 : 10)
+            .opacity(visible || reduceMotion || forceSettled ? 1 : 0)
+            .offset(y: visible || reduceMotion || forceSettled ? 0 : 10)
             .onAppear {
-                guard !reduceMotion else {
+                guard !reduceMotion, !forceSettled else {
                     visible = true
                     return
                 }
@@ -52,6 +53,7 @@ extension View {
 /// Scale + opacity pop for XP / mastery / exact-tile badges.
 struct CelebrateBadge<Content: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.atlasForceSettledMotion) private var forceSettled
     @State private var popped = false
     let content: Content
 
@@ -61,10 +63,10 @@ struct CelebrateBadge<Content: View>: View {
 
     var body: some View {
         content
-            .scaleEffect(popped || reduceMotion ? 1 : 0.6)
-            .opacity(popped || reduceMotion ? 1 : 0)
+            .scaleEffect(popped || reduceMotion || forceSettled ? 1 : 0.6)
+            .opacity(popped || reduceMotion || forceSettled ? 1 : 0)
             .onAppear {
-                guard !reduceMotion else {
+                guard !reduceMotion, !forceSettled else {
                     popped = true
                     return
                 }
@@ -137,11 +139,12 @@ struct SessionFeedbackToast: View {
 struct GrowOnAppear: ViewModifier {
     @Binding var progress: Double
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.atlasForceSettledMotion) private var forceSettled
 
     func body(content: Content) -> some View {
         content
             .onAppear {
-                guard !reduceMotion else {
+                if reduceMotion || forceSettled {
                     progress = 1
                     return
                 }

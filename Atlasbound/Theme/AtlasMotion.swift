@@ -49,3 +49,17 @@ enum AtlasMotion {
         }
     }
 }
+
+// MARK: - Snapshot / settled-frame override
+
+private struct AtlasForceSettledMotionKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// When true, motion views snap to their final frame (used by snapshot tests).
+    var atlasForceSettledMotion: Bool {
+        get { self[AtlasForceSettledMotionKey.self] }
+        set { self[AtlasForceSettledMotionKey.self] = newValue }
+    }
+}

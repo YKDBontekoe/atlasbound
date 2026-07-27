@@ -59,6 +59,7 @@ struct SegmentedBar: View {
     var cornerRadius: CGFloat = 4
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.atlasForceSettledMotion) private var forceSettled
     @State private var growProgress: Double = 0
 
     private var total: Double {
@@ -66,7 +67,7 @@ struct SegmentedBar: View {
     }
 
     private var progress: Double {
-        reduceMotion ? 1 : growProgress
+        (reduceMotion || forceSettled) ? 1 : growProgress
     }
 
     var body: some View {
@@ -114,6 +115,7 @@ struct XPSplitArc: View {
     var size: CGFloat = 72
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.atlasForceSettledMotion) private var forceSettled
     @State private var growProgress: Double = 0
 
     private var total: Int { discovery + familiarity }
@@ -122,7 +124,7 @@ struct XPSplitArc: View {
     }
 
     private var progress: Double {
-        reduceMotion ? 1 : growProgress
+        (reduceMotion || forceSettled) ? 1 : growProgress
     }
 
     var body: some View {
