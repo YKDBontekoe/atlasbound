@@ -79,9 +79,13 @@ final class FrontierEngineTests: XCTestCase {
     }
 
     func testScoringComponentsAndComboCap() {
-        let territory: Set<TileCoordinate> = [TileCoordinate(q: 0, r: 0)]
-        var discovered = territory
-        let targetSector = engine.sectorEngine.sectorAt(distance: 1, from: engine.sectorEngine.sectorCoordinate(for: TileCoordinate(q: 0, r: 0)), directionIndex: 0)
+        let origin = TileCoordinate(q: 0, r: 0)
+        let territory: Set<TileCoordinate> = [origin]
+        let targetSector = engine.sectorEngine.sectorAt(
+            distance: 1,
+            from: engine.sectorEngine.sectorCoordinate(for: origin),
+            directionIndex: 0
+        )
         let targetID = engine.sectorEngine.sectorID(for: targetSector, sizeMeters: 80)
         let offer = ExpeditionOffer(
             id: "expedition:test",
@@ -92,7 +96,11 @@ final class FrontierEngineTests: XCTestCase {
             tilesRequired: 12,
             completionBonus: 500
         )
-        let targetTile = engine.sectorEngine.centerTile(for: targetSector)
+        let targetTile = engine.sectorEngine.tiles(in: targetSector).min {
+            TileEngine.hexDistance($0, origin) < TileEngine.hexDistance($1, origin)
+        }!
+        let path = TileEngine.hexLine(from: origin, to: targetTile)
+        let discovered = Set(path.dropLast()).union(territory)
         let tileID = TileEngine.makeTileID(q: targetTile.q, r: targetTile.r, sizeMeters: 80)
 
         var combo = FrontierComboState.empty
@@ -121,7 +129,6 @@ final class FrontierEngineTests: XCTestCase {
             tileEngine: tileEngine,
             at: .now
         )
-        discovered.insert(targetTile)
         XCTAssertNotNil(result.award)
         XCTAssertEqual(result.award?.basePoints, FrontierEngine.baseTilePoints)
         XCTAssertEqual(result.award?.sectorBonus, FrontierEngine.targetSectorBonus)
@@ -129,11 +136,11 @@ final class FrontierEngineTests: XCTestCase {
     }
 
     func testConnectionBonusIsIdempotent() {
-        let territory: Set<TileCoordinate> = [TileCoordinate(q: 0, r: 0)]
-        let discovered = territory
+        let origin = TileCoordinate(q: 0, r: 0)
+        let territory: Set<TileCoordinate> = [origin]
         let targetSector = engine.sectorEngine.sectorAt(
             distance: 1,
-            from: engine.sectorEngine.sectorCoordinate(for: TileCoordinate(q: 0, r: 0)),
+            from: engine.sectorEngine.sectorCoordinate(for: origin),
             directionIndex: 0
         )
         let targetID = engine.sectorEngine.sectorID(for: targetSector, sizeMeters: 80)
@@ -146,12 +153,16 @@ final class FrontierEngineTests: XCTestCase {
             tilesRequired: 12,
             completionBonus: 500
         )
-        let bridge = TileCoordinate(q: 1, r: 0)
-        let tileID = TileEngine.makeTileID(q: bridge.q, r: bridge.r, sizeMeters: 80)
+        let entryTile = engine.sectorEngine.tiles(in: targetSector).min {
+            TileEngine.hexDistance($0, origin) < TileEngine.hexDistance($1, origin)
+        }!
+        let path = TileEngine.hexLine(from: origin, to: entryTile)
+        let discovered = Set(path.dropLast()).union(territory)
+        let tileID = TileEngine.makeTileID(q: entryTile.q, r: entryTile.r, sizeMeters: 80)
 
         let first = engine.scoreDiscovery(
             tileID: tileID,
-            tile: bridge,
+            tile: entryTile,
             isNewDiscovery: true,
             activeOffer: offer,
             territory: territory,
@@ -166,11 +177,11 @@ final class FrontierEngineTests: XCTestCase {
 
         let second = engine.scoreDiscovery(
             tileID: tileID,
-            tile: bridge,
+            tile: entryTile,
             isNewDiscovery: true,
             activeOffer: offer,
             territory: territory,
-            discovered: discovered.union([bridge]),
+            discovered: discovered.union([entryTile]),
             targetSectorDiscoveredCount: 0,
             connectionBonusesAwarded: [offer.id],
             combo: .empty,

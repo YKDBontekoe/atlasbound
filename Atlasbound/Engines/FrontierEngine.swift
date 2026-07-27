@@ -87,9 +87,27 @@ struct FrontierEngine: Sendable {
         territory: Set<TileCoordinate>,
         discovered: Set<TileCoordinate>
     ) -> Bool {
-        guard discovered.contains(tile) else { return false }
-        if territory.contains(tile) { return true }
-        return axialNeighbors(of: tile).contains(where: territory.contains)
+        tilesConnectedToTerritory(territory: territory, discovered: discovered).contains(tile)
+    }
+
+    /// Discovered tiles reachable from the territory anchor through contiguous discovered hexes.
+    func tilesConnectedToTerritory(
+        territory: Set<TileCoordinate>,
+        discovered: Set<TileCoordinate>,
+        extra: TileCoordinate? = nil
+    ) -> Set<TileCoordinate> {
+        var world = discovered
+        if let extra { world.insert(extra) }
+
+        var visited = Set<TileCoordinate>()
+        var queue = Array(territory)
+        while let current = queue.popLast() {
+            guard visited.insert(current).inserted else { continue }
+            for neighbor in axialNeighbors(of: current) where world.contains(neighbor) && !visited.contains(neighbor) {
+                queue.append(neighbor)
+            }
+        }
+        return visited
     }
 
     func routeConnectsTerritoryToSector(
@@ -101,10 +119,8 @@ struct FrontierEngine: Sendable {
         guard let parsed = sectorEngine.parseSectorID(targetSectorID) else { return false }
         let targetSector = parsed.sector
         let targetTiles = sectorEngine.tiles(in: targetSector)
-        let connectedDiscovered = discovered.filter { tile in
-            isConnectedToTerritory(tile: tile, territory: territory, discovered: discovered)
-        }
-        return !connectedDiscovered.isDisjoint(with: targetTiles)
+        let connected = tilesConnectedToTerritory(territory: territory, discovered: discovered)
+        return !connected.isDisjoint(with: targetTiles)
     }
 
     // MARK: - Weekly offers
@@ -223,7 +239,7 @@ struct FrontierEngine: Sendable {
         guard isNewDiscovery else {
             return (nil, combo, false, nil)
         }
-        guard isConnectedToTerritory(tile: tile, territory: territory, discovered: discovered) else {
+        guard tilesConnectedToTerritory(territory: territory, discovered: discovered, extra: tile).contains(tile) else {
             return (nil, combo, false, nil)
         }
 
@@ -245,8 +261,11 @@ struct FrontierEngine: Sendable {
         var connectionBonusValue: Int?
         if let offer = activeOffer,
            !connectionBonusesAwarded.contains(offer.id) {
-            var extendedDiscovered = discovered
-            extendedDiscovered.insert(tile)
+            let extendedDiscovered = tilesConnectedToTerritory(
+                territory: territory,
+                discovered: discovered,
+                extra: tile
+            )
             if routeConnectsTerritoryToSector(
                 territory: territory,
                 discovered: extendedDiscovered,
