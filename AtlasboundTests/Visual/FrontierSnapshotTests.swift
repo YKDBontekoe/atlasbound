@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 final class FrontierSnapshotTests: XCTestCase {
-    func testIdleExpeditionPanelSnapshot() throws {
+    private func makeController() -> WorldController {
         let store = TileStore(fileURL: FileManager.default.temporaryDirectory
             .appendingPathComponent("snapshot-\(UUID().uuidString).json"),
             installationID: "snapshot-install")
@@ -12,21 +12,44 @@ final class FrontierSnapshotTests: XCTestCase {
             .appendingPathComponent("history-\(UUID().uuidString).json"))
         let controller = WorldController(store: store, activityHistory: history)
         controller.refreshFrontierPresentation()
+        return controller
+    }
 
-        let view = IdleExpeditionPanel(controller: controller, store: store)
+    func testExpeditionMissionListSnapshot() throws {
+        let controller = makeController()
+        let store = controller.store
+
+        let view = ExpeditionMissionList(controller: controller, store: store)
+            .frame(width: 390, height: 520)
+            .padding()
+        try SnapshotSupport.assertSnapshot(of: view, named: "ExpeditionMissionList")
+    }
+
+    func testFrontierMissionBannerIdleSnapshot() throws {
+        let controller = makeController()
+        let store = controller.store
+
+        let view = FrontierMissionBanner(controller: controller, store: store, onTap: {})
             .frame(width: 390)
             .padding()
-        try SnapshotSupport.assertSnapshot(of: view, named: "IdleExpeditionPanel")
+        try SnapshotSupport.assertSnapshot(of: view, named: "FrontierMissionBannerIdle")
+    }
+
+    func testFrontierMissionBannerActiveSnapshot() throws {
+        let controller = makeController()
+        let store = controller.store
+        if let offer = controller.availableExpeditions.first {
+            controller.selectExpedition(offer)
+        }
+
+        let view = FrontierMissionBanner(controller: controller, store: store, onTap: {})
+            .frame(width: 390)
+            .padding()
+        try SnapshotSupport.assertSnapshot(of: view, named: "FrontierMissionBannerActive")
     }
 
     func testActiveFrontierTrackerSnapshot() throws {
-        let store = TileStore(fileURL: FileManager.default.temporaryDirectory
-            .appendingPathComponent("snapshot-\(UUID().uuidString).json"),
-            installationID: "snapshot-install")
-        let history = ActivityHistoryStore(fileURL: FileManager.default.temporaryDirectory
-            .appendingPathComponent("history-\(UUID().uuidString).json"))
-        let controller = WorldController(store: store, activityHistory: history)
-        controller.refreshFrontierPresentation()
+        let controller = makeController()
         if let offer = controller.availableExpeditions.first {
             controller.selectExpedition(offer)
         }
