@@ -9,7 +9,10 @@ struct PinpointRoundResultView: View {
     let runningTotal: Int
     let onNext: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var displayedScore = 0
+    @State private var showDetails = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,13 +32,18 @@ struct PinpointRoundResultView: View {
 
                 HStack(spacing: 24) {
                     VStack(spacing: 4) {
-                        Text("\(result.score)")
+                        Text("\(displayedScore)")
                             .font(.system(size: 36, weight: .bold, design: .rounded).monospacedDigit())
                             .foregroundStyle(scoreColor)
+                            .contentTransition(.numericText())
+                            .animation(AtlasMotion.number, value: displayedScore)
                         Text("points")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .opacity(showDetails || reduceMotion ? 1 : 0)
+                    .offset(y: showDetails || reduceMotion ? 0 : 8)
+
                     VStack(spacing: 4) {
                         Text(PinpointScoring.formatDistance(result.distanceMeters))
                             .font(.system(size: 20, weight: .semibold, design: .rounded))
@@ -43,6 +51,8 @@ struct PinpointRoundResultView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .opacity(showDetails || reduceMotion ? 1 : 0)
+
                     VStack(spacing: 4) {
                         Text("\(result.hexDistance)")
                             .font(.system(size: 20, weight: .semibold, design: .rounded).monospacedDigit())
@@ -50,12 +60,15 @@ struct PinpointRoundResultView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .opacity(showDetails || reduceMotion ? 1 : 0)
                 }
 
                 if result.familiarityXPAwarded > 0 {
-                    Text("+\(result.familiarityXPAwarded) familiarity XP")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AtlasTheme.gold)
+                    CelebrateBadge {
+                        Text("+\(result.familiarityXPAwarded) familiarity XP")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AtlasTheme.gold)
+                    }
                 }
 
                 HStack {
@@ -65,9 +78,11 @@ struct PinpointRoundResultView: View {
                     Spacer()
                     Text("Total: \(runningTotal)")
                         .font(.subheadline.weight(.bold).monospacedDigit())
+                        .contentTransition(.numericText())
                 }
 
                 Button {
+                    AtlasHaptics.select()
                     onNext()
                 } label: {
                     Text(roundNumber + 1 >= totalRounds ? "See Results" : "Next Round")
@@ -89,6 +104,25 @@ struct PinpointRoundResultView: View {
                 center: CLLocationCoordinate2D(latitude: midLat, longitude: midLon),
                 span: MKCoordinateSpan(latitudeDelta: max(spanLat, 1), longitudeDelta: max(spanLon, 1))
             ))
+
+            if result.score >= 3_000 || result.hitExactTile {
+                AtlasHaptics.success()
+            } else {
+                AtlasHaptics.light()
+            }
+
+            if reduceMotion {
+                displayedScore = result.score
+                showDetails = true
+                return
+            }
+
+            withAnimation(AtlasMotion.chrome) {
+                showDetails = true
+            }
+            withAnimation(AtlasMotion.celebrate) {
+                displayedScore = result.score
+            }
         }
     }
 
@@ -101,9 +135,13 @@ struct PinpointRoundResultView: View {
                 .background(AtlasTheme.blue.opacity(0.12), in: Capsule())
 
             if result.hitExactTile {
-                badge("Exact tile", color: AtlasTheme.gold)
+                CelebrateBadge {
+                    badge("Exact tile", color: AtlasTheme.gold)
+                }
             } else if result.guessInDiscoveredAtlas {
-                badge("Atlas hit", color: AtlasTheme.teal)
+                CelebrateBadge {
+                    badge("Atlas hit", color: AtlasTheme.teal)
+                }
             }
         }
     }

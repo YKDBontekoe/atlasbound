@@ -14,6 +14,7 @@ struct LookAroundGuessView: View {
     let onGuess: (CLLocationCoordinate2D) -> Void
     let onQuit: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var galleryImages: [UIImage] = []
     @State private var isLoadingScene = true
     @State private var sceneUnavailable = false
@@ -22,6 +23,7 @@ struct LookAroundGuessView: View {
     @State private var secondsRemaining: Int
     @State private var timerActive = false
     @State private var showQuitConfirmation = false
+    @State private var urgencyPulse = false
 
     private let snapshotEngine = LookAroundSnapshotEngine()
 
@@ -52,11 +54,14 @@ struct LookAroundGuessView: View {
         ZStack(alignment: .bottom) {
             if isLoadingScene {
                 loadingView
+                    .transition(.opacity)
             } else if sceneUnavailable {
                 unavailableView
+                    .transition(.opacity)
             } else if !galleryImages.isEmpty {
                 LookAroundGalleryView(images: galleryImages)
                     .ignoresSafeArea()
+                    .transition(.opacity)
             }
 
             VStack(spacing: 0) {
@@ -69,6 +74,7 @@ struct LookAroundGuessView: View {
                 }
             }
         }
+        .animation(AtlasMotion.optional(AtlasMotion.fade, reduceMotion: reduceMotion), value: isLoadingScene)
         .confirmationDialog("Leave this game?", isPresented: $showQuitConfirmation, titleVisibility: .visible) {
             Button("Leave Game", role: .destructive, action: onQuit)
             Button("Keep Playing", role: .cancel) { }
@@ -84,11 +90,19 @@ struct LookAroundGuessView: View {
         .onChange(of: showGuessMap) { _, showing in
             timerActive = !showing && !isLoadingScene && !sceneUnavailable
         }
+        .onChange(of: secondsRemaining) { _, remaining in
+            guard remaining <= 10, remaining > 0, !reduceMotion else { return }
+            if !urgencyPulse {
+                withAnimation(AtlasMotion.ambient.repeatForever(autoreverses: true)) {
+                    urgencyPulse = true
+                }
+            }
+        }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             guard timerActive, secondsRemaining > 0 else { return }
             secondsRemaining -= 1
             if secondsRemaining == 0 {
-                withAnimation(.spring(response: 0.35)) {
+                AtlasMotion.withOptionalAnimation(AtlasMotion.panel, reduceMotion: reduceMotion) {
                     showGuessMap = true
                 }
             }
@@ -133,6 +147,8 @@ struct LookAroundGuessView: View {
                 Text("\(currentScore)")
                     .font(.subheadline.weight(.bold).monospacedDigit())
                     .foregroundStyle(AtlasTheme.teal)
+                    .contentTransition(.numericText())
+                    .animation(AtlasMotion.number, value: currentScore)
             }
         }
         .padding(.horizontal, 16)
@@ -166,6 +182,9 @@ struct LookAroundGuessView: View {
                 .foregroundStyle(urgent ? AtlasTheme.finishRed : .primary)
         }
         .frame(width: 40, height: 40)
+        .scaleEffect(urgent && urgencyPulse ? 1.08 : 1)
+        .opacity(urgent && urgencyPulse ? 0.85 : 1)
+        .animation(AtlasMotion.optional(AtlasMotion.number, reduceMotion: reduceMotion), value: secondsRemaining)
     }
 
     private var loadingView: some View {
@@ -192,7 +211,10 @@ struct LookAroundGuessView: View {
                 .foregroundStyle(.secondary)
 
             Button {
-                showGuessMap = true
+                AtlasMotion.withOptionalAnimation(AtlasMotion.panel, reduceMotion: reduceMotion) {
+                    showGuessMap = true
+                }
+                AtlasHaptics.select()
             } label: {
                 Text("Open Map")
                     .font(.headline.weight(.bold))
@@ -214,9 +236,10 @@ struct LookAroundGuessView: View {
             .foregroundStyle(.white.opacity(0.86))
 
             Button {
-                withAnimation(.spring(response: 0.35)) {
+                AtlasMotion.withOptionalAnimation(AtlasMotion.panel, reduceMotion: reduceMotion) {
                     showGuessMap = true
                 }
+                AtlasHaptics.select()
             } label: {
                 Label("Place Guess", systemImage: "mappin.and.ellipse")
                     .font(.subheadline.weight(.semibold))
@@ -255,7 +278,7 @@ struct LookAroundGuessView: View {
                     .font(.subheadline.weight(.semibold))
                 Spacer()
                 Button {
-                    withAnimation(.spring(response: 0.35)) {
+                    AtlasMotion.withOptionalAnimation(AtlasMotion.panel, reduceMotion: reduceMotion) {
                         showGuessMap = false
                     }
                 } label: {
@@ -278,6 +301,7 @@ struct LookAroundGuessView: View {
                 if guessCoordinate != nil {
                     Button {
                         if let guess = guessCoordinate {
+                            AtlasHaptics.success()
                             onGuess(guess)
                         }
                     } label: {
@@ -289,6 +313,8 @@ struct LookAroundGuessView: View {
                     .buttonStyle(TintedGlassButtonStyle(tint: AtlasTheme.teal, shape: .capsule))
                     .padding(.horizontal, 20)
                     .padding(.bottom, 12)
+                    .transition(.scale.combined(with: .opacity))
+                    .animation(AtlasMotion.optional(AtlasMotion.celebrate, reduceMotion: reduceMotion), value: guessCoordinate != nil)
                 }
             }
         }

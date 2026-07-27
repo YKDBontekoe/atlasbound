@@ -13,6 +13,7 @@ final class WorldController: ObservableObject {
     @Published private(set) var frontierCombo = FrontierComboState.empty
     @Published private(set) var sessionFrontierScore = 0
     @Published private(set) var frontierScoreCallouts: [FrontierScoreCallout] = []
+    @Published private(set) var sessionFeedback: [SessionFeedbackEvent] = []
     @Published private(set) var lastSummary: ActivitySummary?
 
     let recorder: ActivityRecorder
@@ -258,6 +259,7 @@ final class WorldController: ObservableObject {
         frontierCombo = .empty
         sessionFrontierScore = 0
         frontierScoreCallouts = []
+        sessionFeedback = []
         sessionTiles = [:]
         sessionProgress = .empty
         sessionFrontier = .empty
@@ -267,6 +269,7 @@ final class WorldController: ObservableObject {
             sessionFrontier.targetTilesDiscovered = targetSectorDiscoveredCount
         }
         lastSummary = nil
+        AtlasHaptics.prepare()
         recorder.start()
     }
 
@@ -382,6 +385,12 @@ final class WorldController: ObservableObject {
             sessionTiles[id] = store.tiles[id]
         }
 
+        let priorStates: [String: TileState] = Dictionary(
+            uniqueKeysWithValues: newIDs.map { id in
+                (id, sessionTiles[id]?.state ?? .fogged)
+            }
+        )
+
         let discoveryCandidates = Set(newIDs.filter { id in
             guard let tile = sessionTiles[id] else { return true }
             return tile.state == .fogged || tile.firstVisitedAt == nil
@@ -409,6 +418,13 @@ final class WorldController: ObservableObject {
         sessionProgress.discoveryXP += progress.discoveryXP
         sessionProgress.familiarityXP += progress.familiarityXP
         sessionDiscoveredCount = sessionProgress.tilesDiscovered
+
+        emitSessionFeedback(
+            discoveredCount: progress.tilesDiscovered,
+            tileIDs: newIDs,
+            priorStates: priorStates,
+            at: date
+        )
 
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
 
@@ -441,6 +457,7 @@ final class WorldController: ObservableObject {
         var batchConnectionBonus = 0
         var batchCompletionBonus = 0
         var completedOffer: ExpeditionOffer?
+        var newCalloutIDs: [UUID] = []
 
         for id in newDiscoveryIDs {
             guard let coordinate = tileEngine.parseTileID(id) else { continue }
@@ -491,9 +508,16 @@ final class WorldController: ObservableObject {
             updatedTile.weeklyCharge = min(FrontierConstants.maxWeeklyCharge, updatedTile.weeklyCharge + 1)
             sessionTiles[id] = updatedTile
 
+            let calloutID = UUID()
+            newCalloutIDs.append(calloutID)
             frontierScoreCallouts.append(
-                FrontierScoreCallout(id: UUID(), tileID: id, points: award.totalPoints, createdAt: date)
+                FrontierScoreCallout(id: calloutID, tileID: id, points: award.totalPoints, createdAt: date)
             )
+        }
+
+        if !newCalloutIDs.isEmpty {
+            pruneFrontierCallouts(after: newCalloutIDs)
+            AtlasHaptics.light()
         }
 
         guard batchTilePoints > 0 || batchConnectionBonus > 0 || batchCompletionBonus > 0 else { return }
@@ -523,6 +547,51 @@ final class WorldController: ObservableObject {
         }, playerTile: playerTileCoordinate)
 
         sessionFrontier.weeklyTotalAfter = store.frontierState.weeklyScore
+    }
+
+    private func emitSessionFeedback(
+        discoveredCount: Int,
+        tileIDs: [String],
+        priorStates: [String: TileState],
+        at date: Date
+    ) {
+        var events: [SessionFeedbackEvent] = []
+
+        if discoveredCount > 0 {
+            events.append(SessionFeedbackEvent(kind: .discovery(count: discoveredCount), createdAt: date))
+            AtlasHaptics.discovery()
+        }
+
+        var masteryUps: [TileState] = []
+        for id in tileIDs {
+            let prior = priorStates[id] ?? .fogged
+            guard let next = sessionTiles[id]?.state else { continue }
+            guard next.rawValue > prior.rawValue, next.rawValue >= TileState.explored.rawValue else { continue }
+            masteryUps.append(next)
+        }
+
+        if let highest = masteryUps.max(by: { $0.rawValue < $1.rawValue }) {
+            events.append(SessionFeedbackEvent(kind: .mastery(state: highest), createdAt: date))
+            AtlasHaptics.mastery()
+        }
+
+        guard !events.isEmpty else { return }
+        sessionFeedback.append(contentsOf: events)
+        pruneSessionFeedback(after: events.map(\.id))
+    }
+
+    private func pruneSessionFeedback(after ids: [UUID]) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.4))
+            sessionFeedback.removeAll { ids.contains($0.id) }
+        }
+    }
+
+    private func pruneFrontierCallouts(after ids: [UUID]) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.4))
+            frontierScoreCallouts.removeAll { ids.contains($0.id) }
+        }
     }
 }
 

@@ -48,16 +48,20 @@ struct MainMapScreen: View {
             VStack(spacing: 0) {
                 if controller.isRecording {
                     activeHeader
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 } else {
                     idleHeader
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 Spacer(minLength: 0)
                     .allowsHitTesting(false)
             }
+            .animation(AtlasMotion.chrome, value: controller.isRecording)
 
             mapSideControls
                 .padding(.trailing, 16)
                 .padding(.bottom, controller.isRecording ? 240 : 100)
+                .animation(AtlasMotion.chrome, value: controller.isRecording)
 
             #if DEBUG
             if showsSimGPSPad {
@@ -65,6 +69,7 @@ struct MainMapScreen: View {
                     .padding(.leading, 16)
                     .padding(.bottom, controller.isRecording ? 240 : 100)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .animation(AtlasMotion.chrome, value: controller.isRecording)
             }
             #endif
 
@@ -77,18 +82,28 @@ struct MainMapScreen: View {
                         .padding(.vertical, 8)
                         .background(AtlasTheme.finishRed, in: Capsule())
                         .padding(.horizontal, 16)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+
+                ForEach(controller.sessionFeedback.suffix(3)) { event in
+                    SessionFeedbackToast(event: event)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
 
                 if controller.isRecording {
                     activeBottomPanel
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 } else {
                     FrontierMissionBanner(controller: controller, store: store) {
                         showExpeditionSheet = true
                     }
                     idleBottomSheet
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .padding(.bottom, 8)
+            .animation(AtlasMotion.chrome, value: controller.isRecording)
+            .animation(AtlasMotion.fade, value: controller.sessionFeedback.map(\.id))
         }
         .overlay {
             if !hasCompletedOnboarding {
@@ -254,6 +269,7 @@ struct MainMapScreen: View {
             Button {
                 controller.startActivity()
                 followsUser = true
+                AtlasHaptics.success()
             } label: {
                 Text(recorder.activityType.startButtonTitle)
                     .font(.subheadline.weight(.bold))
@@ -328,27 +344,33 @@ struct MainMapScreen: View {
                     icon: "hexagon.fill",
                     value: "\(controller.sessionDiscoveredCount)",
                     unit: "new tiles",
-                    tint: AtlasTheme.teal
+                    tint: AtlasTheme.teal,
+                    animatesNumber: true
                 )
             }
             .padding(.vertical, 14)
             .background(cardBackground)
+            .animation(AtlasMotion.number, value: controller.sessionDiscoveredCount)
+            .animation(AtlasMotion.number, value: distanceValue)
 
             ActiveFrontierTracker(controller: controller, compact: true)
 
             HStack(spacing: 14) {
                 Button {
                     controller.togglePause()
+                    AtlasHaptics.select()
                 } label: {
                     Image(systemName: controller.isPaused ? "play.fill" : "pause.fill")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(AtlasTheme.blue)
                         .frame(width: 48, height: 48)
+                        .contentTransition(.symbolEffect(.replace))
                 }
                 .buttonStyle(GlassButtonStyle(shape: .circle, weight: .regular))
 
                 Button {
                     controller.stopActivity()
+                    AtlasHaptics.success()
                 } label: {
                     Text("Finish")
                         .font(.headline.weight(.bold))
@@ -379,11 +401,14 @@ struct MainMapScreen: View {
 
                 Button {
                     showLayers.toggle()
+                    AtlasHaptics.select()
                 } label: {
                     Image(systemName: "square.3.layers.3d.top.filled")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(showLayers ? AtlasTheme.blue : .secondary)
                         .frame(width: 42, height: 42)
+                        .scaleEffect(showLayers ? 1.05 : 1)
+                        .animation(AtlasMotion.fade, value: showLayers)
                 }
                 .buttonStyle(GlassButtonStyle(shape: .circle))
             }
@@ -418,18 +443,26 @@ struct MainMapScreen: View {
         StatsFormat.distanceUnit(recorder.distanceMeters)
     }
 
-    private func liveStat(icon: String, value: String, unit: String, tint: Color = AtlasTheme.blue) -> some View {
+    private func liveStat(
+        icon: String,
+        value: String,
+        unit: String,
+        tint: Color = AtlasTheme.blue,
+        animatesNumber: Bool = false
+    ) -> some View {
         VStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(tint)
             Text(value)
                 .font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
+                .contentTransition(.numericText())
             Text(unit)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+        .animation(animatesNumber ? AtlasMotion.number : nil, value: value)
     }
 
     private func recenter() {
@@ -438,7 +471,7 @@ struct MainMapScreen: View {
         let span = controller.isRecording
             ? AtlasTheme.mapSpanRecordingMeters
             : AtlasTheme.mapSpanIdleMeters
-        withAnimation(.easeInOut(duration: 0.35)) {
+        withAnimation(AtlasMotion.camera) {
             position = .region(
                 MKCoordinateRegion(
                     center: location.coordinate,

@@ -41,6 +41,7 @@ enum SnapshotSupport {
         let wrapped = view
             .environment(\.colorScheme, .light)
             .environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.accessibilityReduceMotion, true)
             .frame(width: size.width, height: size.height)
 
         let renderer = ImageRenderer(content: wrapped)

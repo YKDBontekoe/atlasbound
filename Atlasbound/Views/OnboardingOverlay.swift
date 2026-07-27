@@ -6,6 +6,7 @@ struct OnboardingOverlay: View {
     let onComplete: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let steps: [(icon: String, title: String, body: String)] = [
         (
@@ -43,16 +44,22 @@ struct OnboardingOverlay: View {
                                 endPoint: .bottomTrailing
                             )
                         )
+                        .id("icon-\(step)")
+                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
 
                     Text(steps[step].title)
                         .font(.title2.weight(.bold))
                         .multilineTextAlignment(.center)
+                        .id("title-\(step)")
+                        .transition(.opacity.combined(with: .offset(y: 8)))
 
                     Text(steps[step].body)
                         .font(.body)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
+                        .id("body-\(step)")
+                        .transition(.opacity)
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity)
@@ -63,29 +70,37 @@ struct OnboardingOverlay: View {
                     )
                 }
                 .padding(.horizontal, 24)
+                .animation(AtlasMotion.optional(AtlasMotion.chrome, reduceMotion: reduceMotion), value: step)
 
                 HStack(spacing: 8) {
                     ForEach(0..<steps.count, id: \.self) { index in
                         Capsule()
                             .fill(index == step ? AtlasTheme.blue : Color.secondary.opacity(0.3))
                             .frame(width: index == step ? 20 : 8, height: 8)
-                            .animation(.easeInOut(duration: 0.2), value: step)
+                            .animation(AtlasMotion.optional(AtlasMotion.fade, reduceMotion: reduceMotion), value: step)
                     }
                 }
 
                 HStack(spacing: 12) {
                     if step > 0 {
                         Button("Back") {
-                            withAnimation { step -= 1 }
+                            AtlasHaptics.select()
+                            AtlasMotion.withOptionalAnimation(AtlasMotion.chrome, reduceMotion: reduceMotion) {
+                                step -= 1
+                            }
                         }
                         .buttonStyle(.bordered)
                     }
 
                     Button(step == steps.count - 1 ? "Get started" : "Next") {
                         if step == steps.count - 1 {
+                            AtlasHaptics.success()
                             onComplete()
                         } else {
-                            withAnimation { step += 1 }
+                            AtlasHaptics.select()
+                            AtlasMotion.withOptionalAnimation(AtlasMotion.chrome, reduceMotion: reduceMotion) {
+                                step += 1
+                            }
                         }
                     }
                     .buttonStyle(.borderedProminent)

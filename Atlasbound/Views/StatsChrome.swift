@@ -14,6 +14,7 @@ struct StatKPI: View {
                 .foregroundStyle(accent)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+                .contentTransition(.numericText())
             Text(caption)
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.secondary)
@@ -21,6 +22,7 @@ struct StatKPI: View {
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity)
+        .animation(AtlasMotion.number, value: value)
     }
 }
 
@@ -56,8 +58,15 @@ struct SegmentedBar: View {
     var height: CGFloat = 8
     var cornerRadius: CGFloat = 4
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var growProgress: Double = 0
+
     private var total: Double {
         segments.reduce(0) { $0 + max(0, $1.value) }
+    }
+
+    private var progress: Double {
+        reduceMotion ? 1 : growProgress
     }
 
     var body: some View {
@@ -68,13 +77,14 @@ struct SegmentedBar: View {
                     if fraction > 0 {
                         RoundedRectangle(cornerRadius: 2, style: .continuous)
                             .fill(seg.color)
-                            .frame(width: max(3, fraction * (geo.size.width - CGFloat(max(0, visibleCount - 1)) * 1.5)))
+                            .frame(width: max(3, fraction * progress * (geo.size.width - CGFloat(max(0, visibleCount - 1)) * 1.5)))
                     }
                 }
             }
         }
         .frame(height: height)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .growOnAppear($growProgress)
     }
 
     private var visibleCount: Int {
@@ -103,9 +113,16 @@ struct XPSplitArc: View {
     let familiarity: Int
     var size: CGFloat = 72
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var growProgress: Double = 0
+
     private var total: Int { discovery + familiarity }
     private var discoveryFraction: Double {
         total > 0 ? Double(discovery) / Double(total) : 0.5
+    }
+
+    private var progress: Double {
+        reduceMotion ? 1 : growProgress
     }
 
     var body: some View {
@@ -114,24 +131,26 @@ struct XPSplitArc: View {
                 .stroke(AtlasTheme.slate.opacity(0.18), lineWidth: 6)
 
             Circle()
-                .trim(from: 0, to: discoveryFraction)
+                .trim(from: 0, to: discoveryFraction * progress)
                 .stroke(AtlasTheme.teal, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                 .rotationEffect(.degrees(-90))
 
             Circle()
-                .trim(from: discoveryFraction, to: 1)
+                .trim(from: discoveryFraction * progress, to: progress)
                 .stroke(AtlasTheme.gold, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                 .rotationEffect(.degrees(-90))
 
             VStack(spacing: 0) {
                 Text("\(total)")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .contentTransition(.numericText())
                 Text("XP")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
         }
         .frame(width: size, height: size)
+        .growOnAppear($growProgress)
     }
 }
 

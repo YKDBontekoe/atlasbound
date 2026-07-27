@@ -5,21 +5,32 @@ struct ActivitySummaryView: View {
     let onDismiss: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var displayedXP = 0
 
     private var revisited: Int { max(0, summary.tilesVisited - summary.tilesDiscovered) }
+    private var frontierIndexOffset: Int {
+        (summary.frontierContribution?.sessionTotal ?? 0) > 0 ? 1 : 0
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
                     heroHeader
+                        .staggeredAppear(index: 0)
                     kpiBand
+                        .staggeredAppear(index: 1)
                     if let frontier = summary.frontierContribution, frontier.sessionTotal > 0 {
                         frontierCard(frontier)
+                            .staggeredAppear(index: 2)
                     }
                     tileCompositionCard
+                        .staggeredAppear(index: 2 + frontierIndexOffset)
                     xpBreakdownCard
+                        .staggeredAppear(index: 3 + frontierIndexOffset)
                     nerdStrip
+                        .staggeredAppear(index: 4 + frontierIndexOffset)
                 }
                 .padding(20)
             }
@@ -30,6 +41,17 @@ struct ActivitySummaryView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", action: onDismiss)
                         .fontWeight(.semibold)
+                }
+            }
+            .onAppear {
+                AtlasHaptics.success()
+                guard !reduceMotion else {
+                    displayedXP = summary.totalXP
+                    return
+                }
+                displayedXP = 0
+                withAnimation(AtlasMotion.celebrate) {
+                    displayedXP = summary.totalXP
                 }
             }
         }
@@ -52,8 +74,10 @@ struct ActivitySummaryView: View {
                     Text(summary.activityType.activeTitle)
                         .font(.title3.weight(.bold))
                     HStack(spacing: 4) {
-                        Text("+\(summary.totalXP)")
+                        Text("+\(displayedXP)")
                             .font(.system(.subheadline, design: .rounded, weight: .bold))
+                            .contentTransition(.numericText())
+                            .animation(AtlasMotion.number, value: displayedXP)
                         Text("XP earned")
                             .font(.subheadline)
                     }
