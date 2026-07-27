@@ -45,9 +45,9 @@ AtlasboundApp
 - Discovered markers are capped (~80 highest-ranked) for performance.
 - Stubs: `regionName = "Dordrecht"` + discovered tile count in the header — not real geo regions / % coverage.
 
-## Future seams (do not prematurely build)
+## Extension points
 
-- Region Engine (replace stubs)
-- Background Always + passive drive path (`enableBackgroundRecordingIfAuthorized` exists; Phase 1 is When In Use)
+- Region Engine (replace stub `regionName` / tile-count header with real geo regions)
+- Background Always + passive drive path (`enableBackgroundRecordingIfAuthorized` exists; currently When In Use)
 - Streak multiplier wired into XP (UI-only today)
-- Skill tree / Game Center / CloudKit (out of Phase 1)
+- Skill tree / Game Center / CloudKit integration

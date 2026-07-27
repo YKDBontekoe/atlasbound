@@ -1,12 +1,11 @@
 ---
-description: Phase 1 scope and hard invariants for Atlasbound
+description: Engineering invariants for Atlasbound
 alwaysApply: true
 ---
 
-# Atlasbound Phase 1
+# Atlasbound invariants
 
-- Location RPG prototype: discover hex tiles on move; revisits = familiarity XP.
-- **Do not add:** Game Center, CloudKit, skill tree, social, StoreKit, Watch, challenges, widgets, Live Activities, real Region Engine.
+- Location RPG: discover hex tiles on move; revisits = familiarity XP.
 - Persist tile IDs + mastery fields only — **never** store hex geometry.
 - Tile IDs: `hex:{sizeMeters}:{q}:{r}`; progress is **per tile-size grid**.
 - Engines own domain logic; views observe `WorldController` / `TileStore`.

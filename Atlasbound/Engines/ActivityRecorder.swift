@@ -86,7 +86,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
         manager.startUpdatingLocation()
     }
 
-    /// Call when ready to opt into background recording (Phase 1+: requires Always auth).
+    /// Call when ready to opt into background recording (requires Always auth).
     func enableBackgroundRecordingIfAuthorized() {
         guard manager.authorizationStatus == .authorizedAlways else {
             manager.requestAlwaysAuthorization()

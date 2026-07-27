@@ -4,7 +4,7 @@ Guidance for AI agents and contributors working in this repo.
 
 ## What this is
 
-**Atlasbound** is a Phase 1 iPhone location RPG: movement discovers hexagonal MapKit tiles; revisits award familiarity XP. Single SwiftUI target, local JSON persistence, unsigned IPA via AltStore/SideStore.
+**Atlasbound** is an iPhone location RPG: movement discovers hexagonal MapKit tiles; revisits award familiarity XP. Single SwiftUI target, local JSON persistence, unsigned IPA via AltStore/SideStore.
 
 | | |
 |--|--|
@@ -16,16 +16,12 @@ Guidance for AI agents and contributors working in this repo.
 
 ## Read first
 
-1. [README.md](README.md) — run, Phase 1 scope, AltStore overview
+1. [README.md](README.md) — run, capabilities, AltStore overview
 2. [docs/architecture.md](docs/architecture.md) — ownership & layering
 3. [docs/domain.md](docs/domain.md) — hex IDs, XP, mastery
 4. [docs/development.md](docs/development.md) — edit / build conventions
 5. [docs/release.md](docs/release.md) — versioning & AltStore pipeline
 6. [docs/testing.md](docs/testing.md) — manual test matrix
-
-## Phase 1 boundaries (do not build)
-
-Game Center, CloudKit, skill tree, social, StoreKit, Watch, challenges, widgets, Live Activities, Region Engine (real geo regions). Keep stubs (`regionName`, tile-count header) clearly placeholder.
 
 ## Hard invariants
 
@@ -85,7 +81,7 @@ Load these when the task matches (under `.cursor/skills/`):
 
 ## Cursor rules
 
-`.cursor/rules/` — Phase 1 scope (always) and SwiftUI/engine conventions (on matching files).
+`.cursor/rules/` — engineering invariants (always) and SwiftUI/engine conventions (on matching files).
 
 ## Working style
 

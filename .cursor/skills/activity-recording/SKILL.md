@@ -31,9 +31,9 @@ Prefer adjusting settings objects over hardcoding magic numbers in the recorder.
 
 ## Location auth
 
-- Phase 1: **When In Use** primary path
-- Background mode declared in Info.plist for later; `allowsBackgroundLocationUpdates` only when Always authorized
-- Do not silently require Always for Phase 1 features
+- **When In Use** is the current primary path
+- Background mode declared in Info.plist; `allowsBackgroundLocationUpdates` only when Always authorized
+- Do not silently require Always for features that work with When In Use
 
 ## UI touchpoints
 

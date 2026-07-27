@@ -97,7 +97,7 @@ struct ProgressionEngine: Sendable {
     }
 
     private func advanceStateIfNeeded(_ tile: inout WorldTile) {
-        // Lightweight thresholds for Phase 1 — full skill tree later.
+        // Lightweight thresholds — skill tree can layer on top.
         switch tile.masteryXP {
         case 500...:
             if tile.state.rawValue < TileState.legendary.rawValue { tile.state = .legendary }
