@@ -37,90 +37,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: |
-          CANDIDATE="$(ls -d /Applications/Xcode_16*.app /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)"
-          if [[ -z "$CANDIDATE" ]]; then
-            CANDIDATE="/Applications/Xcode.app"
-          fi
-          echo "Using $CANDIDATE"
-          sudo xcode-select -s "$CANDIDATE"
-          xcodebuild -version
+        uses: ./.github/actions/xcode-select
 
-      - name: Resolve simulator destination
-        id: sim
-        run: |
-          set -euo pipefail
-          NAME="$(xcrun simctl list devices available -j | python3 -c '
-          import json, sys
-          data = json.load(sys.stdin)
-          devices = []
-          for runtime, items in data.get("devices", {}).items():
-              if "iOS" not in runtime:
-                  continue
-              for device in items:
-                  if device.get("isAvailable") and str(device.get("name", "")).startswith("iPhone"):
-                      devices.append(device["name"])
-          preferred = ["iPhone 16", "iPhone 16 Pro", "iPhone 15", "iPhone 15 Pro"]
-          for name in preferred:
-              if name in devices:
-                  print(name)
-                  raise SystemExit(0)
-          if not devices:
-              raise SystemExit("No available iPhone simulators")
-          print(devices[0])
-          ')"
-          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
-          echo "Using simulator: ${NAME}"
-
-      - name: Bootstrap snapshots if missing
-        id: snapshots
-        run: |
-          set -euo pipefail
-          COUNT="$(find AtlasboundTests/Visual/__Snapshots__ -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
-          if [[ "$COUNT" -eq 0 ]]; then
-            echo "bootstrap=1" >> "$GITHUB_OUTPUT"
-            echo "No reference PNGs — will record snapshots this run"
-          else
-            echo "bootstrap=0" >> "$GITHUB_OUTPUT"
-            echo "Found ${COUNT} reference PNG(s)"
-          fi
-
-      - name: Boot simulator and grant location
-        run: |
-          set -euo pipefail
-          NAME="${{ steps.sim.outputs.name }}"
-          xcrun simctl boot "$NAME" 2>/dev/null || true
-          xcrun simctl bootstatus "$NAME" -b
-          # Pre-authorize so UI tests are not blocked by the system prompt.
-          xcrun simctl privacy "$NAME" grant location-always com.atlasbound.app || true
-          xcrun simctl privacy "$NAME" grant location com.atlasbound.app || true
-
-      - name: Run tests
-        env:
-          # TEST_RUNNER_* is forwarded into the test host with the prefix stripped.
-          TEST_RUNNER_BOOTSTRAP_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
-          TEST_RUNNER_RECORD_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
-          BOOTSTRAP_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
-          RECORD_SNAPSHOTS: ${{ steps.snapshots.outputs.bootstrap }}
-        run: |
-          set -euo pipefail
-          DEST="platform=iOS Simulator,name=${{ steps.sim.outputs.name }}"
-          xcodebuild test \
-            -project Atlasbound.xcodeproj \
-            -scheme Atlasbound \
-            -destination "$DEST" \
-            -resultBundlePath TestResults.xcresult
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Run iOS tests
+        uses: ./.github/actions/ios-test
         with:
-          name: atlasbound-test-results
-          path: |
-            TestResults.xcresult
-            AtlasboundTests/Visual/__Snapshots__
-          if-no-files-found: warn
-          retention-days: 7
+          upload-artifact-name: atlasbound-test-results
+          artifact-retention-days: "7"
 
   build:
     name: Build unsigned IPA
@@ -132,14 +55,7 @@ jobs:
           fetch-depth: 0
 
       - name: Select Xcode
-        run: |
-          CANDIDATE="$(ls -d /Applications/Xcode_16*.app /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)"
-          if [[ -z "$CANDIDATE" ]]; then
-            CANDIDATE="/Applications/Xcode.app"
-          fi
-          echo "Using $CANDIDATE"
-          sudo xcode-select -s "$CANDIDATE"
-          xcodebuild -version
+        uses: ./.github/actions/xcode-select
 
       - name: Compute automatic version
         id: version
