@@ -26,7 +26,8 @@ struct LookAroundLocationPool: Sendable {
     static func generateWorldwideTargets(count: Int = PinpointConstants.roundsPerGame) async throws -> [CLLocationCoordinate2D] {
         var targets: [CLLocationCoordinate2D] = []
         for _ in 0..<count {
-            guard let coordinate = await findWorldwideCoordinate(maxAttempts: 40) else {
+            try Task.checkCancellation()
+            guard let coordinate = await findWorldwideCoordinate(maxAttempts: 12) else {
                 throw GenerationError.worldwideGenerationFailed
             }
             targets.append(coordinate)
@@ -51,11 +52,12 @@ struct LookAroundLocationPool: Sendable {
         let shuffled = discoveredTiles.shuffled()
 
         for _ in 0..<count {
+            try Task.checkCancellation()
             guard let coordinate = await findHomeTurfCoordinate(
                 tiles: shuffled,
                 engine: engine,
                 usedTileIDs: &usedTileIDs,
-                maxAttempts: 40
+                maxAttempts: 12
             ) else {
                 throw GenerationError.insufficientHomeTurfCoverage
             }
@@ -97,6 +99,7 @@ struct LookAroundLocationPool: Sendable {
 
     private static func findWorldwideCoordinate(maxAttempts: Int) async -> CLLocationCoordinate2D? {
         for _ in 0..<maxAttempts {
+            guard !Task.isCancelled else { return nil }
             let probe = randomLandCoordinate()
 
             if let coordinate = await findLookAroundFromMappedPlaces(center: probe, radius: 25_000) {
