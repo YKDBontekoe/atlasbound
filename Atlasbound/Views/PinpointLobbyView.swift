@@ -44,13 +44,6 @@ struct PinpointLobbyView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 40)
         }
-        .overlay {
-            if controller.phase == .preparing {
-                preparingOverlay
-                    .transition(.opacity)
-            }
-        }
-        .animation(AtlasMotion.fade, value: controller.phase == .preparing)
     }
 
     private var heroSection: some View {
@@ -280,27 +273,4 @@ struct PinpointLobbyView: View {
         }
     }
 
-    private var preparingOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.35).ignoresSafeArea()
-            VStack(spacing: 16) {
-                ProgressView()
-                    .scaleEffect(1.3)
-                    .tint(.white)
-                Text("Finding locations…")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                Button("Cancel") {
-                    controller.cancelPreparation()
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(.white.opacity(0.16), in: Capsule())
-            }
-            .padding(28)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-    }
 }

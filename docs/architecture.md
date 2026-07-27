@@ -53,15 +53,16 @@ A location-guessing game alongside the tile discovery mode.
 | Type | Role | Threading |
 |------|------|-----------|
 | `PinpointScoring` | Pure scoring, area metrics, distance calc | `Sendable` value type |
-| `LookAroundLocationPool` | Worldwide + Home Turf target generation | `Sendable` value type |
+| `LookAroundLocationPool` | Worldwide coverage-region sampling + Home Turf targets | `Sendable` value type |
 | `PinpointStore` | Game history + per-mode high scores (JSON) | `@MainActor` |
 | `PinpointController` | Game orchestration + tile XP awards | `@MainActor` |
 | `GameCenterManager` | GameKit auth + leaderboard submission | `@MainActor` |
-| `PinpointView` | Lobby, active game, round result, game over | SwiftUI |
+| `PinpointView` | Lobby, preparing, active game, round result, game over | SwiftUI |
+| `PinpointPreparingView` | Full-screen prep UI with live find progress | SwiftUI |
 | `LookAroundSnapshotEngine` | Nearby-probe Look Around snapshots (spoiler-free) | `Sendable` value type |
 | `LookAroundGuessView` | Static snapshot gallery + timed guess map | SwiftUI |
 
-Flow: lobby (Worldwide or Home Turf) → 5 rounds (static Look Around gallery around spawn + timer → tap map to guess → score) → game over → submit to Game Center leaderboard. No live `MKLookAroundViewController` during play (avoids place-name spoilers).
+Flow: lobby (Worldwide or Home Turf) → preparing (dynamic Look Around scouting with progress) → 5 rounds (static Look Around gallery around spawn + timer → tap map to guess → score) → game over → submit to Game Center leaderboard. No live `MKLookAroundViewController` during play (avoids place-name spoilers). Worldwide samples random streets inside Look Around coverage regions (not a fixed landmark list).
 
 Persistence: `Documents/atlasbound-pinpoint.json`. Leaderboard ID: `com.atlasbound.geoguessr.highscore`.
 

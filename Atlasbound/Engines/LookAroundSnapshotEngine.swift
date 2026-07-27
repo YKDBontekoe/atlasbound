@@ -15,16 +15,28 @@ struct LookAroundGalleryProbe: Sendable, Equatable {
     static let south = LookAroundGalleryProbe(latitudeOffsetMeters: -20, longitudeOffsetMeters: 0)
     static let west = LookAroundGalleryProbe(latitudeOffsetMeters: 0, longitudeOffsetMeters: -20)
 
-    /// Spawn first (validated coverage), then four cardinal street-scale offsets.
+    static let northEast = LookAroundGalleryProbe(latitudeOffsetMeters: 20, longitudeOffsetMeters: 20)
+    static let southEast = LookAroundGalleryProbe(latitudeOffsetMeters: -20, longitudeOffsetMeters: 20)
+    static let southWest = LookAroundGalleryProbe(latitudeOffsetMeters: -20, longitudeOffsetMeters: -20)
+    static let northWest = LookAroundGalleryProbe(latitudeOffsetMeters: 20, longitudeOffsetMeters: -20)
+
+    static let farNorth = LookAroundGalleryProbe(latitudeOffsetMeters: 40, longitudeOffsetMeters: 0)
+    static let farEast = LookAroundGalleryProbe(latitudeOffsetMeters: 0, longitudeOffsetMeters: 40)
+    static let farSouth = LookAroundGalleryProbe(latitudeOffsetMeters: -40, longitudeOffsetMeters: 0)
+    static let farWest = LookAroundGalleryProbe(latitudeOffsetMeters: 0, longitudeOffsetMeters: -40)
+
+    /// Spawn first, then near cardinals, diagonals, and a farther ring.
     static let defaultProbes: [LookAroundGalleryProbe] = [
         LookAroundGalleryProbe(latitudeOffsetMeters: 0, longitudeOffsetMeters: 0),
-        .north, .east, .south, .west
+        .north, .east, .south, .west,
+        .northEast, .southEast, .southWest, .northWest,
+        .farNorth, .farEast, .farSouth, .farWest
     ]
 }
 
 /// Pure helper for rendering spoiler-free Look Around imagery via MapKit snapshots.
 struct LookAroundSnapshotEngine: Sendable {
-    static let maxGalleryImages = 4
+    static let maxGalleryImages = 8
     static let galleryProbeDistanceMeters: Double = 20
 
     /// Offset a coordinate by meters north/east (negative = south/west).

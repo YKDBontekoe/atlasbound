@@ -14,7 +14,7 @@ enum PinpointGameMode: String, Sendable, Codable, CaseIterable {
 
     var subtitle: String {
         switch self {
-        case .worldwide: "Random places anywhere on Earth"
+        case .worldwide: "Random streets wherever Look Around covers"
         case .homeTurf: "Only places you've already discovered — prove you know your atlas"
         }
     }
