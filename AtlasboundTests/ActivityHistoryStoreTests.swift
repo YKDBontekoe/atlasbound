@@ -40,7 +40,7 @@ final class ActivityHistoryStoreTests: XCTestCase {
             )
         }
         XCTAssertEqual(store.sessions.count, ActivityHistoryStore.maxSessions)
-        XCTAssertEqual(store.sessions.first?.distanceMeters, 6, accuracy: 0.01)
+        XCTAssertEqual(store.sessions.first?.distanceMeters ?? -1, 6, accuracy: 0.01)
     }
 
     func testJSONRoundtrip() {
