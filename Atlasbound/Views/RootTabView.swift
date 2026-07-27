@@ -3,6 +3,8 @@ import SwiftUI
 struct RootTabView: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
+    @ObservedObject var geoStore: GeoGuessrStore
+    @ObservedObject var gameCenterManager: GameCenterManager
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedTab = 0
@@ -16,19 +18,26 @@ struct RootTabView: View {
                 .accessibilityIdentifier("mapTab")
                 .tag(0)
 
+            GeoGuessrView(geoStore: geoStore, gameCenterManager: gameCenterManager)
+                .tabItem {
+                    Label("GeoGuessr", systemImage: "globe.americas.fill")
+                }
+                .accessibilityIdentifier("geoGuessrTab")
+                .tag(1)
+
             ActivityTabView(controller: controller, store: store)
                 .tabItem {
                     Label("Activity", systemImage: "waveform.path.ecg")
                 }
                 .accessibilityIdentifier("activityTab")
-                .tag(1)
+                .tag(2)
 
             ProgressTabView(store: store)
                 .tabItem {
                     Label("Progress", systemImage: "flag.fill")
                 }
                 .accessibilityIdentifier("progressTab")
-                .tag(2)
+                .tag(3)
         }
         .tint(AtlasTheme.blue)
         .toolbarBackground(.visible, for: .tabBar)

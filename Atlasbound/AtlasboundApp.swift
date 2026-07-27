@@ -4,13 +4,20 @@ import SwiftUI
 struct AtlasboundApp: App {
     @StateObject private var store = TileStore()
     @StateObject private var controllerHolder = ControllerHolder()
+    @StateObject private var geoStore = GeoGuessrStore()
+    @StateObject private var gameCenterManager = GameCenterManager()
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
 
     var body: some Scene {
         WindowGroup {
             Group {
                 if let controller = controllerHolder.controller {
-                    RootTabView(controller: controller, store: store)
+                    RootTabView(
+                        controller: controller,
+                        store: store,
+                        geoStore: geoStore,
+                        gameCenterManager: gameCenterManager
+                    )
                 } else {
                     ProgressView("Loading world…")
                 }
@@ -20,6 +27,7 @@ struct AtlasboundApp: App {
             )
             .onAppear {
                 controllerHolder.bootstrap(store: store)
+                gameCenterManager.authenticate()
             }
         }
     }
