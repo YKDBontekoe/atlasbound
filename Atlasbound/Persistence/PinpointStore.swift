@@ -1,12 +1,14 @@
 import Foundation
 
-/// Persists GeoGuessr game history and high scores as JSON.
+/// Persists Pinpoint game history and high scores as JSON.
 /// Single responsibility: persistence only — no game logic.
 @MainActor
-final class GeoGuessrStore: ObservableObject {
-    @Published private(set) var gameHistory: [GeoGuessrGame] = []
-    @Published private(set) var highScore: Int = 0
+final class PinpointStore: ObservableObject {
+    @Published private(set) var gameHistory: [PinpointGame] = []
+    @Published private(set) var highScoreWorldwide: Int = 0
+    @Published private(set) var highScoreHomeTurf: Int = 0
     @Published private(set) var gamesPlayed: Int = 0
+    @Published private(set) var exactTileHits: Int = 0
 
     private let fileURL: URL
     private let encoder: JSONEncoder = {
@@ -21,7 +23,7 @@ final class GeoGuessrStore: ObservableObject {
         return d
     }()
 
-    private static let fileName = "atlasbound-geoguessr.json"
+    private static let fileName = "atlasbound-pinpoint.json"
 
     init(fileURL: URL? = nil) {
         if let fileURL {
@@ -34,27 +36,47 @@ final class GeoGuessrStore: ObservableObject {
         loadFromDisk()
     }
 
-    func record(_ game: GeoGuessrGame) {
+    func highScore(for mode: PinpointGameMode) -> Int {
+        switch mode {
+        case .worldwide: highScoreWorldwide
+        case .homeTurf: highScoreHomeTurf
+        }
+    }
+
+    func record(_ game: PinpointGame) {
         gameHistory.append(game)
         gamesPlayed = gameHistory.count
-        if game.totalScore > highScore {
-            highScore = game.totalScore
+        exactTileHits += game.rounds.filter(\.hitExactTile).count
+
+        switch game.mode {
+        case .worldwide:
+            if game.totalScore > highScoreWorldwide {
+                highScoreWorldwide = game.totalScore
+            }
+        case .homeTurf:
+            if game.totalScore > highScoreHomeTurf {
+                highScoreHomeTurf = game.totalScore
+            }
         }
         persistToDisk()
     }
 
     func clearHistory() {
         gameHistory = []
-        highScore = 0
+        highScoreWorldwide = 0
+        highScoreHomeTurf = 0
         gamesPlayed = 0
+        exactTileHits = 0
         persistToDisk()
     }
 
     // MARK: - Disk
 
     private struct SaveFile: Codable {
-        let games: [GeoGuessrGame]
-        let highScore: Int
+        let games: [PinpointGame]
+        let highScoreWorldwide: Int
+        let highScoreHomeTurf: Int
+        let exactTileHits: Int
     }
 
     private func loadFromDisk() {
@@ -64,14 +86,21 @@ final class GeoGuessrStore: ObservableObject {
             let save = try decoder.decode(SaveFile.self, from: data)
             gameHistory = save.games
             gamesPlayed = save.games.count
-            highScore = save.highScore
+            highScoreWorldwide = save.highScoreWorldwide
+            highScoreHomeTurf = save.highScoreHomeTurf
+            exactTileHits = save.exactTileHits
         } catch {
             gameHistory = []
         }
     }
 
     private func persistToDisk() {
-        let save = SaveFile(games: gameHistory, highScore: highScore)
+        let save = SaveFile(
+            games: gameHistory,
+            highScoreWorldwide: highScoreWorldwide,
+            highScoreHomeTurf: highScoreHomeTurf,
+            exactTileHits: exactTileHits
+        )
         do {
             let data = try encoder.encode(save)
             try data.write(to: fileURL, options: [.atomic])

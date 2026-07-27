@@ -2,34 +2,37 @@ import SwiftUI
 import MapKit
 
 /// Thin coordinator view — routes to the correct sub-screen based on controller phase.
-struct GeoGuessrView: View {
-    @ObservedObject var controller: GeoGuessrController
+struct PinpointView: View {
+    @ObservedObject var controller: PinpointController
 
     var body: some View {
         NavigationStack {
             ZStack {
                 switch controller.phase {
-                case .lobby:
-                    GeoGuessrLobbyView(controller: controller)
+                case .lobby, .preparing:
+                    PinpointLobbyView(controller: controller)
 
                 case .playing:
                     if controller.currentRound < controller.targets.count {
                         LookAroundGuessView(
                             target: controller.targets[controller.currentRound],
+                            mode: controller.currentMode,
                             roundIndex: controller.currentRound,
-                            totalRounds: GeoGuessrConstants.roundsPerGame,
+                            totalRounds: PinpointConstants.roundsPerGame,
                             currentScore: controller.runningScore,
+                            roundSeconds: PinpointConstants.roundSeconds(for: controller.currentMode),
+                            regionConstraint: controller.atlasRegionConstraint,
                             onGuess: { controller.submitGuess($0) }
                         )
-                        .id("round-\(controller.currentRound)")
+                        .id("round-\(controller.currentRound)-\(controller.currentMode.rawValue)")
                     }
 
                 case .roundResult:
                     if let result = controller.lastRoundResult {
-                        GeoGuessrRoundResultView(
+                        PinpointRoundResultView(
                             result: result,
                             roundNumber: controller.currentRound,
-                            totalRounds: GeoGuessrConstants.roundsPerGame,
+                            totalRounds: PinpointConstants.roundsPerGame,
                             runningTotal: controller.runningScore,
                             onNext: { controller.advanceRound() }
                         )
@@ -37,11 +40,11 @@ struct GeoGuessrView: View {
 
                 case .gameOver:
                     if let game = controller.lastGameResult {
-                        GeoGuessrGameOverView(game: game, controller: controller)
+                        PinpointGameOverView(game: game, controller: controller)
                     }
                 }
             }
-            .navigationTitle("GeoGuessr")
+            .navigationTitle("Pinpoint")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
