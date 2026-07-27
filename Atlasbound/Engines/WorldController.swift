@@ -21,6 +21,7 @@ final class WorldController: ObservableObject {
     let recorder: ActivityRecorder
     let store: TileStore
     let activityHistory: ActivityHistoryStore
+    let regionLookup: RegionLookupStore
     let gameCenterManager: GameCenterManager
     private let progression = ProgressionEngine()
     private let frontierEngine = FrontierEngine()
@@ -37,11 +38,13 @@ final class WorldController: ObservableObject {
     init(
         store: TileStore,
         activityHistory: ActivityHistoryStore,
+        regionLookup: RegionLookupStore? = nil,
         gameCenterManager: GameCenterManager? = nil,
         recorder: ActivityRecorder? = nil
     ) {
         self.store = store
         self.activityHistory = activityHistory
+        self.regionLookup = regionLookup ?? RegionLookupStore()
         self.gameCenterManager = gameCenterManager ?? GameCenterManager()
         self.recorder = recorder ?? ActivityRecorder()
         restoreSelectedActivityType()
@@ -314,6 +317,7 @@ final class WorldController: ObservableObject {
         showSummary = true
         frontierCombo = .empty
         frontierScoreCallouts = []
+        regionLookup.resolve(tilesBySize: store.allDiscoveredTilesBySize)
 
         Task {
             await gameCenterManager.submitFrontierScore(

@@ -5,6 +5,7 @@ struct RootTabView: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     @ObservedObject var activityHistory: ActivityHistoryStore
+    @ObservedObject var regionLookup: RegionLookupStore
     @ObservedObject var pinpointController: PinpointController
     @Environment(\.colorScheme) private var colorScheme
 
@@ -40,6 +41,7 @@ struct RootTabView: View {
             ProgressTabView(
                 store: store,
                 activityHistory: activityHistory,
+                regionLookup: regionLookup,
                 pinpointStore: pinpointController.store,
                 controller: controller
             )
@@ -176,6 +178,7 @@ struct ActivityTabView: View {
 struct ProgressTabView: View {
     @ObservedObject var store: TileStore
     @ObservedObject var activityHistory: ActivityHistoryStore
+    @ObservedObject var regionLookup: RegionLookupStore
     @ObservedObject var pinpointStore: PinpointStore
     @ObservedObject var controller: WorldController
     @Environment(\.colorScheme) private var colorScheme
@@ -191,6 +194,10 @@ struct ProgressTabView: View {
 
     private var territory: StatsEngine.TerritorySummary {
         StatsEngine.totalUnlockedArea(tilesBySize: tilesBySize)
+    }
+
+    private var placesVisited: StatsEngine.PlacesVisitedSummary {
+        regionLookup.placesVisited(tilesBySize: tilesBySize)
     }
 
     private var masterySnapshot: MasterySnapshot {
@@ -216,6 +223,9 @@ struct ProgressTabView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     territoryCard
+                    if !placesVisited.isEmpty || regionLookup.isResolving {
+                        placesVisitedCard
+                    }
                     frontierStatsCard
                     personalRecordsCard
                     if !activityFootprint.isEmpty {
@@ -233,6 +243,9 @@ struct ProgressTabView: View {
             }
             .background(AtlasTheme.canvas(for: colorScheme).ignoresSafeArea())
             .navigationTitle("Atlas Stats")
+            .task(id: store.discoveredTiles.count) {
+                regionLookup.resolve(tilesBySize: tilesBySize)
+            }
             .sheet(isPresented: $showExplorerMap) {
                 AtlasExplorerMapScreen(
                     tilesBySize: tilesBySize,
@@ -298,6 +311,92 @@ struct ProgressTabView: View {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // MARK: - Places visited
+
+    private var placesVisitedCard: some View {
+        let places = placesVisited
+        return StatSectionCard {
+            VStack(spacing: 14) {
+                HStack {
+                    Text("Places visited")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "globe.europe.africa.fill")
+                        .foregroundStyle(AtlasTheme.blue.opacity(0.55))
+                }
+
+                HStack(spacing: 0) {
+                    if !places.countries.isEmpty {
+                        StatKPI(
+                            value: "\(places.countries.count)",
+                            caption: "Countries",
+                            accent: AtlasTheme.blue
+                        )
+                    }
+                    if !places.provinces.isEmpty {
+                        StatKPI(
+                            value: "\(places.provinces.count)",
+                            caption: "Provinces"
+                        )
+                    }
+                    if !places.cities.isEmpty {
+                        StatKPI(
+                            value: "\(places.cities.count)",
+                            caption: "Cities",
+                            accent: AtlasTheme.teal
+                        )
+                    }
+                    if places.isEmpty {
+                        StatKPI(value: "…", caption: "Resolving")
+                    }
+                }
+
+                if regionLookup.isResolving {
+                    Text("Updating places…")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                placeList(title: "Countries", entries: places.countries)
+                placeList(title: "Provinces / states", entries: places.provinces)
+                placeList(title: "Cities", entries: places.cities)
+            }
+        }
+        .accessibilityIdentifier("placesVisitedCard")
+    }
+
+    @ViewBuilder
+    private func placeList(title: String, entries: [StatsEngine.PlaceEntry]) -> some View {
+        if !entries.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+
+                let visible = Array(entries.prefix(8))
+                ForEach(visible, id: \.key) { entry in
+                    HStack(spacing: 8) {
+                        Text(entry.name)
+                            .font(.caption.weight(.medium))
+                            .lineLimit(1)
+                        Spacer()
+                        Text("\(entry.tileCount)")
+                            .font(.caption.weight(.bold).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if entries.count > visible.count {
+                    Text("+\(entries.count - visible.count) more")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.tertiary)
                 }
             }
         }

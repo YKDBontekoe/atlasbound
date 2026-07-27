@@ -62,4 +62,8 @@ Finished sessions are persisted in `Documents/atlasbound-activities.json` (`Acti
 areaPerTile = (√3 / 2) × W²   // square meters
 ```
 
-`StatsEngine.totalUnlockedArea` sums discovered tile counts across all three grids (60 / 80 / 100 m). The Progress tab ("Atlas Stats") shows km² totals, personal records per activity, activity footprint from tile stamps, and a layered exploration map.
+`StatsEngine.totalUnlockedArea` sums discovered tile counts across all three grids (60 / 80 / 100 m). The Progress tab ("Atlas Stats") shows km² totals, personal records per activity, activity footprint from tile stamps, a layered exploration map, and **places visited** (countries / provinces / cities) when reverse-geocoded labels are available.
+
+### Places visited
+
+Discovered tile centers are quantized into ~2 km cache cells and reverse-geocoded via `CLGeocoder` (`GeocodeLimiter`). Results live in `Documents/atlasbound-regions.json` (`RegionLookupStore`) — placemark label strings only, never polygons. Aggregation is pure (`RegionLookupEngine` / `StatsEngine.placesVisited`). Empty placemark fields are omitted; unresolved cells do not block other stats.

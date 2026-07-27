@@ -26,6 +26,9 @@ struct StatsEngine: Sendable {
         let gridBreakdown: [GridAreaEntry]
     }
 
+    typealias PlaceEntry = RegionLookupEngine.PlaceEntry
+    typealias PlacesVisitedSummary = RegionLookupEngine.PlacesVisitedSummary
+
     // MARK: - Area
 
     /// Flat-top hex area from flat-to-flat width in meters.
@@ -53,6 +56,29 @@ struct StatsEngine: Sendable {
             totalTileCount: totalTiles,
             totalAreaSquareMeters: totalArea,
             gridBreakdown: breakdown
+        )
+    }
+
+    // MARK: - Places visited
+
+    /// Aggregate countries / provinces / cities from resolved coarse-cell labels.
+    static func placesVisited(
+        cellLabels: [String: RegionLookupEngine.PlaceLabels],
+        tileCountsByCell: [String: Int]
+    ) -> PlacesVisitedSummary {
+        RegionLookupEngine.placesVisited(
+            cellLabels: cellLabels,
+            tileCountsByCell: tileCountsByCell
+        )
+    }
+
+    static func placesVisited(
+        tilesBySize: [Int: [WorldTile]],
+        cellLabels: [String: RegionLookupEngine.PlaceLabels]
+    ) -> PlacesVisitedSummary {
+        placesVisited(
+            cellLabels: cellLabels,
+            tileCountsByCell: RegionLookupEngine.tileCountsByCell(tilesBySize: tilesBySize)
         )
     }
 

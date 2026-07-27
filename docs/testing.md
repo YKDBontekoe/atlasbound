@@ -58,6 +58,7 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | High speed | Sim GPS leap step + Auto, or Freeway Drive | Continuous hex fill via `hexLine` (no large gaps) |
 | Pause / resume | Pause mid-activity | Samples stop; resume continues route |
 | Finish summary | End activity | Sheet with discovery/familiarity splits |
+| Places visited | Progress tab after discovering tiles (network) | Countries / provinces / cities appear as MapKit reverse-geocode resolves |
 | Session history | Activity tab → Recent activities | Past sessions listed; tap for detail sheet |
 | Background recording | Settings → Record while screen is off; grant Always; Drive sim with screen locked | Recording continues; tiles still discovered |
 | Activity switch | Map idle sheet / Activity tab | Walk → Cycle etc.; reveal width + grid update |

@@ -11,7 +11,7 @@ Guidance for AI agents and contributors working in this repo.
 | Platform | iOS 17+, Xcode 16+ |
 | Bundle ID | `com.atlasbound.app` |
 | Scheme | `Atlasbound` |
-| Persistence | `Documents/atlasbound-world.json` + `atlasbound-pinpoint.json` + `atlasbound-activities.json` + UserDefaults tile size |
+| Persistence | `Documents/atlasbound-world.json` + `atlasbound-pinpoint.json` + `atlasbound-activities.json` + `atlasbound-regions.json` + UserDefaults tile size |
 | Distribution | Unsigned IPA → GitHub Releases + Pages AltStore source |
 
 ## Read first
@@ -45,11 +45,14 @@ Atlasbound/
     TileEngine.swift           # Lat/lon → axial hex
     ProgressionEngine.swift    # Discovery / familiarity XP
     StatsEngine.swift          # Territory area, footprints, explorer metrics
+    RegionLookupEngine.swift   # Coarse-cell place labels + places-visited aggregate
+    GeocodeLimiter.swift       # Shared throttled CLGeocoder
     PinpointController.swift   # Pinpoint game orchestration
     PinpointScoring.swift      # Distance + score math (Sendable)
     LookAroundLocationPool.swift # Target location generation (Sendable)
     GameCenterManager.swift    # GameKit auth + leaderboards
   Persistence/                 # JSON save + Codable records
+    RegionLookupStore.swift    # Reverse-geocode place cache (JSON)
     PinpointStore.swift        # Pinpoint game history (JSON)
     ActivityHistoryStore.swift # Activity session history + per-type records
   Models/                      # WorldTile, activity types, PinpointModels
