@@ -304,11 +304,27 @@ struct LookAroundLocationPool: Sendable {
 // MARK: - Test hooks
 
 extension LookAroundLocationPool {
-    static func isLikelyUrban(_ placemark: CLPlacemark) -> Bool {
-        if placemark.locality != nil { return true }
-        if placemark.subLocality != nil { return true }
-        if placemark.thoroughfare != nil, placemark.administrativeArea != nil { return true }
-        if let areas = placemark.areasOfInterest, !areas.isEmpty { return true }
+    static func isLikelyUrban(
+        locality: String?,
+        subLocality: String?,
+        thoroughfare: String?,
+        administrativeArea: String?,
+        areasOfInterest: [String]?
+    ) -> Bool {
+        if locality != nil { return true }
+        if subLocality != nil { return true }
+        if thoroughfare != nil, administrativeArea != nil { return true }
+        if let areas = areasOfInterest, !areas.isEmpty { return true }
         return false
+    }
+
+    static func isLikelyUrban(_ placemark: CLPlacemark) -> Bool {
+        isLikelyUrban(
+            locality: placemark.locality,
+            subLocality: placemark.subLocality,
+            thoroughfare: placemark.thoroughfare,
+            administrativeArea: placemark.administrativeArea,
+            areasOfInterest: placemark.areasOfInterest
+        )
     }
 }

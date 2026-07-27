@@ -6,26 +6,39 @@ import MapKit
 final class LookAroundLocationPoolTests: XCTestCase {
 
     func testIsLikelyUrbanRecognizesCityPlacemark() {
-        let placemark = MKPlacemark(
-            coordinate: CLLocationCoordinate2D(latitude: 51.5074, longitude: -0.1278),
-            addressDictionary: [
-                kCLPlacemarkLocalityKey as String: "London",
-                kCLPlacemarkAdministrativeAreaKey as String: "England",
-            ]
+        XCTAssertTrue(
+            LookAroundLocationPool.isLikelyUrban(
+                locality: "London",
+                subLocality: nil,
+                thoroughfare: nil,
+                administrativeArea: "England",
+                areasOfInterest: nil
+            )
         )
+    }
 
-        XCTAssertTrue(LookAroundLocationPool.isLikelyUrban(placemark))
+    func testIsLikelyUrbanRecognizesStreetAndRegion() {
+        XCTAssertTrue(
+            LookAroundLocationPool.isLikelyUrban(
+                locality: nil,
+                subLocality: nil,
+                thoroughfare: "Market St",
+                administrativeArea: "California",
+                areasOfInterest: nil
+            )
+        )
     }
 
     func testIsLikelyUrbanRejectsSparsePlacemark() {
-        let placemark = MKPlacemark(
-            coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-            addressDictionary: [
-                kCLPlacemarkOceanKey as String: "Atlantic Ocean",
-            ]
+        XCTAssertFalse(
+            LookAroundLocationPool.isLikelyUrban(
+                locality: nil,
+                subLocality: nil,
+                thoroughfare: nil,
+                administrativeArea: nil,
+                areasOfInterest: nil
+            )
         )
-
-        XCTAssertFalse(LookAroundLocationPool.isLikelyUrban(placemark))
     }
 
     func testAtlasRegionReturnsNilForEmptyTiles() {
