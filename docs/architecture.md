@@ -57,9 +57,10 @@ A location-guessing game alongside the tile discovery mode.
 | `PinpointController` | Game orchestration + tile XP awards | `@MainActor` |
 | `GameCenterManager` | GameKit auth + leaderboard submission | `@MainActor` |
 | `PinpointView` | Lobby, active game, round result, game over | SwiftUI |
-| `LookAroundGuessView` | MKLookAroundScene + timed guess map | SwiftUI |
+| `LookAroundSnapshotEngine` | Nearby-probe Look Around snapshots (spoiler-free) | `Sendable` value type |
+| `LookAroundGuessView` | Static snapshot gallery + timed guess map | SwiftUI |
 
-Flow: lobby (Worldwide or Home Turf) → 5 rounds (Look Around + timer → tap map to guess → score) → game over → submit to Game Center leaderboard.
+Flow: lobby (Worldwide or Home Turf) → 5 rounds (static Look Around gallery around spawn + timer → tap map to guess → score) → game over → submit to Game Center leaderboard. No live `MKLookAroundViewController` during play (avoids place-name spoilers).
 
 Persistence: `Documents/atlasbound-pinpoint.json`. Leaderboard ID: `com.atlasbound.geoguessr.highscore`.
 
