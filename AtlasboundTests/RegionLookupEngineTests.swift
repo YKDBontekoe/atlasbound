@@ -115,15 +115,15 @@ final class RegionLookupEngineTests: XCTestCase {
     }
 
     func testTileCountsByCellGroupsNearbyTiles() {
-        let engine = TileEngine(tileSizeMeters: 80)
+        let engine = TileEngine(tileSizeMeters: 20)
         let origin = engine.centerCoordinate(for: TileCoordinate(q: 0, r: 0))
         // Neighbor hexes are far closer than the 0.02° cell, so they share a key.
         let tiles = [
-            makeTile(size: 80, q: 0, r: 0),
-            makeTile(size: 80, q: 1, r: 0),
-            makeTile(size: 80, q: 0, r: 1)
+            makeTile(size: 20, q: 0, r: 0),
+            makeTile(size: 20, q: 1, r: 0),
+            makeTile(size: 20, q: 0, r: 1)
         ]
-        let counts = RegionLookupEngine.tileCountsByCell(tilesBySize: [80: tiles])
+        let counts = RegionLookupEngine.tileCountsByCell(tilesBySize: [20: tiles])
         XCTAssertEqual(counts.values.reduce(0, +), 3)
         XCTAssertEqual(counts[RegionLookupEngine.cellKey(for: origin)], 3)
     }
@@ -196,7 +196,7 @@ final class RegionLookupStoreTests: XCTestCase {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
 
-        let engine = TileEngine(tileSizeMeters: 80)
+        let engine = TileEngine(tileSizeMeters: 20)
         let center = engine.centerCoordinate(for: TileCoordinate(q: 0, r: 0))
         let key = RegionLookupEngine.cellKey(for: center)
         let labels = RegionLookupEngine.labels(
@@ -210,11 +210,11 @@ final class RegionLookupStoreTests: XCTestCase {
 
         let store = RegionLookupStore(fileURL: tempURL)
         let tile = WorldTile(
-            id: TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 80),
+            id: TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 20),
             coordinate: TileCoordinate(q: 0, r: 0),
             state: .discovered
         )
-        let summary = store.placesVisited(tilesBySize: [80: [tile]])
+        let summary = store.placesVisited(tilesBySize: [20: [tile]])
         XCTAssertEqual(summary.countries.map(\.name), ["Netherlands"])
         XCTAssertEqual(summary.provinces.map(\.name), ["Zuid-Holland"])
         XCTAssertEqual(summary.cities.map(\.name), ["Dordrecht"])

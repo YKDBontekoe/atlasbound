@@ -3,7 +3,7 @@
 ## Hex tiles
 
 - Flat-top axial hexes (`q`, `r`; `s = -q - r`).
-- Flat-to-flat width: **60 / 80 (default) / 100** m (`TileSizeOption`).
+- Flat-to-flat width: **15 / 20 (default) / 25** m (`TileSizeOption`).
 - Projection: lat/lon → Web Mercator meters → axial.
 - **ID:** `hex:{sizeMeters}:{q}:{r}` — size is part of identity so grids never collide.
 
@@ -41,7 +41,7 @@ Session totals: `SessionProgress` (discovered / revisited / XP splits). Lifetime
 
 `walk` | `run` | `cycle` | `hike` | `drive` | `publicTransport` | `unknown` — stamped on tiles (`activityStamps`).
 
-Players pick an activity before recording (map idle sheet or Activity tab). Selection is remembered across launches. Changing activity while recording is blocked; each activity maps to a reveal width (60 / 80 / 100 m).
+Players pick an activity before recording (map idle sheet or Activity tab). Selection is remembered across launches. Changing activity while recording is blocked; each activity maps to a reveal width (15 / 20 / 25 m).
 
 ## Session extras
 
@@ -62,7 +62,7 @@ Finished sessions are persisted in `Documents/atlasbound-activities.json` (`Acti
 areaPerTile = (√3 / 2) × W²   // square meters
 ```
 
-`StatsEngine.totalUnlockedArea` sums discovered tile counts across all three grids (60 / 80 / 100 m). The Progress tab ("Atlas Stats") shows km² totals, personal records per activity, activity footprint from tile stamps, a layered exploration map, and **places visited** (countries / provinces / cities) when reverse-geocoded labels are available.
+`StatsEngine.totalUnlockedArea` sums discovered tile counts across all three grids (15 / 20 / 25 m). The Progress tab ("Atlas Stats") shows km² totals, personal records per activity, activity footprint from tile stamps, a layered exploration map, and **places visited** (countries / provinces / cities) when reverse-geocoded labels are available.
 
 ### Places visited
 

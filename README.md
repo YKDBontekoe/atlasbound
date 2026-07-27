@@ -8,7 +8,7 @@ Location-based exploration RPG prototype for iPhone. Walk, run, cycle, or drive 
 
 - SwiftUI app with four tabs: **Map**, **Pinpoint**, **Activity**, and **Progress (Atlas Stats)**
 - Foreground activity recording via Core Location; optional **background recording** when Always location is granted
-- Hex tile engine (~60 / **80** / 100 m flat-to-flat, chosen automatically per activity type)
+- Hex tile engine (~15 / **20** / 25 m flat-to-flat, chosen automatically per activity type)
 - Fog vs discovered tile overlay on the map; mastery ladder and familiarity XP
 - **Frontier Expeditions** — weekly missions, combo scoring, Game Center leaderboards
 - **Pinpoint** — 5-round Look Around location guessing (dynamic Worldwide streets + Home Turf)
@@ -40,9 +40,9 @@ Tile size is **not** a user setting. It follows the selected activity:
 
 | Activity | Reveal width | Flat-to-flat |
 |----------|--------------|--------------|
-| Walk, Run | Narrow | 60 m |
-| Cycle, Hike, Transit | Medium | 80 m |
-| Drive | Wide | 100 m |
+| Walk, Run | Narrow | 15 m |
+| Cycle, Hike, Transit | Medium | 20 m |
+| Drive | Wide | 25 m |
 
 Tile IDs include size (`hex:{meters}:{q}:{r}`), so activity grids stay separate. Progress is stored per reveal grid.
 

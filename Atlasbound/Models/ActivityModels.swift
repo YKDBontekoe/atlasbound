@@ -2,9 +2,9 @@ import Foundation
 import CoreLocation
 
 enum TileSizeOption: Int, CaseIterable, Identifiable, Codable, Sendable {
-    case sixty = 60
-    case eighty = 80
-    case hundred = 100
+    case fifteen = 15
+    case twenty = 20
+    case twentyFive = 25
 
     var id: Int { rawValue }
 
@@ -25,8 +25,8 @@ struct ActivitySettings: Codable, Sendable {
 
     static let `default` = ActivitySettings(
         tileSize: .default,
-        maxHorizontalAccuracy: 50,
-        minSampleDistance: 8
+        maxHorizontalAccuracy: 25,
+        minSampleDistance: 4
     )
 }
 

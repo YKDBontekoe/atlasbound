@@ -3,11 +3,11 @@ import CoreLocation
 @testable import Atlasbound
 
 final class TileEngineTests: XCTestCase {
-    private let engine = TileEngine(tileSizeMeters: 80)
+    private let engine = TileEngine(tileSizeMeters: 20)
 
     func testMakeAndParseTileID() {
-        let id = TileEngine.makeTileID(q: 12, r: -4, sizeMeters: 80)
-        XCTAssertEqual(id, "hex:80:12:-4")
+        let id = TileEngine.makeTileID(q: 12, r: -4, sizeMeters: 20)
+        XCTAssertEqual(id, "hex:20:12:-4")
 
         let parsed = engine.parseTileID(id)
         XCTAssertEqual(parsed?.q, 12)
@@ -15,7 +15,7 @@ final class TileEngineTests: XCTestCase {
     }
 
     func testParseTileIDRejectsMalformed() {
-        XCTAssertNil(engine.parseTileID("hex:80:onlytwo"))
+        XCTAssertNil(engine.parseTileID("hex:20:onlytwo"))
         XCTAssertNil(engine.parseTileID("tile:80:1:2"))
         XCTAssertNil(engine.parseTileID(""))
     }
@@ -33,16 +33,16 @@ final class TileEngineTests: XCTestCase {
         let first = engine.tileID(for: coordinate)
         let second = engine.tileID(for: coordinate)
         XCTAssertEqual(first, second)
-        XCTAssertTrue(first.hasPrefix("hex:80:"))
+        XCTAssertTrue(first.hasPrefix("hex:20:"))
     }
 
     func testDifferentSizesDoNotCollide() {
         let coordinate = CLLocationCoordinate2D(latitude: 52.0907, longitude: 5.1214)
-        let sixty = TileEngine(tileSizeMeters: 60).tileID(for: coordinate)
-        let hundred = TileEngine(tileSizeMeters: 100).tileID(for: coordinate)
-        XCTAssertNotEqual(sixty, hundred)
-        XCTAssertTrue(sixty.hasPrefix("hex:60:"))
-        XCTAssertTrue(hundred.hasPrefix("hex:100:"))
+        let fifteen = TileEngine(tileSizeMeters: 15).tileID(for: coordinate)
+        let twentyFive = TileEngine(tileSizeMeters: 25).tileID(for: coordinate)
+        XCTAssertNotEqual(fifteen, twentyFive)
+        XCTAssertTrue(fifteen.hasPrefix("hex:15:"))
+        XCTAssertTrue(twentyFive.hasPrefix("hex:25:"))
     }
 
     func testHexLineIsContinuous() {
@@ -87,16 +87,16 @@ final class TileEngineTests: XCTestCase {
 
     func testIsolatedTileIsTerritoryPerimeter() {
         let center = TileCoordinate(q: 0, r: 0)
-        let id = TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 80)
+        let id = TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 20)
         XCTAssertTrue(engine.isTerritoryPerimeter(center, discoveredIDs: [id]))
     }
 
     func testInteriorHexOfClusterIsNotPerimeter() {
         let center = TileCoordinate(q: 0, r: 0)
         var discovered = Set(engine.neighbors(of: center).map {
-            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: 80)
+            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: 20)
         })
-        discovered.insert(TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 80))
+        discovered.insert(TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 20))
 
         XCTAssertFalse(engine.isTerritoryPerimeter(center, discoveredIDs: discovered))
         for neighbor in engine.neighbors(of: center) {
@@ -112,7 +112,7 @@ final class TileEngineTests: XCTestCase {
         let ring = engine.neighbors(of: center)
         let tiles = ([center] + ring).map { axial in
             WorldTile(
-                id: TileEngine.makeTileID(q: axial.q, r: axial.r, sizeMeters: 80),
+                id: TileEngine.makeTileID(q: axial.q, r: axial.r, sizeMeters: 20),
                 coordinate: axial,
                 state: .discovered,
                 masteryXP: 10,

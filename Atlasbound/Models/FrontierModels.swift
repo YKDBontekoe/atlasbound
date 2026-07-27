@@ -1,6 +1,6 @@
 import Foundation
 
-/// Coarse sector coordinate on the span-9 axial lattice.
+/// Coarse sector coordinate on the span-36 axial lattice.
 struct SectorCoordinate: Hashable, Codable, Sendable, Comparable {
     let q: Int
     let r: Int
