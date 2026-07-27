@@ -1,9 +1,9 @@
 import SwiftUI
 import MapKit
 
-/// Shows the result of a single GeoGuessr round: map with target + guess, score, distance.
-struct GeoGuessrRoundResultView: View {
-    let result: GeoGuessrRound
+/// Shows the result of a single Pinpoint round: map with target + guess, score, distance, tile badges.
+struct PinpointRoundResultView: View {
+    let result: PinpointRound
     let roundNumber: Int
     let totalRounds: Int
     let runningTotal: Int
@@ -25,6 +25,8 @@ struct GeoGuessrRoundResultView: View {
             .frame(maxHeight: .infinity)
 
             VStack(spacing: 16) {
+                badgeRow
+
                 HStack(spacing: 24) {
                     VStack(spacing: 4) {
                         Text("\(result.score)")
@@ -35,12 +37,25 @@ struct GeoGuessrRoundResultView: View {
                             .foregroundStyle(.secondary)
                     }
                     VStack(spacing: 4) {
-                        Text(GeoGuessrScoring.formatDistance(result.distanceMeters))
+                        Text(PinpointScoring.formatDistance(result.distanceMeters))
                             .font(.system(size: 20, weight: .semibold, design: .rounded))
                         Text("distance")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    VStack(spacing: 4) {
+                        Text("\(result.hexDistance)")
+                            .font(.system(size: 20, weight: .semibold, design: .rounded).monospacedDigit())
+                        Text("hex hops")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if result.familiarityXPAwarded > 0 {
+                    Text("+\(result.familiarityXPAwarded) familiarity XP")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AtlasTheme.gold)
                 }
 
                 HStack {
@@ -75,6 +90,31 @@ struct GeoGuessrRoundResultView: View {
                 span: MKCoordinateSpan(latitudeDelta: max(spanLat, 1), longitudeDelta: max(spanLon, 1))
             ))
         }
+    }
+
+    private var badgeRow: some View {
+        HStack(spacing: 8) {
+            Text(result.mode.displayName)
+                .font(.caption2.weight(.bold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(AtlasTheme.blue.opacity(0.12), in: Capsule())
+
+            if result.hitExactTile {
+                badge("Exact tile", color: AtlasTheme.gold)
+            } else if result.guessInDiscoveredAtlas {
+                badge("Atlas hit", color: AtlasTheme.teal)
+            }
+        }
+    }
+
+    private func badge(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.12), in: Capsule())
     }
 
     private var scoreColor: Color {

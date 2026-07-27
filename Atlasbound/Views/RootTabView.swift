@@ -5,7 +5,7 @@ struct RootTabView: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     @ObservedObject var activityHistory: ActivityHistoryStore
-    @ObservedObject var geoGuessrController: GeoGuessrController
+    @ObservedObject var pinpointController: PinpointController
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedTab = 0
@@ -19,11 +19,11 @@ struct RootTabView: View {
                 .accessibilityIdentifier("mapTab")
                 .tag(0)
 
-            GeoGuessrView(controller: geoGuessrController)
+            PinpointView(controller: pinpointController)
                 .tabItem {
-                    Label("GeoGuessr", systemImage: "globe.americas.fill")
+                    Label("Pinpoint", systemImage: "scope")
                 }
-                .accessibilityIdentifier("geoGuessrTab")
+                .accessibilityIdentifier("pinpointTab")
                 .tag(1)
 
             ActivityTabView(controller: controller, store: store)
@@ -33,7 +33,11 @@ struct RootTabView: View {
                 .accessibilityIdentifier("activityTab")
                 .tag(2)
 
-            ProgressTabView(store: store, activityHistory: activityHistory)
+            ProgressTabView(
+                store: store,
+                activityHistory: activityHistory,
+                pinpointStore: pinpointController.store
+            )
                 .tabItem {
                     Label("Progress", systemImage: "flag.fill")
                 }
@@ -124,6 +128,7 @@ struct ActivityTabView: View {
 struct ProgressTabView: View {
     @ObservedObject var store: TileStore
     @ObservedObject var activityHistory: ActivityHistoryStore
+    @ObservedObject var pinpointStore: PinpointStore
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var mapLayer: AtlasStatsMapLayer = .mastery
@@ -170,6 +175,7 @@ struct ProgressTabView: View {
                     explorerVitalsCard
                     explorerHero
                     xpTotalsCard
+                    pinpointStatsCard
                     masteryLadderCard
                     revealGridNote
                 }
@@ -502,6 +508,37 @@ struct ProgressTabView: View {
             }
             Text("\(value) XP")
                 .font(.system(.subheadline, design: .rounded, weight: .bold))
+        }
+    }
+
+    // MARK: - Pinpoint stats
+
+    private var pinpointStatsCard: some View {
+        StatSectionCard {
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Pinpoint")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "scope")
+                        .foregroundStyle(AtlasTheme.blue.opacity(0.5))
+                }
+
+                HStack(spacing: 0) {
+                    StatKPI(value: "\(pinpointStore.gamesPlayed)", caption: "Games")
+                    StatKPI(value: "\(pinpointStore.highScoreWorldwide)", caption: "Worldwide", accent: AtlasTheme.blue)
+                    StatKPI(value: "\(pinpointStore.highScoreHomeTurf)", caption: "Home Turf", accent: AtlasTheme.gold)
+                }
+
+                HStack {
+                    Text("Exact tile hits")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(pinpointStore.exactTileHits)")
+                        .font(.caption.weight(.bold).monospacedDigit())
+                }
+            }
         }
     }
 
