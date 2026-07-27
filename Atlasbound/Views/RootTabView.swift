@@ -26,7 +26,11 @@ struct RootTabView: View {
                 .accessibilityIdentifier("pinpointTab")
                 .tag(1)
 
-            ActivityTabView(controller: controller, store: store)
+            ActivityTabView(
+                controller: controller,
+                store: store,
+                activityHistory: activityHistory
+            )
                 .tabItem {
                     Label("Activity", systemImage: "waveform.path.ecg")
                 }
@@ -59,6 +63,13 @@ struct RootTabView: View {
 struct ActivityTabView: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
+    @ObservedObject var activityHistory: ActivityHistoryStore
+
+    @State private var selectedSession: PersistedActivityRecord?
+
+    private var recentSessions: [PersistedActivityRecord] {
+        Array(activityHistory.sessions.suffix(3).reversed())
+    }
 
     var body: some View {
         NavigationStack {
@@ -105,6 +116,36 @@ struct ActivityTabView: View {
                           : "Each activity uses its own reveal grid width.")
                 }
 
+                Section {
+                    if recentSessions.isEmpty {
+                        ContentUnavailableView {
+                            Label("No sessions yet", systemImage: "clock.arrow.circlepath")
+                        } description: {
+                            Text("Your finished activities will appear here.")
+                        }
+                        .listRowBackground(Color.clear)
+                    } else {
+                        ForEach(recentSessions) { session in
+                            Button {
+                                selectedSession = session
+                            } label: {
+                                ActivityHistoryRow(session: session)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        NavigationLink {
+                            ActivityHistoryView(activityHistory: activityHistory)
+                        } label: {
+                            Text("See all activities")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .accessibilityIdentifier("seeAllActivities")
+                    }
+                } header: {
+                    Text("Recent activities")
+                }
+
                 Section("This atlas") {
                     HStack(spacing: 0) {
                         StatKPI(value: "\(store.activitiesCompleted)", caption: "Activities")
@@ -118,6 +159,12 @@ struct ActivityTabView: View {
                 }
             }
             .navigationTitle("Activity")
+            .sheet(item: $selectedSession) { session in
+                ActivitySessionDetailView(session: session) {
+                    selectedSession = nil
+                }
+                .presentationDetents([.medium, .large])
+            }
         }
     }
 

@@ -22,6 +22,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
         }
     }
     @Published private(set) var lastErrorMessage: String?
+    @Published private(set) var prefersBackgroundRecording = false
 
     private let manager = CLLocationManager()
     private var settings: ActivitySettings
@@ -44,6 +45,9 @@ final class ActivityRecorder: NSObject, ObservableObject {
         // Structure for later background use; only active while recording if authorized.
         manager.allowsBackgroundLocationUpdates = false
         manager.showsBackgroundLocationIndicator = true
+        prefersBackgroundRecording = UserDefaults.standard.bool(
+            forKey: BackgroundRecordingPreference.storageKey
+        )
     }
 
     private func applyCoreLocationActivityType() {
@@ -88,11 +92,26 @@ final class ActivityRecorder: NSObject, ObservableObject {
 
     /// Call when ready to opt into background recording (requires Always auth).
     func enableBackgroundRecordingIfAuthorized() {
+        setBackgroundRecordingEnabled(true)
         guard manager.authorizationStatus == .authorizedAlways else {
             manager.requestAlwaysAuthorization()
             return
         }
-        manager.allowsBackgroundLocationUpdates = true
+        applyBackgroundRecordingPreference()
+    }
+
+    func setBackgroundRecordingEnabled(_ enabled: Bool) {
+        prefersBackgroundRecording = enabled
+        UserDefaults.standard.set(enabled, forKey: BackgroundRecordingPreference.storageKey)
+        applyBackgroundRecordingPreference()
+    }
+
+    private func applyBackgroundRecordingPreference() {
+        let shouldEnable = prefersBackgroundRecording
+            && manager.authorizationStatus == .authorizedAlways
+            && isRecording
+            && !isSimulationActive
+        manager.allowsBackgroundLocationUpdates = shouldEnable
     }
 
     func start() {
@@ -121,11 +140,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
             return
         }
 
-        if status == .authorizedAlways {
-            manager.allowsBackgroundLocationUpdates = true
-        } else {
-            manager.allowsBackgroundLocationUpdates = false
-        }
+        applyBackgroundRecordingPreference()
 
         manager.startUpdatingLocation()
     }
@@ -274,6 +289,7 @@ extension ActivityRecorder: CLLocationManagerDelegate {
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor in
             self.authorizationStatus = manager.authorizationStatus
+            self.applyBackgroundRecordingPreference()
             if self.isRecording,
                manager.authorizationStatus == .authorizedWhenInUse
                 || manager.authorizationStatus == .authorizedAlways {

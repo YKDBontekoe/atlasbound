@@ -6,12 +6,16 @@ Location-based exploration RPG prototype for iPhone. Walk, run, cycle, or drive 
 
 ## Current capabilities
 
-- SwiftUI app shell with MapKit + user location
-- Foreground activity recording via Core Location (Info.plist structured for background)
-- Hex tile engine (~60 / **80** / 100 m flat-to-flat, configurable per activity)
-- Fog vs discovered tile overlay on the map
-- Local persistence of discovered tiles + XP totals (JSON in Documents via FileManager; tile size preference in UserDefaults)
-- Discovery vs familiarity progression and an end-of-activity summary
+- SwiftUI app with four tabs: **Map**, **Pinpoint**, **Activity**, and **Progress (Atlas Stats)**
+- Foreground activity recording via Core Location; optional **background recording** when Always location is granted
+- Hex tile engine (~60 / **80** / 100 m flat-to-flat, chosen automatically per activity type)
+- Fog vs discovered tile overlay on the map; mastery ladder and familiarity XP
+- **Frontier Expeditions** — weekly missions, combo scoring, Game Center leaderboards
+- **Pinpoint** — 5-round Look Around location guessing (Worldwide + Home Turf)
+- **Atlas Stats** — territory km², personal records, layered explorer map, Pinpoint stats
+- **Activity session history** — last 100 finished sessions with detail sheets
+- Local persistence (JSON in Documents; tile grids isolated per reveal width)
+- First-run onboarding overlay on the map
 
 ## Open & run
 
@@ -59,7 +63,7 @@ Deeper write-ups: [docs/architecture.md](docs/architecture.md), [docs/domain.md]
 
 ## Privacy
 
-Location is used on-device for tile discovery. Usage strings live in `Atlasbound/Info.plist`. Background mode is declared but recording currently defaults to foreground (`When In Use`).
+Location is used on-device for tile discovery. Usage strings live in `Atlasbound/Info.plist`. Background recording is optional (Settings → “Record while screen is off”) and requires Always location access.
 
 ## Requirements
 

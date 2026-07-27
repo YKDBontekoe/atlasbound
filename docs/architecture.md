@@ -66,6 +66,5 @@ Persistence: `Documents/atlasbound-pinpoint.json`. Leaderboard ID: `com.atlasbou
 ## Extension points
 
 - Region Engine (replace stub `regionName` / tile-count header with real geo regions)
-- Background Always + passive drive path (`enableBackgroundRecordingIfAuthorized` exists; currently When In Use)
-- Streak multiplier wired into XP (UI-only today)
+- Background Always + passive drive path (`enableBackgroundRecordingIfAuthorized` wired via Settings toggle)
 - CloudKit integration

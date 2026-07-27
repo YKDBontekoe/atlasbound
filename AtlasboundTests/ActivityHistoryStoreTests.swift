@@ -53,6 +53,35 @@ final class ActivityHistoryStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.sessionCount(for: .hike), 1)
     }
 
+    func testPersistedFrontierTotal() {
+        var summary = makeSummary(activity: .walk, distance: 500)
+        summary = ActivitySummary(
+            id: summary.id,
+            startedAt: summary.startedAt,
+            endedAt: summary.endedAt,
+            distanceMeters: summary.distanceMeters,
+            sampleCount: summary.sampleCount,
+            tilesVisited: summary.tilesVisited,
+            tilesDiscovered: summary.tilesDiscovered,
+            discoveryXP: summary.discoveryXP,
+            familiarityXP: summary.familiarityXP,
+            activityType: summary.activityType,
+            frontierContribution: FrontierSessionContribution(
+                tilePoints: 30,
+                connectionBonus: 10,
+                completionBonus: 5,
+                weeklyTotalAfter: 100,
+                targetTilesDiscovered: 2,
+                targetTilesRequired: 5,
+                didConnectTarget: false,
+                comboPeak: 1.4
+            )
+        )
+        let store = ActivityHistoryStore(fileURL: tempURL)
+        store.record(summary, tileSizeMeters: 80)
+        XCTAssertEqual(store.sessions.first?.frontierSessionTotal, 45)
+    }
+
     private func makeSummary(activity: ActivityType, distance: Double) -> ActivitySummary {
         ActivitySummary(
             id: UUID(),

@@ -43,9 +43,9 @@ Session totals: `SessionProgress` (discovered / revisited / XP splits). Lifetime
 
 Players pick an activity before recording (map idle sheet or Activity tab). Selection is remembered across launches. Changing activity while recording is blocked; each activity maps to a reveal width (60 / 80 / 100 m).
 
-## Session extras (UI / soft)
+## Session extras
 
-- **Discovery streak:** counts new tiles; expires **20 minutes** after last discovery; multiplier shown in UI but **not** applied to XP yet.
+- **Frontier combo:** during an active expedition, consecutive qualifying frontier tiles within **20 minutes** build a combo multiplier on frontier scoring (see `FrontierEngine`).
 - **Nearby fog / undiscovered counts:** rings around user via `TileEngine.ring`.
 
 ## Multi-size progress
@@ -54,7 +54,7 @@ Players pick an activity before recording (map idle sheet or Activity tab). Sele
 
 ## Activity history & territory stats
 
-Finished sessions are persisted in `Documents/atlasbound-activities.json` (`ActivityHistoryStore`): distance, duration, activity type, and rolling per-activity bests/totals (longest session distance, lifetime km, session counts).
+Finished sessions are persisted in `Documents/atlasbound-activities.json` (`ActivityHistoryStore`): distance, duration, activity type, XP totals, frontier bonuses, and rolling per-activity bests/totals (longest session distance, lifetime km, session counts). The Activity tab shows recent sessions; tap any row for a read-only detail sheet.
 
 **Unlocked area** is derived at runtime — never stored. Per hex tile (flat-to-flat width `W` meters):
 
