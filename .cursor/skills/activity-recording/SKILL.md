@@ -38,7 +38,7 @@ Prefer adjusting settings objects over hardcoding magic numbers in the recorder.
 ## UI touchpoints
 
 - `MainMapScreen` — start / pause / finish chrome; idle sheet opens `ActivityPickerSheet`
-- Activity tab / Settings — same `setActivityType` path (blocked while recording)
+- Activity tab — same `setActivityType` path (blocked while recording)
 - `ActivitySummaryView` — end-of-activity sheet
 - `DiscoveryMapView` — route polyline + hex overlays
 

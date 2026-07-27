@@ -53,7 +53,7 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | High speed | Sim GPS leap step + Auto, or Freeway Drive | Continuous hex fill via `hexLine` (no large gaps) |
 | Pause / resume | Pause mid-activity | Samples stop; resume continues route |
 | Finish summary | End activity | Sheet with discovery/familiarity splits |
-| Activity switch | Map idle sheet / Activity tab / Settings | Walk → Cycle etc.; reveal width + grid update |
+| Activity switch | Map idle sheet / Activity tab | Walk → Cycle etc.; reveal width + grid update |
 | Activity mid-record | Try change while recording | Blocked until finish |
 | Activity persistence | Pick Run, relaunch app | Still Run; Start button says Start Run |
 | Clear progress | Clear for current size | Only active size wiped |
