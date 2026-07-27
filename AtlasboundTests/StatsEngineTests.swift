@@ -77,7 +77,7 @@ final class StatsEngineTests: XCTestCase {
 
     private func makeTile(size: Int, q: Int, r: Int) -> WorldTile {
         WorldTile(
-            id: TileEngine.makeTileID(q: q, r: r, sizeMeters: size),
+            id: TileEngine.makeTileID(q: q, r: r, sizeMeters: Double(size)),
             coordinate: TileCoordinate(q: q, r: r),
             state: .discovered,
             masteryXP: 100,

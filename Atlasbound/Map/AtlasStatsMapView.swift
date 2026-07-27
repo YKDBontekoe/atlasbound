@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import UIKit
 
 enum AtlasStatsMapLayer: String, CaseIterable, Identifiable {
     case mastery
