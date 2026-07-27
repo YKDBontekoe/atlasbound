@@ -81,6 +81,18 @@ struct PersistedActivityRecord: Codable, Identifiable, Sendable, Hashable {
             self.frontierWeeklyTotal = frontier.weeklyTotalAfter
         }
     }
+
+    var frontierSessionTotal: Int {
+        (frontierPoints ?? 0) + (frontierConnectionBonus ?? 0) + (frontierCompletionBonus ?? 0)
+    }
+}
+
+enum BackgroundRecordingPreference {
+    static let storageKey = "atlasbound.backgroundRecordingEnabled"
+}
+
+enum OnboardingPreference {
+    static let storageKey = "atlasbound.hasCompletedOnboarding"
 }
 
 struct LocationSample: Sendable {

@@ -10,7 +10,7 @@ Shared macOS test steps live in [`scripts/ci-run-tests.sh`](../scripts/ci-run-te
 |-------|--------|------|
 | Static | `./scripts/validate-pr.sh` | Privacy/AltStore alignment, `apps.json` JSON, Python script unit tests, CI shell syntax |
 | Unit | `AtlasboundTests` | `TileEngine`, `ProgressionEngine`, `TileStore`, persistence (no geometry) |
-| Visual | `AtlasboundTests/Visual` | Non-map chrome snapshots (`ActivitySummaryView`, `ActivityTypeRow`) |
+| Visual | `AtlasboundTests/Visual` | Non-map chrome snapshots (`ActivitySummaryView`, `ActivityTypeRow`, `ActivityHistoryRow`) |
 | UI smoke | `AtlasboundUITests` | Launch, activity picker, Progress tab, settings (when map chrome available) |
 | Package | `./scripts/build-ipa.sh` | Unsigned IPA archive (PR artifact / release) |
 
@@ -58,6 +58,8 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | High speed | Sim GPS leap step + Auto, or Freeway Drive | Continuous hex fill via `hexLine` (no large gaps) |
 | Pause / resume | Pause mid-activity | Samples stop; resume continues route |
 | Finish summary | End activity | Sheet with discovery/familiarity splits |
+| Session history | Activity tab → Recent activities | Past sessions listed; tap for detail sheet |
+| Background recording | Settings → Record while screen is off; grant Always; Drive sim with screen locked | Recording continues; tiles still discovered |
 | Activity switch | Map idle sheet / Activity tab | Walk → Cycle etc.; reveal width + grid update |
 | Activity mid-record | Try change while recording | Blocked until finish |
 | Activity persistence | Pick Run, relaunch app | Still Run; Start button says Start Run |

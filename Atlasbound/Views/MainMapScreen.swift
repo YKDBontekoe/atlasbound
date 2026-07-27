@@ -14,6 +14,8 @@ struct MainMapScreen: View {
     @State private var showActivityPicker = false
     @State private var showExpeditionSheet = false
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
+    @AppStorage(OnboardingPreference.storageKey) private var hasCompletedOnboarding = false
+    @State private var onboardingStep = 0
 
     init(controller: WorldController, store: TileStore) {
         self.controller = controller
@@ -85,6 +87,13 @@ struct MainMapScreen: View {
                 }
             }
             .padding(.bottom, 8)
+        }
+        .overlay {
+            if !hasCompletedOnboarding {
+                OnboardingOverlay(step: $onboardingStep) {
+                    hasCompletedOnboarding = true
+                }
+            }
         }
         .sheet(isPresented: $controller.showSummary) {
             if let summary = controller.lastSummary {
@@ -450,6 +459,7 @@ struct SettingsSheet: View {
     @ObservedObject var store: TileStore
     @Binding var showSimGPSControls: Bool
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
+    @AppStorage(BackgroundRecordingPreference.storageKey) private var backgroundRecordingEnabled = false
     @Environment(\.dismiss) private var dismiss
 
     private var appearanceBinding: Binding<AppearancePreference> {
@@ -472,6 +482,27 @@ struct SettingsSheet: View {
                     Text("Auto follows your device appearance.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                }
+
+                Section("Recording") {
+                    Toggle("Record while screen is off", isOn: $backgroundRecordingEnabled)
+                        .onChange(of: backgroundRecordingEnabled) { _, enabled in
+                            if enabled {
+                                controller.recorder.enableBackgroundRecordingIfAuthorized()
+                            } else {
+                                controller.recorder.setBackgroundRecordingEnabled(false)
+                            }
+                        }
+                        .accessibilityIdentifier("backgroundRecordingToggle")
+                    Text("Requires Always location access. Keeps tile discovery running when the screen locks — useful for Drive and Transit.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    if backgroundRecordingEnabled,
+                       controller.recorder.authorizationStatus != .authorizedAlways {
+                        Text("Grant “Always” location in Settings to enable background recording.")
+                            .font(.footnote)
+                            .foregroundStyle(AtlasTheme.gold)
+                    }
                 }
 
                 #if DEBUG
