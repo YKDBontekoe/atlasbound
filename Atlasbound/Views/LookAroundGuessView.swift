@@ -1,7 +1,8 @@
 import SwiftUI
 import MapKit
+import UIKit
 
-/// Displays the Look Around scene and a slide-up guess map for one round.
+/// Displays static Look Around snapshots and a slide-up guess map for one round.
 struct LookAroundGuessView: View {
     let target: CLLocationCoordinate2D
     let mode: PinpointGameMode
@@ -13,7 +14,7 @@ struct LookAroundGuessView: View {
     let onGuess: (CLLocationCoordinate2D) -> Void
     let onQuit: () -> Void
 
-    @State private var lookAroundScene: MKLookAroundScene?
+    @State private var galleryImages: [UIImage] = []
     @State private var isLoadingScene = true
     @State private var sceneUnavailable = false
     @State private var showGuessMap = false
@@ -21,7 +22,8 @@ struct LookAroundGuessView: View {
     @State private var secondsRemaining: Int
     @State private var timerActive = false
     @State private var showQuitConfirmation = false
-    @State private var useInteractiveFallback = false
+
+    private let snapshotEngine = LookAroundSnapshotEngine()
 
     init(
         target: CLLocationCoordinate2D,
@@ -52,20 +54,9 @@ struct LookAroundGuessView: View {
                 loadingView
             } else if sceneUnavailable {
                 unavailableView
-            } else if let scene = lookAroundScene {
-                if useInteractiveFallback {
-                    PinpointLookAroundView(scene: scene)
-                        .ignoresSafeArea()
-                } else {
-                    LookAroundSnapshotViewer(scene: scene) {
-                        useInteractiveFallback = true
-                    }
+            } else if !galleryImages.isEmpty {
+                LookAroundGalleryView(images: galleryImages)
                     .ignoresSafeArea()
-                }
-
-                if useInteractiveFallback {
-                    spoilerGuardOverlay
-                }
             }
 
             VStack(spacing: 0) {
@@ -73,7 +64,7 @@ struct LookAroundGuessView: View {
                 Spacer()
                 if showGuessMap {
                     guessMapOverlay
-                } else {
+                } else if !sceneUnavailable {
                     bottomControls
                 }
             }
@@ -213,25 +204,6 @@ struct LookAroundGuessView: View {
         .background(Color(.systemBackground))
     }
 
-    private var spoilerGuardOverlay: some View {
-        VStack {
-            Spacer()
-            HStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .background {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.black.opacity(0.55))
-                    }
-                    .frame(width: 150, height: 88)
-                    .padding(.leading, 8)
-                Spacer()
-            }
-            .padding(.bottom, 44)
-        }
-        .allowsHitTesting(false)
-    }
-
     private var bottomControls: some View {
         VStack(spacing: 9) {
             HStack(spacing: 7) {
@@ -327,28 +299,30 @@ struct LookAroundGuessView: View {
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
-    private func loadScene() async {
-        let request = MKLookAroundSceneRequest(coordinate: target)
-        do {
-            let scene = try await request.scene
-            await MainActor.run {
-                if let scene {
-                    self.lookAroundScene = scene
-                } else {
-                    self.sceneUnavailable = true
-                }
-                self.isLoadingScene = false
+    private func loadGallery() async {
+        let size = await MainActor.run { () -> CGSize in
+            let screen = UIScreen.main.bounds.size
+            let scale = UIScreen.main.scale
+            return CGSize(
+                width: max(screen.width * scale, 1),
+                height: max(screen.height * scale, 1)
+            )
+        }
+        let images = await snapshotEngine.gallerySnapshots(around: target, size: size)
+        await MainActor.run {
+            if images.isEmpty {
+                galleryImages = []
+                sceneUnavailable = true
+            } else {
+                galleryImages = images
+                sceneUnavailable = false
             }
-        } catch {
-            await MainActor.run {
-                self.sceneUnavailable = true
-                self.isLoadingScene = false
-            }
+            isLoadingScene = false
         }
     }
 
-    /// Reuse the view between rounds so MapKit can release its previous preview
-    /// before requesting the next scene. Recreating the entire preview hierarchy
+    /// Reuse the view between rounds so MapKit can release previous imagery
+    /// before requesting the next gallery. Recreating the entire hierarchy
     /// during the result-to-round transition can make the simulator return to the
     /// app root instead of presenting the next round.
     private var sceneRequestID: String {
@@ -360,12 +334,11 @@ struct LookAroundGuessView: View {
         timerActive = false
         isLoadingScene = true
         sceneUnavailable = false
-        lookAroundScene = nil
-        useInteractiveFallback = false
+        galleryImages = []
         showGuessMap = false
         guessCoordinate = nil
         secondsRemaining = roundSeconds
         await Task.yield()
-        await loadScene()
+        await loadGallery()
     }
 }
