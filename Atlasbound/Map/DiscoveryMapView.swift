@@ -17,6 +17,8 @@ struct DiscoveryMapView: View {
     @State private var cachedDiscovered: [WorldTile] = []
     @State private var cachedFog: [TileCoordinate] = []
     @State private var cachedMarkers: [WorldTile] = []
+    @State private var cachedFrontierEdge: [TileCoordinate] = []
+    @State private var cachedTargetBoundary: [TileCoordinate] = []
 
     private var engine: TileEngine { store.tileEngine }
 
@@ -43,12 +45,45 @@ struct DiscoveryMapView: View {
                 let vertices = engine.polygon(for: tile.coordinate)
                 if vertices.count >= 3 {
                     let fresh = controller.sessionDiscoveredIDs.contains(tile.id)
+                    let charge = tile.weeklyCharge
                     MapPolygon(coordinates: vertices)
-                        .foregroundStyle(tile.state.mapFill(isFreshDiscovery: fresh))
+                        .foregroundStyle(tile.state.mapFill(isFreshDiscovery: fresh, weeklyCharge: charge))
                         .stroke(
-                            tile.state.mapStroke(isFreshDiscovery: fresh),
-                            lineWidth: tile.state.mapStrokeWidth(isFreshDiscovery: fresh)
+                            strokeColor(for: tile, fresh: fresh),
+                            lineWidth: strokeWidth(for: tile, fresh: fresh)
                         )
+                }
+            }
+
+            ForEach(cachedFrontierEdge, id: \.self) { axial in
+                let vertices = engine.polygon(for: axial)
+                if vertices.count >= 3 {
+                    MapPolygon(coordinates: vertices)
+                        .foregroundStyle(AtlasTheme.gold.opacity(0.12))
+                        .stroke(AtlasTheme.gold.opacity(0.75), lineWidth: 1.4)
+                }
+            }
+
+            ForEach(cachedTargetBoundary, id: \.self) { axial in
+                let vertices = engine.polygon(for: axial)
+                if vertices.count >= 3 {
+                    MapPolygon(coordinates: vertices)
+                        .foregroundStyle(Color.clear)
+                        .stroke(AtlasTheme.blue.opacity(0.9), lineWidth: 2.2)
+                }
+            }
+
+            if let beacon = controller.expeditionBeaconCoordinate {
+                Annotation("", coordinate: beacon, anchor: .center) {
+                    ExpeditionBeaconView()
+                }
+            }
+
+            ForEach(controller.frontierScoreCallouts) { callout in
+                if let coordinate = engine.parseTileID(callout.tileID).map({ engine.centerCoordinate(for: $0) }) {
+                    Annotation("", coordinate: coordinate, anchor: .bottom) {
+                        FrontierScoreCalloutView(points: callout.points)
+                    }
                 }
             }
 
@@ -85,6 +120,12 @@ struct DiscoveryMapView: View {
         .onChange(of: controller.sessionDiscoveredIDs.count) { _, _ in
             refreshOverlays()
         }
+        .onChange(of: controller.frontierEdgeTileIDs.count) { _, _ in
+            refreshOverlays()
+        }
+        .onChange(of: controller.targetSectorBoundaryTileIDs.count) { _, _ in
+            refreshOverlays()
+        }
         .onChange(of: showLayers) { _, _ in
             refreshOverlays()
         }
@@ -111,6 +152,8 @@ struct DiscoveryMapView: View {
         let discovered = cullDiscovered(engine: engine)
         cachedDiscovered = discovered
         cachedFog = buildFog(engine: engine)
+        cachedFrontierEdge = controller.frontierEdgeTileIDs.compactMap { engine.parseTileID($0) }
+        cachedTargetBoundary = controller.targetSectorBoundaryTileIDs.compactMap { engine.parseTileID($0) }
         cachedMarkers = showLayers
             ? Array(
                 discovered
@@ -119,6 +162,20 @@ struct DiscoveryMapView: View {
                     .prefix(AtlasTheme.maxVisibleMarkers)
               )
             : []
+    }
+
+    private func strokeColor(for tile: WorldTile, fresh: Bool) -> Color {
+        if controller.frontierEdgeTileIDs.contains(tile.id) {
+            return AtlasTheme.gold.opacity(0.85)
+        }
+        return tile.state.mapStroke(isFreshDiscovery: fresh)
+    }
+
+    private func strokeWidth(for tile: WorldTile, fresh: Bool) -> CGFloat {
+        if controller.frontierEdgeTileIDs.contains(tile.id) {
+            return 1.6
+        }
+        return tile.state.mapStrokeWidth(isFreshDiscovery: fresh)
     }
 
     private func cullDiscovered(engine: TileEngine) -> [WorldTile] {
@@ -157,6 +214,57 @@ struct TileMarkerView: View {
                 .foregroundStyle(.white)
         }
         .allowsHitTesting(false)
+    }
+}
+
+struct ExpeditionBeaconView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(AtlasTheme.blue.opacity(0.35), lineWidth: 2)
+                .frame(width: pulse ? 34 : 24, height: pulse ? 34 : 24)
+                .opacity(pulse ? 0.2 : 0.6)
+            Image(systemName: "flag.fill")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(AtlasTheme.blue, in: Circle())
+                .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct FrontierScoreCalloutView: View {
+    let points: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var visible = true
+
+    var body: some View {
+        Text("+\(points)")
+            .font(.caption2.weight(.bold).monospacedDigit())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(AtlasTheme.gold, in: Capsule())
+            .opacity(visible ? 1 : 0)
+            .offset(y: visible ? -8 : -20)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeOut(duration: 1.2).delay(0.2)) {
+                    visible = false
+                }
+            }
+            .allowsHitTesting(false)
     }
 }
 

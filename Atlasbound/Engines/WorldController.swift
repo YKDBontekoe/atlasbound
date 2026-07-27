@@ -10,29 +10,39 @@ final class WorldController: ObservableObject {
     /// Tile IDs first discovered during the active session (map highlight).
     @Published private(set) var sessionDiscoveredIDs: Set<String> = []
     @Published private(set) var sessionDiscoveredCount = 0
-    @Published private(set) var discoveryStreak = 0
-    @Published private(set) var streakExpiresAt: Date?
+    @Published private(set) var frontierCombo = FrontierComboState.empty
+    @Published private(set) var sessionFrontierScore = 0
+    @Published private(set) var frontierScoreCallouts: [FrontierScoreCallout] = []
     @Published private(set) var lastSummary: ActivitySummary?
     @Published var showSummary = false
     @Published var showLayers = false
-
-    /// Soft regional label until Region Engine exists (not a real geo boundary).
-    let regionName = "Dordrecht"
+    @Published var showFrontierLeaderboard = false
 
     let recorder: ActivityRecorder
     let store: TileStore
     let activityHistory: ActivityHistoryStore
+    let gameCenterManager: GameCenterManager
     private let progression = ProgressionEngine()
+    private let frontierEngine = FrontierEngine()
+    private let sectorEngine = HexSectorEngine()
 
     /// Tiles mutated during the active session (merged into store on stop).
     private var sessionTiles: [String: WorldTile] = [:]
     private var sessionProgress = SessionProgress.empty
+    private var sessionFrontier = FrontierSessionContribution.empty
+    private var scoredFrontierTiles: Set<String> = []
 
     private static let selectedActivityKey = "atlasbound.selectedActivityType"
 
-    init(store: TileStore, activityHistory: ActivityHistoryStore, recorder: ActivityRecorder? = nil) {
+    init(
+        store: TileStore,
+        activityHistory: ActivityHistoryStore,
+        gameCenterManager: GameCenterManager? = nil,
+        recorder: ActivityRecorder? = nil
+    ) {
         self.store = store
         self.activityHistory = activityHistory
+        self.gameCenterManager = gameCenterManager ?? GameCenterManager()
         self.recorder = recorder ?? ActivityRecorder()
         restoreSelectedActivityType()
         syncRecorderSettings()
@@ -41,6 +51,7 @@ final class WorldController: ObservableObject {
             self?.handleSample(sample)
         }
         syncTileSizeToActivity()
+        refreshFrontierPresentation()
     }
 
     var isRecording: Bool { recorder.isRecording }
@@ -48,16 +59,116 @@ final class WorldController: ObservableObject {
 
     var tileEngine: TileEngine { store.tileEngine }
 
-    /// Lifetime discovered tiles on the active grid (honest stand-in until real regions).
-    var discoveredTileCount: Int { store.discoveredTiles.count }
+    var frontierState: FrontierState { store.frontierState }
 
-    var streakMultiplier: Double {
-        1.0 + min(1.0, Double(discoveryStreak) * 0.1)
+    var activeExpedition: ExpeditionOffer? { store.frontierState.activeOffer }
+
+    var availableExpeditions: [ExpeditionOffer] { store.frontierState.availableOffers }
+
+    var weeklyFrontierScore: Int { store.frontierState.weeklyScore }
+
+    var currentSectorName: String {
+        guard let coordinate = playerTileCoordinate else { return "Frontier" }
+        let sector = sectorEngine.sectorCoordinate(for: coordinate)
+        return sectorEngine.displayName(for: sector)
     }
 
-    var streakProgress: Double {
-        guard discoveryStreak > 0 else { return 0 }
-        return Double(discoveryStreak % 10) / 10.0
+    var currentSectorCompletionPercent: Int {
+        guard let coordinate = playerTileCoordinate else { return 0 }
+        let sector = sectorEngine.sectorCoordinate(for: coordinate)
+        return sectorEngine.completionPercent(
+            sector: sector,
+            discoveredTileIDs: store.discoveredTileIDs,
+            tileEngine: tileEngine
+        )
+    }
+
+    var currentGridLabel: String { store.tileSize.label }
+
+    var discoveredTileCount: Int { store.discoveredTiles.count }
+
+    var frontierComboMultiplier: Double {
+        frontierCombo.multiplier
+    }
+
+    var frontierComboProgress: Double {
+        guard frontierCombo.isActive else { return 0 }
+        return Double(frontierCombo.count % 10) / 10.0
+    }
+
+    var frontierComboRemainingLabel: String {
+        guard let expires = frontierCombo.expiresAt, frontierCombo.isActive else { return "—" }
+        let remaining = max(0, expires.timeIntervalSinceNow)
+        let minutes = Int(remaining) / 60
+        let seconds = Int(remaining) % 60
+        return String(format: "%02d:%02d remaining", minutes, seconds)
+    }
+
+    var targetSectorDiscoveredCount: Int {
+        guard let offer = activeExpedition else { return 0 }
+        return frontierEngine.targetSectorDiscoveredCount(
+            offer: offer,
+            tiles: mergedTiles,
+            tileEngine: tileEngine
+        )
+    }
+
+    var targetSectorConnected: Bool {
+        guard let offer = activeExpedition else { return false }
+        let discovered = frontierEngine.discoveredTileCoordinates(from: mergedTiles)
+        let territory = frontierEngine.territoryAnchor(
+            playerTile: playerTileCoordinate,
+            discovered: discovered
+        )
+        return frontierEngine.routeConnectsTerritoryToSector(
+            territory: territory,
+            discovered: discovered,
+            targetSectorID: offer.targetSectorID,
+            tileEngine: tileEngine
+        )
+    }
+
+    var frontierEdgeTileIDs: Set<String> {
+        let discovered = frontierEngine.discoveredTileCoordinates(from: mergedTiles)
+        let territory = frontierEngine.territoryAnchor(
+            playerTile: playerTileCoordinate,
+            discovered: discovered
+        )
+        let frontier = frontierEngine.frontierTileCoordinates(territory: territory, discovered: discovered)
+        return Set(frontier.map {
+            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: tileEngine.tileSizeMeters)
+        })
+    }
+
+    var targetSectorBoundaryTileIDs: Set<String> {
+        guard let offer = activeExpedition,
+              let parsed = sectorEngine.parseSectorID(offer.targetSectorID) else {
+            return []
+        }
+        return Set(sectorEngine.boundaryTiles(for: parsed.sector).map {
+            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: tileEngine.tileSizeMeters)
+        })
+    }
+
+    var expeditionBeaconCoordinate: CLLocationCoordinate2D? {
+        guard let offer = activeExpedition,
+              let parsed = sectorEngine.parseSectorID(offer.targetSectorID) else {
+            return nil
+        }
+        let center = sectorEngine.centerTile(for: parsed.sector)
+        return tileEngine.centerCoordinate(for: center)
+    }
+
+    private var playerTileCoordinate: TileCoordinate? {
+        recorder.lastLocation.map { tileEngine.axialCoordinate(for: $0.coordinate) }
+    }
+
+    private var mergedTiles: [String: WorldTile] {
+        var merged = store.tiles
+        for (id, tile) in sessionTiles {
+            merged[id] = tile
+        }
+        return merged
     }
 
     func nearbyUndiscoveredCount(around coordinate: CLLocationCoordinate2D?, radius: Int = 3) -> Int {
@@ -71,7 +182,6 @@ final class WorldController: ObservableObject {
         }.count
     }
 
-    /// Fog hexes around the user for the active map wash.
     func nearbyFogTiles(around coordinate: CLLocationCoordinate2D?, radius: Int = 5) -> [TileCoordinate] {
         guard let coordinate else { return [] }
         let engine = tileEngine
@@ -87,15 +197,38 @@ final class WorldController: ObservableObject {
         recorder.requestAuthorization()
         recorder.startMonitoringIfNeeded()
         syncTileSizeToActivity()
+        store.applyWeeklyChargeResetIfNeeded()
+        refreshFrontierPresentation()
+        gameCenterManager.authenticate()
     }
 
-    /// Activity selects the reveal grid — players never pick tile size manually.
     func setActivityType(_ type: ActivityType) {
         guard !recorder.isRecording else { return }
         guard type != .unknown else { return }
         recorder.activityType = type
         UserDefaults.standard.set(type.rawValue, forKey: Self.selectedActivityKey)
         syncTileSizeToActivity()
+        refreshFrontierPresentation()
+    }
+
+    func selectExpedition(_ offer: ExpeditionOffer) {
+        guard !recorder.isRecording else { return }
+        store.updateFrontierState({ state in
+            var next = state
+            next.activeOfferID = offer.id
+            return next
+        }, playerTile: playerTileCoordinate)
+        refreshFrontierPresentation()
+    }
+
+    func abandonActiveExpedition() {
+        guard !recorder.isRecording else { return }
+        store.updateFrontierState({ state in
+            var next = state
+            next.activeOfferID = nil
+            return next
+        }, playerTile: playerTileCoordinate)
+        refreshFrontierPresentation()
     }
 
     private func restoreSelectedActivityType() {
@@ -109,14 +242,23 @@ final class WorldController: ObservableObject {
 
     func startActivity() {
         syncTileSizeToActivity()
+        store.applyWeeklyChargeResetIfNeeded()
+        refreshFrontierPresentation()
         liveRoute = []
         sessionVisitedTileIDs = []
         sessionDiscoveredIDs = []
         sessionDiscoveredCount = 0
-        discoveryStreak = 0
-        streakExpiresAt = nil
+        frontierCombo = .empty
+        sessionFrontierScore = 0
+        frontierScoreCallouts = []
         sessionTiles = [:]
         sessionProgress = .empty
+        sessionFrontier = .empty
+        scoredFrontierTiles = []
+        if let offer = activeExpedition {
+            sessionFrontier.targetTilesRequired = offer.tilesRequired
+            sessionFrontier.targetTilesDiscovered = targetSectorDiscoveredCount
+        }
         lastSummary = nil
         recorder.start()
     }
@@ -152,6 +294,8 @@ final class WorldController: ObservableObject {
 
         store.applySessionProgress(sessionProgress, updatedTiles: sessionTiles)
 
+        sessionFrontier.weeklyTotalAfter = store.frontierState.weeklyScore
+
         let summary = ActivitySummary(
             id: UUID(),
             startedAt: result.startedAt,
@@ -162,13 +306,29 @@ final class WorldController: ObservableObject {
             tilesDiscovered: sessionProgress.tilesDiscovered,
             discoveryXP: sessionProgress.discoveryXP,
             familiarityXP: sessionProgress.familiarityXP,
-            activityType: recorder.activityType
+            activityType: recorder.activityType,
+            frontierContribution: sessionFrontier
         )
         activityHistory.record(summary, tileSizeMeters: store.tileSize.rawValue)
         lastSummary = summary
         showSummary = true
-        discoveryStreak = 0
-        streakExpiresAt = nil
+        frontierCombo = .empty
+        frontierScoreCallouts = []
+
+        Task {
+            await gameCenterManager.submitFrontierScore(
+                store.frontierState.weeklyScore,
+                tileSize: store.tileSize
+            )
+        }
+    }
+
+    func refreshFrontierPresentation() {
+        store.refreshFrontierState(playerTile: playerTileCoordinate)
+    }
+
+    func showMatchingFrontierLeaderboard() {
+        gameCenterManager.showFrontierLeaderboard(tileSize: store.tileSize)
     }
 
     private func syncRecorderSettings() {
@@ -243,10 +403,7 @@ final class WorldController: ObservableObject {
         sessionProgress.familiarityXP += progress.familiarityXP
         sessionDiscoveredCount = sessionProgress.tilesDiscovered
 
-        if progress.tilesDiscovered > 0 {
-            discoveryStreak += progress.tilesDiscovered
-            streakExpiresAt = date.addingTimeInterval(20 * 60)
-        }
+        processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
 
         for id in newIDs {
             if let tile = sessionTiles[id], tile.isDiscovered {
@@ -255,11 +412,112 @@ final class WorldController: ObservableObject {
         }
         store.addXP(discovery: progress.discoveryXP, familiarity: progress.familiarityXP)
     }
+
+    private func processFrontierScoring(newDiscoveryIDs: [String], at date: Date) {
+        guard !newDiscoveryIDs.isEmpty else { return }
+
+        let discovered = frontierEngine.discoveredTileCoordinates(from: mergedTiles)
+        let territory = frontierEngine.territoryAnchor(
+            playerTile: playerTileCoordinate,
+            discovered: discovered
+        )
+        let activeOffer = store.frontierState.activeOffer
+        var connectionBonuses = Set(store.frontierState.connectionBonusesAwarded)
+        var targetCount = activeOffer.map {
+            frontierEngine.targetSectorDiscoveredCount(offer: $0, tiles: mergedTiles, tileEngine: tileEngine)
+        } ?? 0
+
+        var batchTilePoints = 0
+        var batchConnectionBonus = 0
+        var batchCompletionBonus = 0
+        var completedOffer: ExpeditionOffer?
+
+        for id in newDiscoveryIDs {
+            guard let coordinate = tileEngine.parseTileID(id) else { continue }
+            guard let tile = sessionTiles[id], tile.isDiscovered else { continue }
+            guard !scoredFrontierTiles.contains(id) else { continue }
+
+            let isNew = tile.visitCount <= 1
+            let result = frontierEngine.scoreDiscovery(
+                tileID: id,
+                tile: coordinate,
+                isNewDiscovery: isNew,
+                activeOffer: activeOffer,
+                territory: territory,
+                discovered: discovered,
+                targetSectorDiscoveredCount: targetCount,
+                connectionBonusesAwarded: connectionBonuses,
+                combo: frontierCombo,
+                tileEngine: tileEngine,
+                at: date
+            )
+
+            frontierCombo = result.combo
+            guard let award = result.award else { continue }
+
+            scoredFrontierTiles.insert(id)
+            batchTilePoints += award.totalPoints
+            sessionFrontier.comboPeak = max(sessionFrontier.comboPeak, award.comboMultiplier)
+
+            if let offer = activeOffer,
+               sectorEngine.sectorID(for: coordinate, sizeMeters: tileEngine.tileSizeMeters) == offer.targetSectorID {
+                targetCount += 1
+                sessionFrontier.targetTilesDiscovered = targetCount
+                sessionFrontier.targetTilesRequired = offer.tilesRequired
+            }
+
+            if result.connectionBonusAwarded, let bonus = award.connectionBonus, let offer = activeOffer {
+                connectionBonuses.insert(offer.id)
+                batchConnectionBonus += bonus
+                sessionFrontier.didConnectTarget = true
+            }
+
+            if let completion = result.completionBonus, let offer = activeOffer {
+                batchCompletionBonus += completion
+                completedOffer = offer
+            }
+
+            var updatedTile = tile
+            updatedTile.weeklyCharge = min(3, updatedTile.weeklyCharge + 1)
+            sessionTiles[id] = updatedTile
+
+            frontierScoreCallouts.append(
+                FrontierScoreCallout(id: UUID(), tileID: id, points: award.totalPoints, createdAt: date)
+            )
+        }
+
+        guard batchTilePoints > 0 || batchConnectionBonus > 0 || batchCompletionBonus > 0 else { return }
+
+        sessionFrontier.tilePoints += batchTilePoints
+        sessionFrontier.connectionBonus += batchConnectionBonus
+        sessionFrontier.completionBonus += batchCompletionBonus
+        sessionFrontierScore += batchTilePoints + batchConnectionBonus + batchCompletionBonus
+
+        store.updateFrontierState({ state in
+            var next = state
+            next.weeklyScore += batchTilePoints + batchConnectionBonus + batchCompletionBonus
+            next.connectionBonusesAwarded = Array(Set(next.connectionBonusesAwarded).union(connectionBonuses))
+            for id in sessionTiles.keys {
+                if let tile = sessionTiles[id], tile.weeklyCharge > 0, !next.chargedTileIDs.contains(id) {
+                    next.chargedTileIDs.append(id)
+                }
+            }
+            if let completedOffer {
+                if !next.completedOfferIDs.contains(completedOffer.id) {
+                    next.completedOfferIDs.append(completedOffer.id)
+                    next.lifetimeCompletedExpeditions += 1
+                }
+                next.activeOfferID = nil
+            }
+            return next
+        }, playerTile: playerTileCoordinate)
+
+        sessionFrontier.weeklyTotalAfter = store.frontierState.weeklyScore
+    }
 }
 
 #if DEBUG
 extension WorldController {
-    /// Default seed for Simulator testing (matches placeholder region label).
     static let debugDefaultCoordinate = CLLocationCoordinate2D(latitude: 51.8133, longitude: 4.6901)
 
     enum DebugStepSize: Double, CaseIterable, Identifiable {
@@ -294,9 +552,9 @@ extension WorldController {
         recorder.ingestSimulatedLocation(
             Self.debugLocation(coordinate: coordinate, course: course, speed: speed)
         )
+        refreshFrontierPresentation()
     }
 
-    /// Move relative to the current simulated position (north/east meters).
     func debugNudge(northMeters: Double, eastMeters: Double, speed: CLLocationSpeed = 1.4) {
         recorder.setSimulationActive(true)
         let base = recorder.lastLocation?.coordinate ?? Self.debugDefaultCoordinate

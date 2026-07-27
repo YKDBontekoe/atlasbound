@@ -77,6 +77,7 @@ struct MainMapScreen: View {
                 if controller.isRecording {
                     activeBottomPanel
                 } else {
+                    IdleExpeditionPanel(controller: controller, store: store)
                     idleBottomSheet
                 }
             }
@@ -147,7 +148,7 @@ struct MainMapScreen: View {
                     showSettings = true
                 } label: {
                     HStack(spacing: 6) {
-                        Text("\(controller.regionName) · \(controller.discoveredTileCount) tiles")
+                        Text("\(controller.currentSectorName) · \(controller.currentSectorCompletionPercent)% · \(controller.currentGridLabel)")
                             .font(.subheadline.weight(.semibold))
                         Image(systemName: "chevron.down")
                             .font(.caption.weight(.bold))
@@ -314,7 +315,11 @@ struct MainMapScreen: View {
             .padding(.vertical, 14)
             .background(cardBackground)
 
-            streakCard
+            if controller.activeExpedition != nil {
+                ActiveFrontierTracker(controller: controller)
+            }
+
+            FrontierComboCard(controller: controller)
 
             HStack(spacing: 14) {
                 Button {
@@ -339,38 +344,6 @@ struct MainMapScreen: View {
             }
         }
         .padding(.horizontal, 12)
-    }
-
-    private var streakCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "flame.fill")
-                    .foregroundStyle(AtlasTheme.teal)
-                Text("Discovery streak")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Text(String(format: "x%.1f", controller.streakMultiplier))
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(AtlasTheme.teal)
-            }
-
-            ProgressView(value: max(0.08, controller.streakProgress))
-                .tint(AtlasTheme.teal)
-
-            HStack {
-                Text("Keep exploring to build your streak")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                TimelineView(.periodic(from: .now, by: 1)) { _ in
-                    Text(streakRemainingLabel)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(14)
-        .background(cardBackground)
     }
 
     private var mapSideControls: some View {
@@ -431,14 +404,6 @@ struct MainMapScreen: View {
 
     private var distanceUnit: String {
         recorder.distanceMeters >= 1000 ? "km" : "m"
-    }
-
-    private var streakRemainingLabel: String {
-        guard let expires = controller.streakExpiresAt else { return "—" }
-        let remaining = max(0, expires.timeIntervalSinceNow)
-        let minutes = Int(remaining) / 60
-        let seconds = Int(remaining) % 60
-        return String(format: "%02d:%02d remaining", minutes, seconds)
     }
 
     private func liveStat(icon: String, value: String, unit: String, tint: Color = AtlasTheme.blue) -> some View {

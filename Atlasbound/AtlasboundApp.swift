@@ -37,10 +37,18 @@ struct AtlasboundApp: App {
 @MainActor
 final class ControllerHolder: ObservableObject {
     @Published var controller: WorldController?
+    private var gameCenterManager: GameCenterManager?
 
     func bootstrap(store: TileStore, activityHistory: ActivityHistoryStore) {
         guard controller == nil else { return }
-        controller = WorldController(store: store, activityHistory: activityHistory)
+        let gcManager = gameCenterManager ?? GameCenterManager()
+        gameCenterManager = gcManager
+        gcManager.authenticate()
+        controller = WorldController(
+            store: store,
+            activityHistory: activityHistory,
+            gameCenterManager: gcManager
+        )
     }
 }
 
