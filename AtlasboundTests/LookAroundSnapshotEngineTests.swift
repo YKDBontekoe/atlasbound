@@ -3,14 +3,17 @@ import XCTest
 @testable import Atlasbound
 
 final class LookAroundSnapshotEngineTests: XCTestCase {
-    func testDefaultProbesIncludeSpawnAndCardinals() {
+    func testDefaultProbesIncludeSpawnCardinalsDiagonalsAndFarRing() {
         let probes = LookAroundGalleryProbe.defaultProbes
-        XCTAssertEqual(probes.count, 5)
+        XCTAssertEqual(probes.count, 13)
         XCTAssertEqual(probes[0], LookAroundGalleryProbe(latitudeOffsetMeters: 0, longitudeOffsetMeters: 0))
         XCTAssertEqual(probes[1], .north)
         XCTAssertEqual(probes[2], .east)
         XCTAssertEqual(probes[3], .south)
         XCTAssertEqual(probes[4], .west)
+        XCTAssertTrue(probes.contains(.northEast))
+        XCTAssertTrue(probes.contains(.farNorth))
+        XCTAssertTrue(probes.contains(.farWest))
     }
 
     func testProbeEquality() {
@@ -29,6 +32,8 @@ final class LookAroundSnapshotEngineTests: XCTestCase {
         XCTAssertEqual(LookAroundGalleryProbe.east.longitudeOffsetMeters, 20)
         XCTAssertEqual(LookAroundGalleryProbe.south.latitudeOffsetMeters, -20)
         XCTAssertEqual(LookAroundGalleryProbe.west.longitudeOffsetMeters, -20)
+        XCTAssertEqual(LookAroundGalleryProbe.farNorth.latitudeOffsetMeters, 40)
+        XCTAssertEqual(LookAroundGalleryProbe.farEast.longitudeOffsetMeters, 40)
     }
 
     func testCoordinateOffsetNorth() {
@@ -63,7 +68,7 @@ final class LookAroundSnapshotEngineTests: XCTestCase {
     func testProbeCoordinatesPreserveOrder() {
         let anchor = CLLocationCoordinate2D(latitude: 40.7580, longitude: -73.9855)
         let coords = LookAroundSnapshotEngine.probeCoordinates(around: anchor)
-        XCTAssertEqual(coords.count, 5)
+        XCTAssertEqual(coords.count, LookAroundGalleryProbe.defaultProbes.count)
         XCTAssertEqual(coords[0].latitude, anchor.latitude, accuracy: 0.000_000_1)
         XCTAssertEqual(coords[0].longitude, anchor.longitude, accuracy: 0.000_000_1)
         XCTAssertGreaterThan(coords[1].latitude, anchor.latitude) // north
@@ -73,6 +78,6 @@ final class LookAroundSnapshotEngineTests: XCTestCase {
     }
 
     func testMaxGalleryImagesCap() {
-        XCTAssertEqual(LookAroundSnapshotEngine.maxGalleryImages, 4)
+        XCTAssertEqual(LookAroundSnapshotEngine.maxGalleryImages, 8)
     }
 }

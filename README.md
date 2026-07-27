@@ -11,7 +11,7 @@ Location-based exploration RPG prototype for iPhone. Walk, run, cycle, or drive 
 - Hex tile engine (~60 / **80** / 100 m flat-to-flat, chosen automatically per activity type)
 - Fog vs discovered tile overlay on the map; mastery ladder and familiarity XP
 - **Frontier Expeditions** — weekly missions, combo scoring, Game Center leaderboards
-- **Pinpoint** — 5-round Look Around location guessing (Worldwide + Home Turf)
+- **Pinpoint** — 5-round Look Around location guessing (dynamic Worldwide streets + Home Turf)
 - **Atlas Stats** — territory km², personal records, layered explorer map, Pinpoint stats
 - **Activity session history** — last 100 finished sessions with detail sheets
 - Local persistence (JSON in Documents; tile grids isolated per reveal width)

@@ -26,6 +26,8 @@ final class PinpointController: ObservableObject {
     @Published private(set) var atlasRegionConstraint: MKCoordinateRegion?
     @Published var preparationError: String?
     @Published private(set) var sessionFamiliarityXP: Int = 0
+    @Published private(set) var preparationFoundCount = 0
+    @Published private(set) var preparationTargetCount = PinpointConstants.roundsPerGame
 
     let store: PinpointStore
     let tileStore: TileStore
@@ -74,6 +76,8 @@ final class PinpointController: ObservableObject {
         currentMode = mode
         unlockedAreaM2AtGameStart = unlockedAreaM2
         sessionFamiliarityXP = 0
+        preparationFoundCount = 0
+        preparationTargetCount = PinpointConstants.roundsPerGame
         atlasRegionConstraint = mode == .homeTurf
             ? LookAroundLocationPool.atlasRegion(for: tileStore.discoveredTiles, engine: tileStore.tileEngine)
             : nil
@@ -81,16 +85,7 @@ final class PinpointController: ObservableObject {
         preparationTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let newTargets: [CLLocationCoordinate2D]
-                switch mode {
-                case .worldwide:
-                    newTargets = try await LookAroundLocationPool.generateWorldwideTargets()
-                case .homeTurf:
-                    newTargets = try await LookAroundLocationPool.generateHomeTurfTargets(
-                        discoveredTiles: tileStore.discoveredTiles,
-                        engine: tileStore.tileEngine
-                    )
-                }
+                let newTargets = try await self.prepareTargets(mode: mode, preparationID: preparationID)
 
                 try Task.checkCancellation()
                 guard self.preparationID == preparationID else { return }
@@ -105,6 +100,7 @@ final class PinpointController: ObservableObject {
                 guard !Task.isCancelled else { return }
                 guard self.preparationID == preparationID else { return }
                 preparationError = error.localizedDescription
+                preparationFoundCount = 0
                 phase = .lobby
             }
             if self.preparationID == preparationID {
@@ -120,6 +116,7 @@ final class PinpointController: ObservableObject {
         preparationTask?.cancel()
         preparationTask = nil
         preparationID = nil
+        preparationFoundCount = 0
         phase = .lobby
     }
 
@@ -175,5 +172,44 @@ final class PinpointController: ObservableObject {
     func returnToLobby() {
         phase = .lobby
         preparationError = nil
+        preparationFoundCount = 0
+    }
+
+    // MARK: - Preparation
+
+    private func prepareTargets(mode: PinpointGameMode, preparationID: UUID) async throws -> [CLLocationCoordinate2D] {
+        var collected: [CLLocationCoordinate2D] = []
+        switch mode {
+        case .worldwide:
+            for _ in 0..<PinpointConstants.roundsPerGame {
+                try Task.checkCancellation()
+                guard self.preparationID == preparationID else {
+                    throw CancellationError()
+                }
+                let coordinate = try await LookAroundLocationPool.generateWorldwideTarget(excluding: collected)
+                collected.append(coordinate)
+                preparationFoundCount = collected.count
+            }
+        case .homeTurf:
+            let tiles = tileStore.discoveredTiles
+            guard tiles.count >= PinpointConstants.homeTurfMinTiles else {
+                throw LookAroundLocationPool.GenerationError.insufficientHomeTurfCoverage
+            }
+            var usedTileIDs = Set<String>()
+            for _ in 0..<PinpointConstants.roundsPerGame {
+                try Task.checkCancellation()
+                guard self.preparationID == preparationID else {
+                    throw CancellationError()
+                }
+                let coordinate = try await LookAroundLocationPool.generateHomeTurfTarget(
+                    discoveredTiles: tiles,
+                    engine: tileStore.tileEngine,
+                    usedTileIDs: &usedTileIDs
+                )
+                collected.append(coordinate)
+                preparationFoundCount = collected.count
+            }
+        }
+        return collected
     }
 }
