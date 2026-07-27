@@ -160,14 +160,19 @@ struct AtlasStatsMapView: View {
     }
 
     private func buildMasteryOverlays() -> [AtlasStatsTileOverlay] {
-        cullCurrentGrid().map { tile in
-            AtlasStatsTileOverlay(
+        let visible = cullCurrentGrid()
+        let engine = TileEngine(tileSizeMeters: Double(currentGridSize))
+        let discoveredIDs = Set(tilesBySize[currentGridSize, default: []].filter(\.isDiscovered).map(\.id))
+        let perimeterIDs = engine.territoryPerimeterIDs(among: visible, discoveredIDs: discoveredIDs)
+        return visible.map { tile in
+            let perimeter = perimeterIDs.contains(tile.id)
+            return AtlasStatsTileOverlay(
                 id: tile.id,
                 coordinate: tile.coordinate,
                 tileSizeMeters: currentGridSize,
                 fill: tile.state.mapFill(isFreshDiscovery: false),
-                stroke: tile.state.mapStroke(isFreshDiscovery: false),
-                strokeWidth: tile.state.mapStrokeWidth(isFreshDiscovery: false)
+                stroke: tile.state.mapStroke(isFreshDiscovery: false, isPerimeter: perimeter),
+                strokeWidth: tile.state.mapStrokeWidth(isFreshDiscovery: false, isPerimeter: perimeter)
             )
         }
     }
