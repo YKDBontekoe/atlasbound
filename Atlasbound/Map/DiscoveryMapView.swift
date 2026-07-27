@@ -135,12 +135,15 @@ struct DiscoveryMapView: View {
         .onChange(of: recorder.lastLocation?.coordinate.latitude) { _, _ in
             refreshOverlays()
             guard followsUser, let location = recorder.lastLocation else { return }
+            let span = controller.isRecording
+                ? AtlasTheme.mapSpanRecordingMeters
+                : AtlasTheme.mapSpanIdleMeters
             withAnimation(.easeInOut(duration: 0.35)) {
                 position = .region(
                     MKCoordinateRegion(
                         center: location.coordinate,
-                        latitudinalMeters: controller.isRecording ? 650 : 950,
-                        longitudinalMeters: controller.isRecording ? 650 : 950
+                        latitudinalMeters: span,
+                        longitudinalMeters: span
                     )
                 )
             }

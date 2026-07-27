@@ -56,16 +56,9 @@ struct PinpointView: View {
 struct RoundScoreDot: View {
     let score: Int
 
-    private var color: Color {
-        if score >= 4500 { return AtlasTheme.gold }
-        if score >= 3000 { return AtlasTheme.teal }
-        if score >= 1000 { return AtlasTheme.blue }
-        return AtlasTheme.finishRed
-    }
-
     var body: some View {
         Circle()
-            .fill(color)
+            .fill(PinpointScoreStyle.color(for: score))
             .frame(width: 8, height: 8)
     }
 }

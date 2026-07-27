@@ -13,28 +13,10 @@ final class RegionLookupStore: ObservableObject {
     private var resolveTask: Task<Void, Never>?
     private let failureBackoff: TimeInterval = 6 * 60 * 60
 
-    private let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return encoder
-    }()
-    private let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
-
     private static let fileName = "atlasbound-regions.json"
 
     init(fileURL: URL? = nil) {
-        if let fileURL {
-            self.fileURL = fileURL
-        } else {
-            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-                ?? FileManager.default.temporaryDirectory
-            self.fileURL = docs.appendingPathComponent(Self.fileName)
-        }
+        self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: Self.fileName)
         loadFromDisk()
         resolvedCellCount = cells.values.filter(\.didSucceed).count
     }
@@ -117,24 +99,16 @@ final class RegionLookupStore: ObservableObject {
     }
 
     private func loadFromDisk() {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        do {
-            let data = try Data(contentsOf: fileURL)
-            let save = try decoder.decode(SaveFile.self, from: data)
-            cells = Dictionary(uniqueKeysWithValues: save.cells.map { ($0.cellKey, $0) })
-        } catch {
+        guard let save = JSONFileStore.load(SaveFile.self, from: fileURL) else {
             cells = [:]
+            return
         }
+        cells = Dictionary(uniqueKeysWithValues: save.cells.map { ($0.cellKey, $0) })
     }
 
     private func persistToDisk() {
         let save = SaveFile(cells: cells.values.sorted { $0.cellKey < $1.cellKey })
-        do {
-            let data = try encoder.encode(save)
-            try data.write(to: fileURL, options: [.atomic])
-        } catch {
-            // Keep in-memory state on write failure.
-        }
+        JSONFileStore.save(save, to: fileURL)
     }
 }
 

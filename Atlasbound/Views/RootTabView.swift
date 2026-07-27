@@ -156,7 +156,7 @@ struct ActivityTabView: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                     if let summary = controller.lastSummary {
-                        LabeledContent("Last session", value: "+\(summary.tilesDiscovered) new · \(formatDistance(summary.distanceMeters))")
+                        LabeledContent("Last session", value: "+\(summary.tilesDiscovered) new · \(StatsFormat.distance(summary.distanceMeters))")
                     }
                 }
             }
@@ -168,10 +168,6 @@ struct ActivityTabView: View {
                 .presentationDetents([.medium, .large])
             }
         }
-    }
-
-    private func formatDistance(_ meters: Double) -> String {
-        meters >= 1000 ? String(format: "%.2f km", meters / 1000) : String(format: "%.0f m", meters)
     }
 }
 
@@ -200,8 +196,8 @@ struct ProgressTabView: View {
         regionLookup.placesVisited(tilesBySize: tilesBySize)
     }
 
-    private var masterySnapshot: MasterySnapshot {
-        MasterySnapshot(tiles: store.discoveredTiles)
+    private var masteryBreakdown: [StatsEngine.MasteryEntry] {
+        StatsEngine.masteryBreakdown(tiles: store.discoveredTiles)
     }
 
     private var activityFootprint: [StatsEngine.ActivityFootprintEntry] {
@@ -739,22 +735,23 @@ struct ProgressTabView: View {
     // MARK: - Mastery ladder
 
     private var masteryLadderCard: some View {
-        let snap = masterySnapshot
+        let entries = masteryBreakdown
+        let total = entries.reduce(0) { $0 + $1.count }
         return StatSectionCard {
             VStack(spacing: 12) {
                 HStack {
                     Text("Mastery ladder")
                         .font(.subheadline.weight(.semibold))
                     Spacer()
-                    Text("\(snap.total) tiles")
+                    Text("\(total) tiles")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                 }
 
-                MasteryDistributionBar(counts: snap.orderedCounts.map { (state: $0.state, count: $0.count) }, height: 12)
+                MasteryDistributionBar(counts: entries.map { (state: $0.state, count: $0.count) }, height: 12)
 
                 VStack(spacing: 6) {
-                    ForEach(snap.orderedCounts, id: \.state) { entry in
+                    ForEach(entries, id: \.state) { entry in
                         HStack(spacing: 8) {
                             Circle().fill(entry.state.mapStroke).frame(width: 8, height: 8)
                             Text(entry.state.displayName)
@@ -762,7 +759,7 @@ struct ProgressTabView: View {
                             Spacer()
                             Text("\(entry.count)")
                                 .font(.caption.weight(.bold).monospacedDigit())
-                            Text(StatsFormat.percent(entry.count, of: snap.total))
+                            Text(StatsFormat.percent(entry.count, of: total))
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                                 .frame(width: 36, alignment: .trailing)
@@ -791,27 +788,5 @@ struct ProgressTabView: View {
                     .foregroundStyle(AtlasTheme.teal.opacity(0.3))
             }
         }
-    }
-}
-
-// MARK: - MasterySnapshot
-
-private struct MasterySnapshot {
-    struct Entry {
-        let state: TileState
-        let count: Int
-    }
-
-    let orderedCounts: [Entry]
-    let total: Int
-
-    init(tiles: [WorldTile]) {
-        var buckets: [TileState: Int] = [:]
-        for tile in tiles {
-            buckets[tile.state, default: 0] += 1
-        }
-        let states = TileState.allCases.filter { $0 != .fogged }
-        orderedCounts = states.map { Entry(state: $0, count: buckets[$0, default: 0]) }
-        total = tiles.count
     }
 }

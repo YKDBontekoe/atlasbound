@@ -66,7 +66,7 @@ struct ActivityHistoryRow: View {
                         .font(.caption.weight(.bold))
                         .foregroundStyle(AtlasTheme.teal)
                 }
-                Text(ActivityHistoryFormat.sessionTimestamp(session.endedAt))
+                Text(StatsFormat.sessionTimestamp(session.endedAt))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -145,7 +145,7 @@ struct ActivitySessionDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(session.activityType.activeTitle)
                         .font(.title3.weight(.bold))
-                    Text(ActivityHistoryFormat.sessionTimestamp(session.endedAt))
+                    Text(StatsFormat.sessionTimestamp(session.endedAt))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     HStack(spacing: 4) {
@@ -231,12 +231,12 @@ struct ActivitySessionDetailView: View {
                 )
                 NerdStat(
                     label: "Started",
-                    value: ActivityHistoryFormat.sessionTimestamp(session.startedAt),
+                    value: StatsFormat.sessionTimestamp(session.startedAt),
                     icon: "play.fill"
                 )
                 NerdStat(
                     label: "Finished",
-                    value: ActivityHistoryFormat.sessionTimestamp(session.endedAt),
+                    value: StatsFormat.sessionTimestamp(session.endedAt),
                     icon: "flag.checkered"
                 )
             }
@@ -263,14 +263,5 @@ struct ActivitySessionDetailView: View {
         Rectangle()
             .fill(AtlasTheme.divider(for: colorScheme))
             .frame(width: 1, height: 32)
-    }
-}
-
-enum ActivityHistoryFormat {
-    static func sessionTimestamp(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
     }
 }

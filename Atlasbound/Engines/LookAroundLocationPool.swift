@@ -74,30 +74,10 @@ struct LookAroundLocationPool: Sendable {
 
     /// Bounding region for Home Turf guess map (discovered tile centers + padding).
     static func atlasRegion(for tiles: [WorldTile], engine: TileEngine) -> MKCoordinateRegion? {
-        guard !tiles.isEmpty else { return nil }
-
-        var minLat = 90.0
-        var maxLat = -90.0
-        var minLon = 180.0
-        var maxLon = -180.0
-
-        for tile in tiles {
-            let center = engine.centerCoordinate(for: tile.coordinate)
-            minLat = min(minLat, center.latitude)
-            maxLat = max(maxLat, center.latitude)
-            minLon = min(minLon, center.longitude)
-            maxLon = max(maxLon, center.longitude)
-        }
-
-        let padding = 0.01
-        let latDelta = max(maxLat - minLat + padding, 0.02)
-        let lonDelta = max(maxLon - minLon + padding, 0.02)
-        return MKCoordinateRegion(
-            center: CLLocationCoordinate2D(
-                latitude: (minLat + maxLat) / 2,
-                longitude: (minLon + maxLon) / 2
-            ),
-            span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
+        let centers = tiles.map { engine.centerCoordinate(for: $0.coordinate) }
+        return StatsEngine.boundingRegion(
+            tileCenters: centers,
+            padding: .additive(padding: 0.01, minDelta: 0.02)
         )
     }
 

@@ -14,9 +14,6 @@ final class WorldController: ObservableObject {
     @Published private(set) var sessionFrontierScore = 0
     @Published private(set) var frontierScoreCallouts: [FrontierScoreCallout] = []
     @Published private(set) var lastSummary: ActivitySummary?
-    @Published var showSummary = false
-    @Published var showLayers = false
-    @Published var showFrontierLeaderboard = false
 
     let recorder: ActivityRecorder
     let store: TileStore
@@ -74,6 +71,13 @@ final class WorldController: ObservableObject {
         guard let coordinate = playerTileCoordinate else { return "Frontier" }
         let sector = sectorEngine.sectorCoordinate(for: coordinate)
         return sectorEngine.displayName(for: sector)
+    }
+
+    func sectorDisplayName(for offer: ExpeditionOffer) -> String {
+        guard let parsed = sectorEngine.parseSectorID(offer.targetSectorID) else {
+            return "Unknown sector"
+        }
+        return sectorEngine.displayName(for: parsed.sector)
     }
 
     var currentSectorCompletionPercent: Int {
@@ -314,7 +318,6 @@ final class WorldController: ObservableObject {
         )
         activityHistory.record(summary, tileSizeMeters: store.tileSize.rawValue)
         lastSummary = summary
-        showSummary = true
         frontierCombo = .empty
         frontierScoreCallouts = []
         regionLookup.resolve(tilesBySize: store.allDiscoveredTilesBySize)
@@ -409,12 +412,15 @@ final class WorldController: ObservableObject {
 
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
 
-        for id in newIDs {
-            if let tile = sessionTiles[id], tile.isDiscovered {
-                store.upsert(tile)
-            }
+        let discoveredUpdates = newIDs.compactMap { id -> WorldTile? in
+            guard let tile = sessionTiles[id], tile.isDiscovered else { return nil }
+            return tile
         }
-        store.addXP(discovery: progress.discoveryXP, familiarity: progress.familiarityXP)
+        store.applyLiveVisitProgress(
+            updatedTiles: discoveredUpdates,
+            discoveryXP: progress.discoveryXP,
+            familiarityXP: progress.familiarityXP
+        )
     }
 
     private func processFrontierScoring(newDiscoveryIDs: [String], at date: Date) {
@@ -482,7 +488,7 @@ final class WorldController: ObservableObject {
             }
 
             var updatedTile = tile
-            updatedTile.weeklyCharge = min(3, updatedTile.weeklyCharge + 1)
+            updatedTile.weeklyCharge = min(FrontierConstants.maxWeeklyCharge, updatedTile.weeklyCharge + 1)
             sessionTiles[id] = updatedTile
 
             frontierScoreCallouts.append(

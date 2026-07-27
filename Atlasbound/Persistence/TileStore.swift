@@ -23,17 +23,6 @@ final class TileStore: ObservableObject {
     private var frontierBySize: [Int: FrontierState] = [:]
     private let fileURL: URL
     private let installationID: String
-    private let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return encoder
-    }()
-    private let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
 
     private static let saveFileName = "atlasbound-world.json"
     private static let installationIDKey = "atlasbound.installationID"
@@ -67,13 +56,7 @@ final class TileStore: ObservableObject {
     }
 
     init(fileURL: URL? = nil, installationID: String? = nil) {
-        if let fileURL {
-            self.fileURL = fileURL
-        } else {
-            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-                ?? FileManager.default.temporaryDirectory
-            self.fileURL = docs.appendingPathComponent(Self.saveFileName)
-        }
+        self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: Self.saveFileName)
 
         if let installationID {
             self.installationID = installationID
@@ -91,28 +74,32 @@ final class TileStore: ObservableObject {
     }
 
     func upsert(_ tile: WorldTile) {
+        upsertMany([tile])
+    }
+
+    /// Batch write tiles once to disk (avoids N atomic writes mid-session).
+    func upsertMany(_ newTiles: [WorldTile]) {
+        guard !newTiles.isEmpty else { return }
         var next = tiles
-        next[tile.id] = tile
+        for tile in newTiles {
+            next[tile.id] = tile
+        }
         tiles = next
         allTilesBySize[tileSize.rawValue] = next
         persistToDisk()
     }
 
     func applySessionProgress(_ progress: SessionProgress, updatedTiles: [String: WorldTile]) {
-        for (_, tile) in updatedTiles {
-            upsert(tile)
+        if !updatedTiles.isEmpty {
+            var next = tiles
+            for (_, tile) in updatedTiles {
+                next[tile.id] = tile
+            }
+            tiles = next
+            allTilesBySize[tileSize.rawValue] = next
         }
         activitiesCompleted += 1
-        var record = progressBySize[tileSize.rawValue] ?? PersistedProgressRecord(
-            discoveryXPTotal: discoveryXPTotal,
-            familiarityXPTotal: familiarityXPTotal,
-            activitiesCompleted: activitiesCompleted,
-            tileSizeMeters: tileSize.rawValue
-        )
-        record.discoveryXPTotal = discoveryXPTotal
-        record.familiarityXPTotal = familiarityXPTotal
-        record.activitiesCompleted = activitiesCompleted
-        progressBySize[tileSize.rawValue] = record
+        syncProgressRecord()
         persistToDisk()
     }
 
@@ -120,6 +107,30 @@ final class TileStore: ObservableObject {
         guard discovery != 0 || familiarity != 0 else { return }
         discoveryXPTotal += discovery
         familiarityXPTotal += familiarity
+        syncProgressRecord()
+        persistToDisk()
+    }
+
+    /// Apply mid-session tile + XP updates with a single disk write.
+    func applyLiveVisitProgress(updatedTiles: [WorldTile], discoveryXP: Int, familiarityXP: Int) {
+        guard !updatedTiles.isEmpty || discoveryXP != 0 || familiarityXP != 0 else { return }
+        if !updatedTiles.isEmpty {
+            var next = tiles
+            for tile in updatedTiles {
+                next[tile.id] = tile
+            }
+            tiles = next
+            allTilesBySize[tileSize.rawValue] = next
+        }
+        if discoveryXP != 0 || familiarityXP != 0 {
+            discoveryXPTotal += discoveryXP
+            familiarityXPTotal += familiarityXP
+            syncProgressRecord()
+        }
+        persistToDisk()
+    }
+
+    private func syncProgressRecord() {
         var record = progressBySize[tileSize.rawValue] ?? PersistedProgressRecord(
             discoveryXPTotal: 0,
             familiarityXPTotal: 0,
@@ -130,7 +141,6 @@ final class TileStore: ObservableObject {
         record.familiarityXPTotal = familiarityXPTotal
         record.activitiesCompleted = activitiesCompleted
         progressBySize[tileSize.rawValue] = record
-        persistToDisk()
     }
 
     func updateFrontierState(_ transform: (FrontierState) -> FrontierState, playerTile: TileCoordinate?) {
@@ -202,41 +212,38 @@ final class TileStore: ObservableObject {
     // MARK: - Disk
 
     private func loadFromDisk() {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        do {
-            let data = try Data(contentsOf: fileURL)
-            let save = try decoder.decode(WorldSaveFile.self, from: data)
-
-            var grouped: [Int: [String: WorldTile]] = [:]
-            for record in save.tiles {
-                var map = grouped[record.tileSizeMeters] ?? [:]
-                map[record.id] = record.asWorldTile()
-                grouped[record.tileSizeMeters] = map
-            }
-            allTilesBySize = grouped
-
-            var progress: [Int: PersistedProgressRecord] = [:]
-            for (key, value) in save.progressBySize {
-                if let size = Int(key) {
-                    progress[size] = value
-                }
-            }
-            progressBySize = progress
-
-            var frontier: [Int: FrontierState] = [:]
-            if let frontierPayload = save.frontierBySize {
-                for (key, value) in frontierPayload {
-                    if let size = Int(key) {
-                        frontier[size] = value.asFrontierState()
-                    }
-                }
-            }
-            frontierBySize = frontier
-        } catch {
+        guard let save = JSONFileStore.load(WorldSaveFile.self, from: fileURL) else {
             allTilesBySize = [:]
             progressBySize = [:]
             frontierBySize = [:]
+            return
         }
+
+        var grouped: [Int: [String: WorldTile]] = [:]
+        for record in save.tiles {
+            var map = grouped[record.tileSizeMeters] ?? [:]
+            map[record.id] = record.asWorldTile()
+            grouped[record.tileSizeMeters] = map
+        }
+        allTilesBySize = grouped
+
+        var progress: [Int: PersistedProgressRecord] = [:]
+        for (key, value) in save.progressBySize {
+            if let size = Int(key) {
+                progress[size] = value
+            }
+        }
+        progressBySize = progress
+
+        var frontier: [Int: FrontierState] = [:]
+        if let frontierPayload = save.frontierBySize {
+            for (key, value) in frontierPayload {
+                if let size = Int(key) {
+                    frontier[size] = value.asFrontierState()
+                }
+            }
+        }
+        frontierBySize = frontier
     }
 
     private func loadForCurrentTileSize() {
@@ -280,11 +287,6 @@ final class TileStore: ObservableObject {
             progressBySize: progressPayload,
             frontierBySize: frontierPayload.isEmpty ? nil : frontierPayload
         )
-        do {
-            let data = try encoder.encode(save)
-            try data.write(to: fileURL, options: [.atomic])
-        } catch {
-            // Keep in-memory state if disk write fails.
-        }
+        JSONFileStore.save(save, to: fileURL)
     }
 }

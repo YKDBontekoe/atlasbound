@@ -13,6 +13,8 @@ struct MainMapScreen: View {
     @State private var showSettings = false
     @State private var showActivityPicker = false
     @State private var showExpeditionSheet = false
+    @State private var showLayers = false
+    @State private var presentedSummary: ActivitySummary?
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
     @AppStorage(OnboardingPreference.storageKey) private var hasCompletedOnboarding = false
     @State private var onboardingStep = 0
@@ -39,7 +41,7 @@ struct MainMapScreen: View {
                 recorder: recorder,
                 position: $position,
                 followsUser: $followsUser,
-                showLayers: controller.showLayers
+                showLayers: showLayers
             )
             .ignoresSafeArea()
 
@@ -95,12 +97,15 @@ struct MainMapScreen: View {
                 }
             }
         }
-        .sheet(isPresented: $controller.showSummary) {
-            if let summary = controller.lastSummary {
-                ActivitySummaryView(summary: summary) {
-                    controller.showSummary = false
-                }
-                .presentationDetents([.medium, .large])
+        .sheet(item: $presentedSummary) { summary in
+            ActivitySummaryView(summary: summary) {
+                presentedSummary = nil
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .onChange(of: controller.lastSummary?.id) { _, newID in
+            if newID != nil {
+                presentedSummary = controller.lastSummary
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -373,11 +378,11 @@ struct MainMapScreen: View {
                 .opacity(controller.isRecording ? 0 : 1)
 
                 Button {
-                    controller.showLayers.toggle()
+                    showLayers.toggle()
                 } label: {
                     Image(systemName: "square.3.layers.3d.top.filled")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(controller.showLayers ? AtlasTheme.blue : .secondary)
+                        .foregroundStyle(showLayers ? AtlasTheme.blue : .secondary)
                         .frame(width: 42, height: 42)
                 }
                 .buttonStyle(GlassButtonStyle(shape: .circle))
@@ -406,15 +411,11 @@ struct MainMapScreen: View {
     }
 
     private var distanceValue: String {
-        let meters = recorder.distanceMeters
-        if meters >= 1000 {
-            return String(format: "%.2f", meters / 1000)
-        }
-        return String(format: "%.0f", meters)
+        StatsFormat.distanceValue(recorder.distanceMeters)
     }
 
     private var distanceUnit: String {
-        recorder.distanceMeters >= 1000 ? "km" : "m"
+        StatsFormat.distanceUnit(recorder.distanceMeters)
     }
 
     private func liveStat(icon: String, value: String, unit: String, tint: Color = AtlasTheme.blue) -> some View {
@@ -434,23 +435,22 @@ struct MainMapScreen: View {
     private func recenter() {
         followsUser = true
         guard let location = recorder.lastLocation else { return }
+        let span = controller.isRecording
+            ? AtlasTheme.mapSpanRecordingMeters
+            : AtlasTheme.mapSpanIdleMeters
         withAnimation(.easeInOut(duration: 0.35)) {
             position = .region(
                 MKCoordinateRegion(
                     center: location.coordinate,
-                    latitudinalMeters: controller.isRecording ? 650 : 950,
-                    longitudinalMeters: controller.isRecording ? 650 : 950
+                    latitudinalMeters: span,
+                    longitudinalMeters: span
                 )
             )
         }
     }
 
     private func formatDuration(_ interval: TimeInterval) -> String {
-        let total = Int(interval)
-        let hours = total / 3600
-        let minutes = (total % 3600) / 60
-        let seconds = total % 60
-        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+        StatsFormat.clockDuration(interval)
     }
 }
 

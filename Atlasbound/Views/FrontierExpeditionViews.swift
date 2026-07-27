@@ -135,19 +135,13 @@ struct ExpeditionCard: View {
     }
 
     private var difficultyColor: Color {
-        switch offer.difficulty {
-        case .scout: AtlasTheme.teal
-        case .trailblazer: AtlasTheme.blue
-        case .pathfinder: AtlasTheme.gold
-        }
+        offer.difficulty.tint
     }
 }
 
 struct ExpeditionMissionList: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
-
-    private let sectorEngine = HexSectorEngine()
 
     private var completedExpeditions: [ExpeditionOffer] {
         let completed = Set(store.frontierState.completedOfferIDs)
@@ -163,7 +157,7 @@ struct ExpeditionMissionList: View {
                     sectionHeader("Active expedition")
                     ExpeditionCard(
                         offer: active,
-                        sectorName: sectorName(for: active),
+                        sectorName: controller.sectorDisplayName(for: active),
                         isActive: true,
                         isCompleted: false,
                         progress: controller.targetSectorDiscoveredCount,
@@ -177,7 +171,7 @@ struct ExpeditionMissionList: View {
                     ForEach(controller.availableExpeditions) { offer in
                         ExpeditionCard(
                             offer: offer,
-                            sectorName: sectorName(for: offer),
+                            sectorName: controller.sectorDisplayName(for: offer),
                             isActive: false,
                             isCompleted: false,
                             progress: 0,
@@ -191,7 +185,7 @@ struct ExpeditionMissionList: View {
                     ForEach(completedExpeditions) { offer in
                         ExpeditionCard(
                             offer: offer,
-                            sectorName: sectorName(for: offer),
+                            sectorName: controller.sectorDisplayName(for: offer),
                             isActive: false,
                             isCompleted: true,
                             progress: offer.tilesRequired,
@@ -249,11 +243,6 @@ struct ExpeditionMissionList: View {
             .foregroundStyle(.secondary)
             .textCase(.uppercase)
     }
-
-    private func sectorName(for offer: ExpeditionOffer) -> String {
-        guard let parsed = sectorEngine.parseSectorID(offer.targetSectorID) else { return "Unknown sector" }
-        return sectorEngine.displayName(for: parsed.sector)
-    }
 }
 
 /// Full-screen sheet for browsing and selecting weekly frontier expeditions.
@@ -291,8 +280,6 @@ struct FrontierMissionBanner: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     let onTap: () -> Void
-
-    private let sectorEngine = HexSectorEngine()
 
     var body: some View {
         Button(action: onTap) {
@@ -347,7 +334,7 @@ struct FrontierMissionBanner: View {
 
     private var primaryLabel: String {
         if let active = controller.activeExpedition {
-            return sectorName(for: active)
+            return controller.sectorDisplayName(for: active)
         }
         let count = controller.availableExpeditions.count
         if count > 0 {
@@ -385,18 +372,9 @@ struct FrontierMissionBanner: View {
 
     private var bannerTint: Color {
         if let active = controller.activeExpedition {
-            switch active.difficulty {
-            case .scout: return AtlasTheme.teal
-            case .trailblazer: return AtlasTheme.blue
-            case .pathfinder: return AtlasTheme.gold
-            }
+            return active.difficulty.tint
         }
         return controller.availableExpeditions.isEmpty ? AtlasTheme.teal : AtlasTheme.gold
-    }
-
-    private func sectorName(for offer: ExpeditionOffer) -> String {
-        guard let parsed = sectorEngine.parseSectorID(offer.targetSectorID) else { return "Unknown sector" }
-        return sectorEngine.displayName(for: parsed.sector)
     }
 }
 
@@ -404,8 +382,6 @@ struct ActiveFrontierTracker: View {
     @ObservedObject var controller: WorldController
     var compact = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private let sectorEngine = HexSectorEngine()
 
     var body: some View {
         if let offer = controller.activeExpedition {
@@ -424,8 +400,8 @@ struct ActiveFrontierTracker: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
                         Image(systemName: offer.difficulty.iconName)
-                            .foregroundStyle(AtlasTheme.blue)
-                        Text(sectorName(for: offer))
+                            .foregroundStyle(offer.difficulty.tint)
+                        Text(controller.sectorDisplayName(for: offer))
                             .font(.caption.weight(.semibold))
                             .lineLimit(1)
                         Spacer()
@@ -444,7 +420,7 @@ struct ActiveFrontierTracker: View {
                     value: Double(controller.targetSectorDiscoveredCount),
                     total: Double(max(1, offer.tilesRequired))
                 )
-                .tint(AtlasTheme.blue)
+                .tint(offer.difficulty.tint)
 
                 if !compact {
                     HStack(spacing: 12) {
@@ -492,10 +468,5 @@ struct ActiveFrontierTracker: View {
             }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: controller.sessionFrontierScore)
         }
-    }
-
-    private func sectorName(for offer: ExpeditionOffer) -> String {
-        guard let parsed = sectorEngine.parseSectorID(offer.targetSectorID) else { return "Unknown sector" }
-        return sectorEngine.displayName(for: parsed.sector)
     }
 }

@@ -40,6 +40,11 @@ enum AtlasTheme {
     static let cardRadius: CGFloat = 20
     static let pillRadius: CGFloat = 22
 
+    /// Map camera meters when following the user during a recording.
+    static let mapSpanRecordingMeters: Double = 650
+    /// Map camera meters when idle / recentering outside a session.
+    static let mapSpanIdleMeters: Double = 950
+
     // MARK: - Adaptive chrome (map tile accents stay brand-fixed)
 
     static func canvas(for scheme: ColorScheme) -> Color {
@@ -224,7 +229,7 @@ extension TileState {
     func mapFill(isFreshDiscovery: Bool, weeklyCharge: Int) -> Color {
         let base = mapFill(isFreshDiscovery: isFreshDiscovery)
         guard weeklyCharge > 0 else { return base }
-        let intensity = min(3, weeklyCharge)
+        let intensity = min(FrontierConstants.maxWeeklyCharge, weeklyCharge)
         return base.opacity(min(1, 0.65 + Double(intensity) * 0.12))
     }
 
@@ -264,5 +269,24 @@ extension TileState {
         case .legendary:
             return AtlasTheme.gold
         }
+    }
+}
+
+extension ExpeditionDifficulty {
+    var tint: Color {
+        switch self {
+        case .scout: AtlasTheme.teal
+        case .trailblazer: AtlasTheme.blue
+        case .pathfinder: AtlasTheme.gold
+        }
+    }
+}
+
+enum PinpointScoreStyle {
+    static func color(for score: Int) -> Color {
+        if score >= 4500 { return AtlasTheme.gold }
+        if score >= 3000 { return AtlasTheme.teal }
+        if score >= 1000 { return AtlasTheme.blue }
+        return AtlasTheme.finishRed
     }
 }
