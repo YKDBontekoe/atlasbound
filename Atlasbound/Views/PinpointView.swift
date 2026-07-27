@@ -22,9 +22,9 @@ struct PinpointView: View {
                             currentScore: controller.runningScore,
                             roundSeconds: PinpointConstants.roundSeconds(for: controller.currentMode),
                             regionConstraint: controller.atlasRegionConstraint,
-                            onGuess: { controller.submitGuess($0) }
+                            onGuess: { controller.submitGuess($0) },
+                            onQuit: { controller.returnToLobby() }
                         )
-                        .id("round-\(controller.currentRound)-\(controller.currentMode.rawValue)")
                     }
 
                 case .roundResult:
@@ -46,6 +46,8 @@ struct PinpointView: View {
             }
             .navigationTitle("Pinpoint")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar(controller.isGameInProgress ? .hidden : .visible, for: .navigationBar)
+            .toolbar(controller.isGameInProgress ? .hidden : .visible, for: .tabBar)
         }
     }
 }

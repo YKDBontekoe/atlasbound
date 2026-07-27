@@ -46,7 +46,7 @@ struct RootTabView: View {
                 .tag(3)
         }
         .tint(AtlasTheme.blue)
-        .toolbarBackground(.visible, for: .tabBar)
+        .toolbar(pinpointController.isGameInProgress ? .hidden : .visible, for: .tabBar)
         .toolbarBackground(AtlasTheme.tabBarBackground(for: colorScheme), for: .tabBar)
         .onChange(of: controller.isRecording) { _, isRecording in
             if isRecording {

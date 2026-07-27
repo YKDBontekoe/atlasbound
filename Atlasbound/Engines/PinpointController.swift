@@ -47,6 +47,11 @@ final class PinpointController: ObservableObject {
         roundResults.reduce(0) { $0 + $1.score }
     }
 
+    /// Active Pinpoint uses a focused, full-screen presentation.
+    var isGameInProgress: Bool {
+        phase == .preparing || phase == .playing || phase == .roundResult
+    }
+
     var unlockedAreaM2: Double {
         PinpointScoring.unlockedAreaM2(
             discoveredCount: tileStore.discoveredTiles.count,
