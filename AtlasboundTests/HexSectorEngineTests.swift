@@ -41,7 +41,10 @@ final class HexSectorEngineTests: XCTestCase {
     func testCompletionPercentTracksDiscoveredIDs() {
         let sector = engine.sectorCoordinate(for: TileCoordinate(q: 36, r: 0))
         let members = engine.tiles(in: sector)
-        let discovered = Set(members.prefix(3).map {
+        XCTAssertFalse(members.isEmpty)
+        // Span-36 sectors are large; sample enough tiles so rounded percent is > 0.
+        let sampleCount = max(3, members.count / 20)
+        let discovered = Set(Array(members).prefix(sampleCount).map {
             TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: 20)
         })
         let percent = engine.completionPercent(
