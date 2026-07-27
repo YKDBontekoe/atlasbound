@@ -26,7 +26,7 @@ final class ActivitySummarySnapshotTests: XCTestCase {
 
     func testActivitySummaryRenders() throws {
         let view = ActivitySummaryView(summary: fixtureSummary, onDismiss: {})
-            .frame(width: 390, height: 700)
-        try SnapshotSupport.assertRenders(view, size: CGSize(width: 390, height: 700))
+            .frame(width: 390, height: 900)
+        try SnapshotSupport.assertRenders(view, size: CGSize(width: 390, height: 900))
     }
 }

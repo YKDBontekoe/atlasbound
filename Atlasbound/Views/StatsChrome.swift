@@ -1,0 +1,218 @@
+import SwiftUI
+
+// MARK: - StatKPI
+
+struct StatKPI: View {
+    let value: String
+    let caption: String
+    var accent: Color = .primary
+
+    var body: some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundStyle(accent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(caption)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - StatSectionCard
+
+struct StatSectionCard<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(16)
+            .background {
+                RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous)
+                    .fill(AtlasTheme.chromeFill(for: colorScheme))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous)
+                            .strokeBorder(AtlasTheme.chromeStroke(for: colorScheme), lineWidth: 1)
+                    }
+                    .shadow(color: AtlasTheme.cardShadow(for: colorScheme), radius: 10, y: 3)
+            }
+    }
+}
+
+// MARK: - SegmentedBar
+
+struct SegmentedBar: View {
+    let segments: [(color: Color, value: Double)]
+    var height: CGFloat = 8
+    var cornerRadius: CGFloat = 4
+
+    private var total: Double {
+        segments.reduce(0) { $0 + max(0, $1.value) }
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            HStack(spacing: 1.5) {
+                ForEach(Array(segments.enumerated()), id: \.offset) { _, seg in
+                    let fraction = total > 0 ? max(0, seg.value) / total : 0
+                    if fraction > 0 {
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(seg.color)
+                            .frame(width: max(3, fraction * (geo.size.width - CGFloat(max(0, visibleCount - 1)) * 1.5)))
+                    }
+                }
+            }
+        }
+        .frame(height: height)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+
+    private var visibleCount: Int {
+        segments.filter { $0.value > 0 }.count
+    }
+}
+
+// MARK: - MasteryDistributionBar
+
+struct MasteryDistributionBar: View {
+    let counts: [(state: TileState, count: Int)]
+    var height: CGFloat = 10
+
+    var body: some View {
+        SegmentedBar(
+            segments: counts.map { (color: $0.state.mapStroke, value: Double($0.count)) },
+            height: height
+        )
+    }
+}
+
+// MARK: - XPSplitArc
+
+struct XPSplitArc: View {
+    let discovery: Int
+    let familiarity: Int
+    var size: CGFloat = 72
+
+    private var total: Int { discovery + familiarity }
+    private var discoveryFraction: Double {
+        total > 0 ? Double(discovery) / Double(total) : 0.5
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(AtlasTheme.slate.opacity(0.18), lineWidth: 6)
+
+            Circle()
+                .trim(from: 0, to: discoveryFraction)
+                .stroke(AtlasTheme.teal, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+
+            Circle()
+                .trim(from: discoveryFraction, to: 1)
+                .stroke(AtlasTheme.gold, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+
+            VStack(spacing: 0) {
+                Text("\(total)")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                Text("XP")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+// MARK: - NerdStat
+
+struct NerdStat: View {
+    let label: String
+    let value: String
+    var icon: String? = nil
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            Text(label)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.caption.weight(.bold).monospacedDigit())
+        }
+    }
+}
+
+// MARK: - Formatters
+
+enum StatsFormat {
+    static func distance(_ meters: Double) -> String {
+        if meters >= 1000 {
+            return String(format: "%.2f km", meters / 1000)
+        }
+        return String(format: "%.0f m", meters)
+    }
+
+    static func duration(_ interval: TimeInterval) -> String {
+        let total = Int(interval)
+        let minutes = total / 60
+        let seconds = total % 60
+        if minutes >= 60 {
+            return String(format: "%dh %02dm", minutes / 60, minutes % 60)
+        }
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    static func pace(_ meters: Double, duration: TimeInterval) -> String? {
+        guard meters > 50, duration > 10 else { return nil }
+        let km = meters / 1000
+        let minPerKm = (duration / 60) / km
+        if minPerKm < 100 {
+            let whole = Int(minPerKm)
+            let frac = Int((minPerKm - Double(whole)) * 60)
+            return String(format: "%d'%02d\"/km", whole, frac)
+        }
+        return nil
+    }
+
+    static func rate(_ count: Int, duration: TimeInterval) -> String? {
+        guard duration > 30 else { return nil }
+        let perMin = Double(count) / (duration / 60)
+        if perMin >= 1 {
+            return String(format: "%.1f/min", perMin)
+        }
+        let perHour = perMin * 60
+        return String(format: "%.1f/hr", perHour)
+    }
+
+    static func xpPerKm(_ xp: Int, meters: Double) -> String? {
+        guard meters > 100 else { return nil }
+        let km = meters / 1000
+        let value = Double(xp) / km
+        return String(format: "%.0f XP/km", value)
+    }
+
+    static func percent(_ part: Int, of whole: Int) -> String {
+        guard whole > 0 else { return "0%" }
+        let pct = Double(part) / Double(whole) * 100
+        if pct >= 99.5 && part < whole { return "99%" }
+        if pct < 1 && part > 0 { return "<1%" }
+        return String(format: "%.0f%%", pct)
+    }
+}

@@ -91,8 +91,12 @@ struct ActivityTabView: View {
                 }
 
                 Section("This atlas") {
-                    LabeledContent("Activities completed", value: "\(store.activitiesCompleted)")
-                    LabeledContent("Tiles discovered", value: "\(store.discoveredTiles.count)")
+                    HStack(spacing: 0) {
+                        StatKPI(value: "\(store.activitiesCompleted)", caption: "Activities")
+                        StatKPI(value: "\(store.discoveredTiles.count)", caption: "Tiles", accent: AtlasTheme.teal)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                     if let summary = controller.lastSummary {
                         LabeledContent("Last session", value: "+\(summary.tilesDiscovered) new · \(formatDistance(summary.distanceMeters))")
                     }
@@ -109,31 +113,162 @@ struct ActivityTabView: View {
 
 struct ProgressTabView: View {
     @ObservedObject var store: TileStore
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var masterySnapshot: MasterySnapshot {
+        MasterySnapshot(tiles: store.discoveredTiles)
+    }
 
     var body: some View {
         NavigationStack {
-            List {
-                Section("Explorer") {
-                    LabeledContent("Discovery XP", value: "\(store.discoveryXPTotal)")
-                    LabeledContent("Familiarity XP", value: "\(store.familiarityXPTotal)")
-                    LabeledContent("Activities", value: "\(store.activitiesCompleted)")
+            ScrollView {
+                VStack(spacing: 14) {
+                    explorerHero
+                    xpTotalsCard
+                    masteryLadderCard
+                    revealGridNote
                 }
-
-                Section("Tiles") {
-                    ForEach(TileState.allCases.filter { $0 != .fogged }, id: \.self) { state in
-                        let count = store.discoveredTiles.filter { $0.state == state }.count
-                        LabeledContent(state.displayName, value: "\(count)")
-                    }
-                }
-
-                Section("Reveal grid") {
-                    LabeledContent("Current width", value: store.tileSize.label)
-                    Text("Set automatically from your activity type.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+                .padding(20)
             }
+            .background(AtlasTheme.canvas(for: colorScheme).ignoresSafeArea())
             .navigationTitle("Progress")
         }
+    }
+
+    // MARK: - Explorer hero
+
+    private var explorerHero: some View {
+        StatSectionCard {
+            VStack(spacing: 14) {
+                Text("\(store.discoveryXPTotal + store.familiarityXPTotal)")
+                    .font(.system(size: 36, weight: .heavy, design: .rounded))
+                    .foregroundStyle(AtlasTheme.teal)
+                Text("Lifetime XP")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+
+                HStack(spacing: 0) {
+                    StatKPI(value: "\(store.discoveredTiles.count)", caption: "Tiles")
+                    StatKPI(value: "\(store.activitiesCompleted)", caption: "Activities")
+                    StatKPI(
+                        value: StatsFormat.percent(store.discoveryXPTotal, of: store.discoveryXPTotal + store.familiarityXPTotal),
+                        caption: "Discovery"
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - XP totals
+
+    private var xpTotalsCard: some View {
+        StatSectionCard {
+            HStack(spacing: 16) {
+                XPSplitArc(
+                    discovery: store.discoveryXPTotal,
+                    familiarity: store.familiarityXPTotal,
+                    size: 80
+                )
+
+                VStack(alignment: .leading, spacing: 12) {
+                    xpTotalRow(label: "Discovery", value: store.discoveryXPTotal, color: AtlasTheme.teal)
+                    xpTotalRow(label: "Familiarity", value: store.familiarityXPTotal, color: AtlasTheme.gold)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private func xpTotalRow(label: String, value: Int, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Circle().fill(color).frame(width: 8, height: 8)
+                Text(label)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            Text("\(value) XP")
+                .font(.system(.subheadline, design: .rounded, weight: .bold))
+        }
+    }
+
+    // MARK: - Mastery ladder
+
+    private var masteryLadderCard: some View {
+        let snap = masterySnapshot
+        return StatSectionCard {
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Mastery ladder")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("\(snap.total) tiles")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+
+                MasteryDistributionBar(counts: snap.orderedCounts, height: 12)
+
+                VStack(spacing: 6) {
+                    ForEach(snap.orderedCounts, id: \.state) { entry in
+                        HStack(spacing: 8) {
+                            Circle().fill(entry.state.mapStroke).frame(width: 8, height: 8)
+                            Text(entry.state.displayName)
+                                .font(.caption.weight(.medium))
+                            Spacer()
+                            Text("\(entry.count)")
+                                .font(.caption.weight(.bold).monospacedDigit())
+                            Text(StatsFormat.percent(entry.count, of: snap.total))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .frame(width: 36, alignment: .trailing)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Reveal grid
+
+    private var revealGridNote: some View {
+        StatSectionCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Reveal grid")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Current width: \(store.tileSize.label)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "hexagon.fill")
+                    .font(.title2)
+                    .foregroundStyle(AtlasTheme.teal.opacity(0.3))
+            }
+        }
+    }
+}
+
+// MARK: - MasterySnapshot
+
+private struct MasterySnapshot {
+    struct Entry {
+        let state: TileState
+        let count: Int
+    }
+
+    let orderedCounts: [Entry]
+    let total: Int
+
+    init(tiles: [WorldTile]) {
+        var buckets: [TileState: Int] = [:]
+        for tile in tiles {
+            buckets[tile.state, default: 0] += 1
+        }
+        let states = TileState.allCases.filter { $0 != .fogged }
+        orderedCounts = states.map { Entry(state: $0, count: buckets[$0, default: 0]) }
+        total = tiles.count
     }
 }
