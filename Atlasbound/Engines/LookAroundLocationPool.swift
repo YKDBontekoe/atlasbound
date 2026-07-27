@@ -161,7 +161,12 @@ struct LookAroundLocationPool: Sendable {
             items.append(contentsOf: response.mapItems)
         }
 
-        let resolvedPlacemark = placemark ?? await reverseGeocodePlacemark(at: anchor)
+        let resolvedPlacemark: CLPlacemark?
+        if let placemark {
+            resolvedPlacemark = placemark
+        } else {
+            resolvedPlacemark = await reverseGeocodePlacemark(at: anchor)
+        }
         if let resolvedPlacemark,
            let query = localitySearchQuery(from: resolvedPlacemark) {
             let request = MKLocalSearch.Request()

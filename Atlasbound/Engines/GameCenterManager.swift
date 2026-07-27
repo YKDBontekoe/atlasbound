@@ -53,9 +53,6 @@ final class GameCenterManager: ObservableObject {
 
     func showLeaderboard() {
         guard isAuthenticated else { return }
-        guard let windowScene = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first else { return }
 
         let viewController = GKGameCenterViewController(
             leaderboardID: Self.leaderboardID,
