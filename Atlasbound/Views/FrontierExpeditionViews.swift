@@ -395,6 +395,8 @@ struct ActiveFrontierTracker: View {
                     Text("\(controller.sessionFrontierScore) pts")
                         .font(.subheadline.weight(.bold).monospacedDigit())
                         .foregroundStyle(AtlasTheme.gold)
+                        .contentTransition(.numericText())
+                        .scaleEffect(controller.sessionFrontierScore > 0 ? 1 : 0.98)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -421,6 +423,7 @@ struct ActiveFrontierTracker: View {
                     total: Double(max(1, offer.tilesRequired))
                 )
                 .tint(offer.difficulty.tint)
+                .animation(AtlasMotion.optional(AtlasMotion.number, reduceMotion: reduceMotion), value: controller.targetSectorDiscoveredCount)
 
                 if !compact {
                     HStack(spacing: 12) {
@@ -439,11 +442,14 @@ struct ActiveFrontierTracker: View {
                     )
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(controller.frontierCombo.isActive ? AtlasTheme.gold : .secondary)
+                    .scaleEffect(controller.frontierCombo.isActive && !reduceMotion ? 1.04 : 1)
+                    .animation(AtlasMotion.optional(AtlasMotion.celebrate, reduceMotion: reduceMotion), value: controller.frontierCombo.isActive)
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
                     ProgressView(value: max(0.08, controller.frontierComboProgress))
                         .tint(AtlasTheme.gold)
+                        .animation(AtlasMotion.optional(AtlasMotion.number, reduceMotion: reduceMotion), value: controller.frontierComboProgress)
 
                     HStack {
                         Text("Combo from connected frontier tiles")
@@ -466,7 +472,7 @@ struct ActiveFrontierTracker: View {
                     weight: .regular
                 )
             }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: controller.sessionFrontierScore)
+            .animation(AtlasMotion.optional(AtlasMotion.fade, reduceMotion: reduceMotion), value: controller.sessionFrontierScore)
         }
     }
 }

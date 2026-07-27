@@ -8,9 +8,13 @@ struct PinpointLobbyView: View {
         ScrollView {
             VStack(spacing: 24) {
                 heroSection
+                    .staggeredAppear(index: 0)
                 modePicker
+                    .staggeredAppear(index: 1)
                 statsCard
+                    .staggeredAppear(index: 2)
                 gameCenterSection
+                    .staggeredAppear(index: 3)
 
                 if let error = controller.preparationError {
                     VStack(spacing: 8) {
@@ -23,6 +27,7 @@ struct PinpointLobbyView: View {
                         }
                         .font(.caption.weight(.semibold))
                     }
+                    .transition(.opacity)
                 }
 
                 if let error = controller.gameCenterManager.authError {
@@ -33,6 +38,7 @@ struct PinpointLobbyView: View {
 
                 if !controller.store.gameHistory.isEmpty {
                     recentGamesSection
+                        .staggeredAppear(index: 4)
                 }
             }
             .padding(.horizontal, 20)
@@ -41,8 +47,10 @@ struct PinpointLobbyView: View {
         .overlay {
             if controller.phase == .preparing {
                 preparingOverlay
+                    .transition(.opacity)
             }
         }
+        .animation(AtlasMotion.fade, value: controller.phase == .preparing)
     }
 
     private var heroSection: some View {
@@ -146,7 +154,10 @@ struct PinpointLobbyView: View {
 
             footer()
 
-            Button(action: action) {
+            Button(action: {
+                AtlasHaptics.select()
+                action()
+            }) {
                 HStack {
                     Image(systemName: enabled ? "play.fill" : "lock.fill")
                     Text(enabled ? "Play \(mode.displayName)" : "\(mode.displayName) locked")

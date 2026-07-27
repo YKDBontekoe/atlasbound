@@ -69,7 +69,7 @@ struct DebugLocationPad: View {
             .tint(AtlasTheme.teal)
 
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
+                withAnimation(AtlasMotion.panel) { expanded.toggle() }
             } label: {
                 Image(systemName: expanded ? "chevron.down" : "chevron.up")
                     .font(.caption.weight(.bold))

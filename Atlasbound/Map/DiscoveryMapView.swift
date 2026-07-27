@@ -91,6 +91,7 @@ struct DiscoveryMapView: View {
                 if let symbol = tile.state.markerSymbol {
                     Annotation("", coordinate: engine.centerCoordinate(for: tile.coordinate), anchor: .center) {
                         TileMarkerView(symbol: symbol, tint: tile.state.markerTint)
+                            .transition(.scale.combined(with: .opacity))
                     }
                 }
             }
@@ -138,7 +139,7 @@ struct DiscoveryMapView: View {
             let span = controller.isRecording
                 ? AtlasTheme.mapSpanRecordingMeters
                 : AtlasTheme.mapSpanIdleMeters
-            withAnimation(.easeInOut(duration: 0.35)) {
+            withAnimation(AtlasMotion.camera) {
                 position = .region(
                     MKCoordinateRegion(
                         center: location.coordinate,
@@ -205,6 +206,8 @@ struct DiscoveryMapView: View {
 struct TileMarkerView: View {
     let symbol: String
     let tint: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
 
     var body: some View {
         ZStack {
@@ -215,6 +218,13 @@ struct TileMarkerView: View {
             Image(systemName: symbol)
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(.white)
+        }
+        .scaleEffect(appeared || reduceMotion ? 1 : 0.5)
+        .opacity(appeared || reduceMotion ? 1 : 0)
+        .onAppear {
+            AtlasMotion.withOptionalAnimation(AtlasMotion.celebrate, reduceMotion: reduceMotion) {
+                appeared = true
+            }
         }
         .allowsHitTesting(false)
     }
@@ -239,7 +249,7 @@ struct ExpeditionBeaconView: View {
         }
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+            withAnimation(AtlasMotion.ambient.repeatForever(autoreverses: true)) {
                 pulse = true
             }
         }
@@ -263,7 +273,7 @@ struct FrontierScoreCalloutView: View {
             .offset(y: visible ? -8 : -20)
             .onAppear {
                 guard !reduceMotion else { return }
-                withAnimation(.easeOut(duration: 1.2).delay(0.2)) {
+                withAnimation(AtlasMotion.toastFade.delay(0.2)) {
                     visible = false
                 }
             }

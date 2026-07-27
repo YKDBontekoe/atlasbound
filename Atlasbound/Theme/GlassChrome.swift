@@ -61,7 +61,7 @@ struct GlassButtonStyle: ButtonStyle {
             .background { chrome }
             .opacity(configuration.isPressed ? 0.82 : 1)
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(AtlasMotion.press, value: configuration.isPressed)
     }
 
     @ViewBuilder
@@ -92,7 +92,7 @@ struct TintedGlassButtonStyle: ButtonStyle {
             .background { chrome }
             .opacity(configuration.isPressed ? 0.88 : 1)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(AtlasMotion.press, value: configuration.isPressed)
     }
 
     @ViewBuilder

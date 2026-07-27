@@ -101,6 +101,7 @@ struct ActivityTabView: View {
                     ForEach(ActivityType.selectableCases, id: \.self) { type in
                         Button {
                             controller.setActivityType(type)
+                            AtlasHaptics.select()
                         } label: {
                             ActivityTypeRow(
                                 type: type,
@@ -134,6 +135,8 @@ struct ActivityTabView: View {
                                 ActivityHistoryRow(session: session)
                             }
                             .buttonStyle(.plain)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .transition(.opacity)
                         }
 
                         NavigationLink {
@@ -219,21 +222,33 @@ struct ProgressTabView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     territoryCard
+                        .staggeredAppear(index: 0)
                     if !placesVisited.isEmpty || regionLookup.isResolving {
                         placesVisitedCard
+                            .staggeredAppear(index: 1)
                     }
                     frontierStatsCard
+                        .staggeredAppear(index: 2)
                     personalRecordsCard
+                        .staggeredAppear(index: 3)
                     if !activityFootprint.isEmpty {
                         activityFootprintCard
+                            .staggeredAppear(index: 4)
                     }
                     atlasMapCard
+                        .staggeredAppear(index: 5)
                     explorerVitalsCard
+                        .staggeredAppear(index: 6)
                     explorerHero
+                        .staggeredAppear(index: 7)
                     xpTotalsCard
+                        .staggeredAppear(index: 8)
                     pinpointStatsCard
+                        .staggeredAppear(index: 9)
                     masteryLadderCard
+                        .staggeredAppear(index: 10)
                     revealGridNote
+                        .staggeredAppear(index: 11)
                 }
                 .padding(20)
             }
@@ -651,6 +666,8 @@ struct ProgressTabView: View {
                 Text("\(store.discoveryXPTotal + store.familiarityXPTotal)")
                     .font(.system(size: 36, weight: .heavy, design: .rounded))
                     .foregroundStyle(AtlasTheme.teal)
+                    .contentTransition(.numericText())
+                    .animation(AtlasMotion.number, value: store.discoveryXPTotal + store.familiarityXPTotal)
                 Text("Lifetime XP")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -759,6 +776,8 @@ struct ProgressTabView: View {
                             Spacer()
                             Text("\(entry.count)")
                                 .font(.caption.weight(.bold).monospacedDigit())
+                                .contentTransition(.numericText())
+                                .animation(AtlasMotion.number, value: entry.count)
                             Text(StatsFormat.percent(entry.count, of: total))
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)

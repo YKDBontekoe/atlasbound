@@ -5,6 +5,10 @@ struct PinpointGameOverView: View {
     let game: PinpointGame
     @ObservedObject var controller: PinpointController
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var displayedScore = 0
+    @State private var showBreakdown = false
+
     private var isNewHighScore: Bool {
         game.totalScore >= controller.store.highScore(for: game.mode)
     }
@@ -19,29 +23,53 @@ struct PinpointGameOverView: View {
                         .textCase(.uppercase)
 
                     if isNewHighScore {
-                        Text("New High Score!")
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(AtlasTheme.gold)
+                        CelebrateBadge {
+                            Text("New High Score!")
+                                .font(.title3.weight(.bold))
+                                .foregroundStyle(AtlasTheme.gold)
+                        }
                     }
-                    Text("\(game.totalScore)")
+                    Text("\(displayedScore)")
                         .font(.system(size: 56, weight: .bold, design: .rounded).monospacedDigit())
+                        .contentTransition(.numericText())
+                        .animation(AtlasMotion.number, value: displayedScore)
                     Text("out of \(PinpointConstants.maxPossibleScore)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
                     if game.totalFamiliarityXPAwarded > 0 {
-                        Text("+\(game.totalFamiliarityXPAwarded) familiarity XP earned")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AtlasTheme.gold)
+                        CelebrateBadge {
+                            Text("+\(game.totalFamiliarityXPAwarded) familiarity XP earned")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AtlasTheme.gold)
+                        }
                     }
                 }
                 .padding(.top, 32)
+                .staggeredAppear(index: 0)
 
                 roundBreakdown
+                    .opacity(showBreakdown || reduceMotion ? 1 : 0)
+                    .offset(y: showBreakdown || reduceMotion ? 0 : 12)
                 actionButtons
+                    .staggeredAppear(index: 2)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 40)
+        }
+        .onAppear {
+            AtlasHaptics.success()
+            if reduceMotion {
+                displayedScore = game.totalScore
+                showBreakdown = true
+                return
+            }
+            withAnimation(AtlasMotion.celebrate) {
+                displayedScore = game.totalScore
+            }
+            withAnimation(AtlasMotion.chrome.delay(0.15)) {
+                showBreakdown = true
+            }
         }
     }
 
