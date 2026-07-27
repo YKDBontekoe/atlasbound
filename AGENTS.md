@@ -32,6 +32,7 @@ Guidance for AI agents and contributors working in this repo.
 5. **`@MainActor` + `ObservableObject`** for `TileStore`, `WorldController`, `ActivityRecorder`; pure math stays `Sendable` structs.
 6. **Folder-synced Xcode project** — files under `Atlasbound/` are picked up automatically; avoid manual pbxproj file lists.
 7. **Conventional commits** — `feat:` bumps minor on `main`; every push to `main` can publish a release.
+8. **SOLID principles** — every type has a single responsibility. Models are plain data, engines are pure logic (`Sendable`), controllers orchestrate state (`@MainActor`), stores own persistence, and views only render + forward actions. Do not mix concerns into a single file; split when a type serves more than one role.
 
 ## Source map
 
