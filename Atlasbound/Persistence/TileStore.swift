@@ -39,7 +39,7 @@ final class TileStore: ObservableObject {
         Set(discoveredTiles.map(\.id))
     }
 
-    /// All discovered tiles grouped by grid size (60 / 80 / 100 m).
+    /// All discovered tiles grouped by grid size (15 / 20 / 25 m).
     var allDiscoveredTilesBySize: [Int: [WorldTile]] {
         var result: [Int: [WorldTile]] = [:]
         for (size, map) in allTilesBySize {

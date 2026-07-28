@@ -27,7 +27,7 @@ final class ActivityHistorySnapshotTests: XCTestCase {
             tilesDiscovered: 7,
             discoveryXP: 700,
             familiarityXP: 85,
-            tileSizeMeters: 60,
+            tileSizeMeters: 15,
             startedAt: Date(timeIntervalSince1970: 1_700_000_000),
             endedAt: Date(timeIntervalSince1970: 1_700_001_800),
             frontier: FrontierSessionContribution(
@@ -56,7 +56,7 @@ final class ActivityHistorySnapshotTests: XCTestCase {
             tilesDiscovered: 15,
             discoveryXP: 1500,
             familiarityXP: 0,
-            tileSizeMeters: 100,
+            tileSizeMeters: 25,
             startedAt: Date(timeIntervalSince1970: 1_700_000_000),
             endedAt: Date(timeIntervalSince1970: 1_700_000_900),
             frontier: FrontierSessionContribution(

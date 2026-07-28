@@ -3,11 +3,11 @@ import XCTest
 
 final class ProgressionEngineTests: XCTestCase {
     private let progression = ProgressionEngine()
-    private let engine = TileEngine(tileSizeMeters: 80)
+    private let engine = TileEngine(tileSizeMeters: 20)
     private let dayOne = Date(timeIntervalSince1970: 1_700_000_000)
 
     func testDiscoveryAwardsOnce() {
-        var tile = WorldTile(id: "hex:80:0:0", coordinate: TileCoordinate(q: 0, r: 0))
+        var tile = WorldTile(id: "hex:20:0:0", coordinate: TileCoordinate(q: 0, r: 0))
 
         let first = progression.processVisit(tile: &tile, at: dayOne, activity: .walk)
         XCTAssertEqual(first.kind, .discovery)
@@ -33,7 +33,7 @@ final class ProgressionEngineTests: XCTestCase {
     }
 
     func testMasteryThresholds() {
-        var tile = WorldTile(id: "hex:80:1:0", coordinate: TileCoordinate(q: 1, r: 0))
+        var tile = WorldTile(id: "hex:20:1:0", coordinate: TileCoordinate(q: 1, r: 0))
         _ = progression.processVisit(tile: &tile, at: dayOne, activity: .run)
         XCTAssertEqual(tile.state, .discovered)
 
@@ -62,8 +62,8 @@ final class ProgressionEngineTests: XCTestCase {
     func testProcessVisitsAggregatesSessionProgress() {
         var tiles: [String: WorldTile] = [:]
         let ids = [
-            TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 80),
-            TileEngine.makeTileID(q: 1, r: 0, sizeMeters: 80),
+            TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 20),
+            TileEngine.makeTileID(q: 1, r: 0, sizeMeters: 20),
         ]
 
         let firstPass = progression.processVisits(

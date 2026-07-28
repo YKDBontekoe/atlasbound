@@ -38,7 +38,7 @@ enum AtlasTheme {
     static let routeLineWidth: CGFloat = 4
 
     /// Soft-cap for discovered MapPolygon overlays inside the viewport.
-    static let maxVisiblePolygons = 140
+    static let maxVisiblePolygons = 320
     /// Soft-cap for nearby fog wash hexes (MapKit struggles above ~200 polygons).
     static let maxFogPolygons = 120
     /// Cap for mastery marker annotations among visible tiles.

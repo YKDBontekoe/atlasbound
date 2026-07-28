@@ -11,7 +11,7 @@ description: >-
 ## Invariants
 
 - Flat-top axial (`q`, `r`); `s = -q - r`
-- Flat-to-flat width = `tileSizeMeters` (60 / 80 / 100)
+- Flat-to-flat width = `tileSizeMeters` (15 / 20 / 25)
 - ID: `hex:{sizeMeters}:{q}:{r}` via `TileEngine.makeTileID`
 - **Never persist polygons** — derive with `polygon(for:)` / `polygon(forID:)`
 

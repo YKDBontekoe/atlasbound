@@ -47,19 +47,19 @@ enum ActivityType: String, Codable, Sendable, CaseIterable, Hashable {
     var tileSize: TileSizeOption {
         switch self {
         case .walk, .run:
-            return .sixty
+            return .fifteen
         case .cycle, .hike, .publicTransport, .unknown:
-            return .eighty
+            return .twenty
         case .drive:
-            return .hundred
+            return .twentyFive
         }
     }
 
     var revealWidthLabel: String {
         switch tileSize {
-        case .sixty: "Narrow"
-        case .eighty: "Medium"
-        case .hundred: "Wide"
+        case .fifteen: "Narrow"
+        case .twenty: "Medium"
+        case .twentyFive: "Wide"
         }
     }
 }

@@ -20,9 +20,9 @@ final class TileStoreTests: XCTestCase {
     func testMultiSizeIsolation() {
         let store = TileStore(fileURL: tempURL)
 
-        store.tileSize = .sixty
-        let sixtyTile = WorldTile(
-            id: TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 60),
+        store.tileSize = .fifteen
+        let fifteenTile = WorldTile(
+            id: TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 15),
             coordinate: TileCoordinate(q: 0, r: 0),
             state: .discovered,
             masteryXP: 100,
@@ -30,16 +30,16 @@ final class TileStoreTests: XCTestCase {
             firstVisitedAt: .now,
             lastVisitedAt: .now
         )
-        store.upsert(sixtyTile)
+        store.upsert(fifteenTile)
         store.addXP(discovery: 100, familiarity: 0)
         XCTAssertEqual(store.discoveredTiles.count, 1)
 
-        store.tileSize = .hundred
+        store.tileSize = .twentyFive
         XCTAssertEqual(store.discoveredTiles.count, 0)
         XCTAssertEqual(store.discoveryXPTotal, 0)
 
-        let hundredTile = WorldTile(
-            id: TileEngine.makeTileID(q: 2, r: 1, sizeMeters: 100),
+        let twentyFiveTile = WorldTile(
+            id: TileEngine.makeTileID(q: 2, r: 1, sizeMeters: 25),
             coordinate: TileCoordinate(q: 2, r: 1),
             state: .discovered,
             masteryXP: 100,
@@ -47,21 +47,21 @@ final class TileStoreTests: XCTestCase {
             firstVisitedAt: .now,
             lastVisitedAt: .now
         )
-        store.upsert(hundredTile)
+        store.upsert(twentyFiveTile)
         XCTAssertEqual(store.discoveredTiles.count, 1)
 
-        store.tileSize = .sixty
+        store.tileSize = .fifteen
         XCTAssertEqual(store.discoveredTiles.count, 1)
-        XCTAssertEqual(store.discoveredTiles.first?.id, sixtyTile.id)
+        XCTAssertEqual(store.discoveredTiles.first?.id, fifteenTile.id)
     }
 
     func testClearCurrentSizeOnly() {
         let store = TileStore(fileURL: tempURL)
 
-        store.tileSize = .sixty
+        store.tileSize = .fifteen
         store.upsert(
             WorldTile(
-                id: "hex:60:0:0",
+                id: "hex:15:0:0",
                 coordinate: TileCoordinate(q: 0, r: 0),
                 state: .discovered,
                 masteryXP: 100,
@@ -72,10 +72,10 @@ final class TileStoreTests: XCTestCase {
         )
         store.addXP(discovery: 100, familiarity: 0)
 
-        store.tileSize = .eighty
+        store.tileSize = .twenty
         store.upsert(
             WorldTile(
-                id: "hex:80:0:0",
+                id: "hex:20:0:0",
                 coordinate: TileCoordinate(q: 0, r: 0),
                 state: .discovered,
                 masteryXP: 100,
@@ -90,7 +90,7 @@ final class TileStoreTests: XCTestCase {
         XCTAssertEqual(store.discoveredTiles.count, 0)
         XCTAssertEqual(store.discoveryXPTotal, 0)
 
-        store.tileSize = .sixty
+        store.tileSize = .fifteen
         XCTAssertEqual(store.discoveredTiles.count, 1)
         XCTAssertEqual(store.discoveryXPTotal, 100)
     }
@@ -98,10 +98,10 @@ final class TileStoreTests: XCTestCase {
     func testPersistsAcrossReload() {
         do {
             let store = TileStore(fileURL: tempURL)
-            store.tileSize = .eighty
+            store.tileSize = .twenty
             store.upsert(
                 WorldTile(
-                    id: "hex:80:3:-1",
+                    id: "hex:20:3:-1",
                     coordinate: TileCoordinate(q: 3, r: -1),
                     state: .explored,
                     masteryXP: 160,
@@ -114,9 +114,9 @@ final class TileStoreTests: XCTestCase {
         }
 
         let reloaded = TileStore(fileURL: tempURL)
-        reloaded.tileSize = .eighty
+        reloaded.tileSize = .twenty
         XCTAssertEqual(reloaded.discoveredTiles.count, 1)
-        XCTAssertEqual(reloaded.discoveredTiles.first?.id, "hex:80:3:-1")
+        XCTAssertEqual(reloaded.discoveredTiles.first?.id, "hex:20:3:-1")
         XCTAssertEqual(reloaded.discoveryXPTotal, 100)
         XCTAssertEqual(reloaded.familiarityXPTotal, 60)
     }

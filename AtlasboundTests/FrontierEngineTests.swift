@@ -3,7 +3,7 @@ import XCTest
 
 final class FrontierEngineTests: XCTestCase {
     private let engine = FrontierEngine()
-    private let tileEngine = TileEngine(tileSizeMeters: 80)
+    private let tileEngine = TileEngine(tileSizeMeters: 20)
 
     func testConnectedComponentsSplitIslands() {
         let a = TileCoordinate(q: 0, r: 0)
@@ -55,7 +55,7 @@ final class FrontierEngineTests: XCTestCase {
         var tiles: [String: WorldTile] = [:]
         var discoveredIDs: Set<String> = []
         for tile in members {
-            let id = TileEngine.makeTileID(q: tile.q, r: tile.r, sizeMeters: 80)
+            let id = TileEngine.makeTileID(q: tile.q, r: tile.r, sizeMeters: 20)
             discoveredIDs.insert(id)
             tiles[id] = WorldTile(
                 id: id,
@@ -75,7 +75,7 @@ final class FrontierEngineTests: XCTestCase {
             installationID: "seed",
             weekKey: "2026-W30"
         )
-        XCTAssertFalse(offers.contains { $0.targetSectorID == engine.sectorEngine.sectorID(for: sector, sizeMeters: 80) })
+        XCTAssertFalse(offers.contains { $0.targetSectorID == engine.sectorEngine.sectorID(for: sector, sizeMeters: 20) })
     }
 
     func testScoringComponentsAndComboCap() {
@@ -86,7 +86,7 @@ final class FrontierEngineTests: XCTestCase {
             from: engine.sectorEngine.sectorCoordinate(for: origin),
             directionIndex: 0
         )
-        let targetID = engine.sectorEngine.sectorID(for: targetSector, sizeMeters: 80)
+        let targetID = engine.sectorEngine.sectorID(for: targetSector, sizeMeters: 20)
         let offer = ExpeditionOffer(
             id: "expedition:test",
             difficulty: .scout,
@@ -101,7 +101,7 @@ final class FrontierEngineTests: XCTestCase {
         }!
         let path = TileEngine.hexLine(from: origin, to: targetTile)
         let discovered = Set(path.dropLast()).union(territory)
-        let tileID = TileEngine.makeTileID(q: targetTile.q, r: targetTile.r, sizeMeters: 80)
+        let tileID = TileEngine.makeTileID(q: targetTile.q, r: targetTile.r, sizeMeters: 20)
 
         var combo = FrontierComboState.empty
         for _ in 0..<12 {
@@ -143,7 +143,7 @@ final class FrontierEngineTests: XCTestCase {
             from: engine.sectorEngine.sectorCoordinate(for: origin),
             directionIndex: 0
         )
-        let targetID = engine.sectorEngine.sectorID(for: targetSector, sizeMeters: 80)
+        let targetID = engine.sectorEngine.sectorID(for: targetSector, sizeMeters: 20)
         let offer = ExpeditionOffer(
             id: "expedition:connect",
             difficulty: .scout,
@@ -158,7 +158,7 @@ final class FrontierEngineTests: XCTestCase {
         }!
         let path = TileEngine.hexLine(from: origin, to: entryTile)
         let discovered = Set(path.dropLast()).union(territory)
-        let tileID = TileEngine.makeTileID(q: entryTile.q, r: entryTile.r, sizeMeters: 80)
+        let tileID = TileEngine.makeTileID(q: entryTile.q, r: entryTile.r, sizeMeters: 20)
 
         let first = engine.scoreDiscovery(
             tileID: tileID,

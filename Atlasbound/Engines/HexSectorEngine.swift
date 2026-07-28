@@ -2,7 +2,7 @@ import Foundation
 
 /// Groups each tile grid into deterministic coarse sectors derived at runtime.
 struct HexSectorEngine: Sendable {
-    static let span = 9
+    static let span = 36
 
     private static let directionOffsets: [(Int, Int)] = [
         (1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)

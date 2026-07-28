@@ -4,7 +4,7 @@ import XCTest
 final class PersistenceGeometryTests: XCTestCase {
     func testPersistedTileRecordRoundTrip() throws {
         let original = WorldTile(
-            id: "hex:80:4:-2",
+            id: "hex:20:4:-2",
             coordinate: TileCoordinate(q: 4, r: -2),
             state: .surveyed,
             masteryXP: 220,
@@ -17,7 +17,7 @@ final class PersistenceGeometryTests: XCTestCase {
             regionIDs: ["stub"]
         )
 
-        let record = PersistedTileRecord(from: original, tileSizeMeters: 80)
+        let record = PersistedTileRecord(from: original, tileSizeMeters: 20)
         let restored = record.asWorldTile()
 
         XCTAssertEqual(restored.id, original.id)
@@ -30,7 +30,7 @@ final class PersistenceGeometryTests: XCTestCase {
 
     func testWorldSaveFileEncodesWithoutGeometryKeys() throws {
         let tile = WorldTile(
-            id: "hex:60:1:1",
+            id: "hex:15:1:1",
             coordinate: TileCoordinate(q: 1, r: 1),
             state: .discovered,
             masteryXP: 100,
@@ -39,13 +39,13 @@ final class PersistenceGeometryTests: XCTestCase {
             lastVisitedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
         let save = WorldSaveFile(
-            tiles: [PersistedTileRecord(from: tile, tileSizeMeters: 60)],
+            tiles: [PersistedTileRecord(from: tile, tileSizeMeters: 15)],
             progressBySize: [
-                "60": PersistedProgressRecord(
+                "15": PersistedProgressRecord(
                     discoveryXPTotal: 100,
                     familiarityXPTotal: 0,
                     activitiesCompleted: 1,
-                    tileSizeMeters: 60
+                    tileSizeMeters: 15
                 )
             ]
         )

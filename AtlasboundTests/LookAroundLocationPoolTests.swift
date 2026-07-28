@@ -42,15 +42,15 @@ final class LookAroundLocationPoolTests: XCTestCase {
     }
 
     func testAtlasRegionReturnsNilForEmptyTiles() {
-        let engine = TileEngine(tileSizeMeters: 80)
+        let engine = TileEngine(tileSizeMeters: 20)
         XCTAssertNil(LookAroundLocationPool.atlasRegion(for: [], engine: engine))
     }
 
     func testAtlasRegionSpansDiscoveredTiles() {
-        let engine = TileEngine(tileSizeMeters: 80)
+        let engine = TileEngine(tileSizeMeters: 20)
         let tiles = [
-            WorldTile(id: "hex:80:0:0", coordinate: TileCoordinate(q: 0, r: 0)),
-            WorldTile(id: "hex:80:1:0", coordinate: TileCoordinate(q: 1, r: 0)),
+            WorldTile(id: "hex:20:0:0", coordinate: TileCoordinate(q: 0, r: 0)),
+            WorldTile(id: "hex:20:1:0", coordinate: TileCoordinate(q: 1, r: 0)),
         ]
 
         let region = LookAroundLocationPool.atlasRegion(for: tiles, engine: engine)

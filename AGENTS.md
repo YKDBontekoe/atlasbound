@@ -27,7 +27,7 @@ Guidance for AI agents and contributors working in this repo.
 
 1. **Geometry is never persisted** — store tile IDs + mastery fields; polygons from `TileEngine.polygon(for:)`.
 2. **Tile ID format** — `hex:{sizeMeters}:{q}:{r}` (size in ID prevents grid collisions).
-3. **Progress is per tile-size grid** — switching 60/80/100 m loads a different grid; clear only clears the current size.
+3. **Progress is per tile-size grid** — switching 15/20/25 m loads a different grid; clear only clears the current size.
 4. **Use `hexLine` between GPS samples** — high speed must not skip tiles (`tileIDsCoveringRoute`).
 5. **`@MainActor` + `ObservableObject`** for `TileStore`, `WorldController`, `ActivityRecorder`; pure math stays `Sendable` structs.
 6. **Folder-synced Xcode project** — files under `Atlasbound/` are picked up automatically; avoid manual pbxproj file lists.

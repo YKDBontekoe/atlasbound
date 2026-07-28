@@ -66,7 +66,7 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | Activity persistence | Pick Run, relaunch app | Still Run; Start button says Start Run |
 | Clear progress | Clear for current size | Only active size wiped |
 | Size mid-record | Try change while recording | Blocked |
-| Device GPS noise | Real device, try 60 vs 100 m | Finer grids more jitter-sensitive |
+| Device GPS noise | Real device, try 15 vs 25 m | Finer grids more jitter-sensitive |
 
 ## Agent checklist after behavioral changes
 

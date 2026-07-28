@@ -21,25 +21,25 @@ final class FrontierPersistenceTests: XCTestCase {
         let legacyJSON = """
         {
           "progressBySize": {
-            "80": {
+            "20": {
               "activitiesCompleted": 2,
               "discoveryXPTotal": 200,
               "familiarityXPTotal": 25,
-              "tileSizeMeters": 80
+              "tileSizeMeters": 20
             }
           },
           "tiles": [
             {
               "activityStampsRaw": ["walk"],
               "firstVisitedAt": "2024-01-01T00:00:00Z",
-              "id": "hex:80:0:0",
+              "id": "hex:20:0:0",
               "lastVisitedAt": "2024-01-02T00:00:00Z",
               "masteryXP": 100,
               "q": 0,
               "r": 0,
               "regionIDs": [],
               "stateRaw": 1,
-              "tileSizeMeters": 80,
+              "tileSizeMeters": 20,
               "uniqueVisitDays": 1,
               "visitCount": 1,
               "weeklyCharge": 0
@@ -50,7 +50,7 @@ final class FrontierPersistenceTests: XCTestCase {
         try legacyJSON.write(to: tempURL, atomically: true, encoding: .utf8)
 
         let store = TileStore(fileURL: tempURL, installationID: "migration-test")
-        store.tileSize = .eighty
+        store.tileSize = .twenty
         XCTAssertEqual(store.discoveredTiles.count, 1)
         XCTAssertEqual(store.discoveryXPTotal, 200)
         XCTAssertEqual(store.frontierState.offers.count, 0)
@@ -60,26 +60,26 @@ final class FrontierPersistenceTests: XCTestCase {
     func testFrontierStateIsolatedPerGrid() {
         let store = TileStore(fileURL: tempURL, installationID: "grid-test")
 
-        store.tileSize = .sixty
+        store.tileSize = .fifteen
         store.updateFrontierState({ state in
             var next = state
             next.weeklyScore = 120
             return next
         }, playerTile: TileCoordinate(q: 0, r: 0))
 
-        store.tileSize = .hundred
+        store.tileSize = .twentyFive
         XCTAssertEqual(store.frontierState.weeklyScore, 0)
 
-        store.tileSize = .sixty
+        store.tileSize = .fifteen
         XCTAssertEqual(store.frontierState.weeklyScore, 120)
     }
 
     func testWeeklyRolloverResetsChargeNotDiscovery() {
         let store = TileStore(fileURL: tempURL, installationID: "rollover-test")
-        store.tileSize = .eighty
+        store.tileSize = .twenty
         store.upsert(
             WorldTile(
-                id: "hex:80:1:0",
+                id: "hex:20:1:0",
                 coordinate: TileCoordinate(q: 1, r: 0),
                 state: .discovered,
                 masteryXP: 100,
@@ -93,21 +93,21 @@ final class FrontierPersistenceTests: XCTestCase {
             var next = state
             next.weekKey = "1999-W01"
             next.weeklyScore = 500
-            next.chargedTileIDs = ["hex:80:1:0"]
+            next.chargedTileIDs = ["hex:20:1:0"]
             return next
         }, playerTile: TileCoordinate(q: 1, r: 0))
 
         store.applyWeeklyChargeResetIfNeeded()
 
-        XCTAssertEqual(store.tiles["hex:80:1:0"]?.weeklyCharge, 0)
-        XCTAssertEqual(store.tiles["hex:80:1:0"]?.state, .discovered)
+        XCTAssertEqual(store.tiles["hex:20:1:0"]?.weeklyCharge, 0)
+        XCTAssertEqual(store.tiles["hex:20:1:0"]?.state, .discovered)
         XCTAssertEqual(store.frontierState.weeklyScore, 0)
         XCTAssertTrue(store.frontierState.chargedTileIDs.isEmpty)
     }
 
     func testPersistedPayloadContainsIDsOnly() throws {
         let store = TileStore(fileURL: tempURL, installationID: "payload-test")
-        store.tileSize = .eighty
+        store.tileSize = .twenty
         store.updateFrontierState({ state in
             var next = state
             next.weekKey = FrontierEngine.isoWeekKey()
@@ -118,7 +118,7 @@ final class FrontierPersistenceTests: XCTestCase {
         let data = try Data(contentsOf: tempURL)
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let frontier = object?["frontierBySize"] as? [String: Any]
-        let record = (frontier?["80"] as? [String: Any]) ?? [:]
+        let record = (frontier?["20"] as? [String: Any]) ?? [:]
         let keys = Set(record.keys)
         let allowed: Set<String> = [
             "weekKey", "offers", "activeOfferID", "completedOfferIDs",

@@ -3,12 +3,16 @@ import XCTest
 
 final class HexSectorEngineTests: XCTestCase {
     private let engine = HexSectorEngine()
-    private let tileEngine = TileEngine(tileSizeMeters: 80)
+    private let tileEngine = TileEngine(tileSizeMeters: 20)
+
+    func testSectorSpanMatchesNeighborhoodScale() {
+        XCTAssertEqual(HexSectorEngine.span, 36)
+    }
 
     func testSectorIDFormatIncludesSize() {
         let sector = SectorCoordinate(q: 2, r: -1)
-        XCTAssertEqual(engine.sectorID(for: sector, sizeMeters: 80), "sector:80:2:-1")
-        XCTAssertEqual(engine.sectorID(for: sector, sizeMeters: 60), "sector:60:2:-1")
+        XCTAssertEqual(engine.sectorID(for: sector, sizeMeters: 20), "sector:20:2:-1")
+        XCTAssertEqual(engine.sectorID(for: sector, sizeMeters: 15), "sector:15:2:-1")
     }
 
     func testDeterministicSectorAssignment() {
@@ -35,10 +39,13 @@ final class HexSectorEngineTests: XCTestCase {
     }
 
     func testCompletionPercentTracksDiscoveredIDs() {
-        let sector = engine.sectorCoordinate(for: TileCoordinate(q: 9, r: 0))
+        let sector = engine.sectorCoordinate(for: TileCoordinate(q: 36, r: 0))
         let members = engine.tiles(in: sector)
-        let discovered = Set(members.prefix(3).map {
-            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: 80)
+        XCTAssertFalse(members.isEmpty)
+        // Span-36 sectors are large; sample enough tiles so rounded percent is > 0.
+        let sampleCount = max(3, members.count / 20)
+        let discovered = Set(Array(members).prefix(sampleCount).map {
+            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: 20)
         })
         let percent = engine.completionPercent(
             sector: sector,
@@ -50,9 +57,9 @@ final class HexSectorEngineTests: XCTestCase {
     }
 
     func testParseSectorIDRoundTrip() {
-        let id = engine.sectorID(for: SectorCoordinate(q: -2, r: 3), sizeMeters: 100)
+        let id = engine.sectorID(for: SectorCoordinate(q: -2, r: 3), sizeMeters: 25)
         let parsed = engine.parseSectorID(id)
         XCTAssertEqual(parsed?.sector, SectorCoordinate(q: -2, r: 3))
-        XCTAssertEqual(parsed?.sizeMeters, 100)
+        XCTAssertEqual(parsed?.sizeMeters, 25)
     }
 }
