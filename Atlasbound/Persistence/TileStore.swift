@@ -241,11 +241,11 @@ final class TileStore: ObservableObject {
     }
 
     /// While recording, skip atomic rewrites; memory stays authoritative until flush.
-    func setDeferPersistence(_ defer: Bool, flush: Bool = true) {
-        if deferPersistence && !defer && flush {
+    func setDeferPersistence(_ shouldDefer: Bool, flush: Bool = true) {
+        if deferPersistence && !shouldDefer && flush {
             flushToDiskIfNeeded()
         }
-        deferPersistence = defer
+        deferPersistence = shouldDefer
     }
 
     /// Write pending changes after pause, background, or session end.
