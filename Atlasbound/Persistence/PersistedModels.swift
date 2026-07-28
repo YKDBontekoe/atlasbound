@@ -1,6 +1,6 @@
 import Foundation
 
-/// Codable snapshot of a WorldTile for on-disk persistence (no geometry).
+/// Codable snapshot of a canonical 20 m tile. Geometry remains derived.
 struct PersistedTileRecord: Codable, Hashable, Sendable {
     var id: String
     var q: Int
@@ -14,34 +14,31 @@ struct PersistedTileRecord: Codable, Hashable, Sendable {
     var lastVisitedAt: Date?
     var weeklyCharge: Int
     var regionIDs: [String]
-    var tileSizeMeters: Int
 
-    init(from tile: WorldTile, tileSizeMeters: Int) {
-        self.id = tile.id
-        self.q = tile.coordinate.q
-        self.r = tile.coordinate.r
-        self.stateRaw = tile.state.rawValue
-        self.masteryXP = tile.masteryXP
-        self.visitCount = tile.visitCount
-        self.uniqueVisitDays = tile.uniqueVisitDays
-        self.activityStampsRaw = tile.activityStamps.map(\.rawValue).sorted()
-        self.firstVisitedAt = tile.firstVisitedAt
-        self.lastVisitedAt = tile.lastVisitedAt
-        self.weeklyCharge = tile.weeklyCharge
-        self.regionIDs = tile.regionIDs
-        self.tileSizeMeters = tileSizeMeters
+    init(from tile: WorldTile) {
+        id = tile.id
+        q = tile.coordinate.q
+        r = tile.coordinate.r
+        stateRaw = tile.state.rawValue
+        masteryXP = tile.masteryXP
+        visitCount = tile.visitCount
+        uniqueVisitDays = tile.uniqueVisitDays
+        activityStampsRaw = tile.activityStamps.map(\.rawValue).sorted()
+        firstVisitedAt = tile.firstVisitedAt
+        lastVisitedAt = tile.lastVisitedAt
+        weeklyCharge = tile.weeklyCharge
+        regionIDs = tile.regionIDs
     }
 
     func asWorldTile() -> WorldTile {
-        let stamps = Set(activityStampsRaw.compactMap(ActivityType.init(rawValue:)))
-        return WorldTile(
+        WorldTile(
             id: id,
             coordinate: TileCoordinate(q: q, r: r),
             state: TileState(rawValue: stateRaw) ?? .fogged,
             masteryXP: masteryXP,
             visitCount: visitCount,
             uniqueVisitDays: uniqueVisitDays,
-            activityStamps: stamps,
+            activityStamps: Set(activityStampsRaw.compactMap(ActivityType.init(rawValue:))),
             firstVisitedAt: firstVisitedAt,
             lastVisitedAt: lastVisitedAt,
             weeklyCharge: weeklyCharge,
@@ -54,10 +51,8 @@ struct PersistedProgressRecord: Codable, Hashable, Sendable {
     var discoveryXPTotal: Int
     var familiarityXPTotal: Int
     var activitiesCompleted: Int
-    var tileSizeMeters: Int
 }
 
-/// Optional per-grid frontier state — IDs and counters only, no geometry.
 struct PersistedFrontierRecord: Codable, Hashable, Sendable {
     var weekKey: String
     var offers: [ExpeditionOffer]
@@ -96,57 +91,21 @@ struct PersistedFrontierRecord: Codable, Hashable, Sendable {
     }
 }
 
-/// Optional per-grid world-event state — IDs and counters only, no geometry.
-struct PersistedWorldEventRecord: Codable, Hashable, Sendable {
-    var dayKey: String
-    var activeEvent: WorldEventInstance?
-    var visitedHotspotIDs: [String]
-    var eventProgressCount: Int
-    var completedEventIDs: [String]
-    var lifetimeEventsCompleted: Int
-    var dailyHotspotTileIDs: [String]
-
-    init(from state: WorldEventState) {
-        dayKey = state.dayKey
-        activeEvent = state.activeEvent
-        visitedHotspotIDs = state.visitedHotspotIDs
-        eventProgressCount = state.eventProgressCount
-        completedEventIDs = state.completedEventIDs
-        lifetimeEventsCompleted = state.lifetimeEventsCompleted
-        dailyHotspotTileIDs = state.dailyHotspotTileIDs
-    }
-
-    func asWorldEventState() -> WorldEventState {
-        WorldEventState(
-            dayKey: dayKey,
-            activeEvent: activeEvent,
-            visitedHotspotIDs: visitedHotspotIDs,
-            eventProgressCount: eventProgressCount,
-            completedEventIDs: completedEventIDs,
-            lifetimeEventsCompleted: lifetimeEventsCompleted,
-            dailyHotspotTileIDs: dailyHotspotTileIDs
-        )
-    }
-}
-
 struct WorldSaveFile: Codable, Sendable {
-    var version: Int?
+    var version: Int
     var tiles: [PersistedTileRecord]
-    var progressBySize: [String: PersistedProgressRecord]
-    var frontierBySize: [String: PersistedFrontierRecord]?
-    var eventsBySize: [String: PersistedWorldEventRecord]?
+    var progress: PersistedProgressRecord
+    var frontier: PersistedFrontierRecord
 
     init(
         tiles: [PersistedTileRecord],
-        progressBySize: [String: PersistedProgressRecord],
-        frontierBySize: [String: PersistedFrontierRecord]? = nil,
-        eventsBySize: [String: PersistedWorldEventRecord]? = nil,
+        progress: PersistedProgressRecord,
+        frontier: PersistedFrontierRecord,
         version: Int = JSONFileStore.currentSchemaVersion
     ) {
         self.version = version
         self.tiles = tiles
-        self.progressBySize = progressBySize
-        self.frontierBySize = frontierBySize
-        self.eventsBySize = eventsBySize
+        self.progress = progress
+        self.frontier = frontier
     }
 }

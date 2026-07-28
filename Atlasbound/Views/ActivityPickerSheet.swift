@@ -3,6 +3,7 @@ import SwiftUI
 /// Chooses the activity that drives reveal width and session stamps.
 struct ActivityPickerSheet: View {
     @ObservedObject var controller: WorldController
+    var startsTrackingOnSelection = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -12,6 +13,9 @@ struct ActivityPickerSheet: View {
                     ForEach(ActivityType.selectableCases, id: \.self) { type in
                         Button {
                             controller.setActivityType(type)
+                            if startsTrackingOnSelection {
+                                controller.startActivity()
+                            }
                             dismiss()
                         } label: {
                             ActivityTypeRow(
@@ -23,7 +27,7 @@ struct ActivityPickerSheet: View {
                         .disabled(controller.isRecording)
                     }
                 } footer: {
-                    Text("Reveal width follows your activity — narrow for walking and running, medium for cycling, hiking, and transit, wide for driving. Progress is stored per reveal grid.")
+                    Text("Activity tracking is optional. Every activity explores the same 20 m atlas and adds its type to your Journal history.")
                 }
             }
             .navigationTitle("Activity")
@@ -58,7 +62,7 @@ struct ActivityTypeRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-                Text("\(type.revealWidthLabel) · \(type.tileSize.label)")
+                Text("Optional tracking · shared 20 m atlas")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(AtlasTheme.teal)
             }

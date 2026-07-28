@@ -14,16 +14,9 @@ struct StatsEngine: Sendable {
         let tileCount: Int
     }
 
-    struct GridAreaEntry: Sendable {
-        let tileSizeMeters: Int
-        let tileCount: Int
-        let areaSquareMeters: Double
-    }
-
     struct TerritorySummary: Sendable {
         let totalTileCount: Int
         let totalAreaSquareMeters: Double
-        let gridBreakdown: [GridAreaEntry]
     }
 
     typealias PlaceEntry = RegionLookupEngine.PlaceEntry
@@ -36,24 +29,11 @@ struct StatsEngine: Sendable {
         TileEngine.areaSquareMeters(tileCount: tileCount, flatToFlatMeters: flatToFlatMeters)
     }
 
-    static func totalUnlockedArea(tilesBySize: [Int: [WorldTile]]) -> TerritorySummary {
-        var breakdown: [GridAreaEntry] = []
-        var totalTiles = 0
-        var totalArea: Double = 0
-
-        for size in TileSizeOption.allCases.map(\.rawValue).sorted() {
-            let tiles = tilesBySize[size, default: []].filter(\.isDiscovered)
-            guard !tiles.isEmpty else { continue }
-            let area = areaSquareMeters(tileCount: tiles.count, flatToFlatMeters: Double(size))
-            breakdown.append(GridAreaEntry(tileSizeMeters: size, tileCount: tiles.count, areaSquareMeters: area))
-            totalTiles += tiles.count
-            totalArea += area
-        }
-
+    static func totalUnlockedArea(tiles: [WorldTile]) -> TerritorySummary {
+        let totalTiles = tiles.filter(\.isDiscovered).count
         return TerritorySummary(
             totalTileCount: totalTiles,
-            totalAreaSquareMeters: totalArea,
-            gridBreakdown: breakdown
+            totalAreaSquareMeters: areaSquareMeters(tileCount: totalTiles, flatToFlatMeters: 20)
         )
     }
 
@@ -71,12 +51,12 @@ struct StatsEngine: Sendable {
     }
 
     static func placesVisited(
-        tilesBySize: [Int: [WorldTile]],
+        tiles: [WorldTile],
         cellLabels: [String: RegionLookupEngine.PlaceLabels]
     ) -> PlacesVisitedSummary {
         placesVisited(
             cellLabels: cellLabels,
-            tileCountsByCell: RegionLookupEngine.tileCountsByCell(tilesBySize: tilesBySize)
+            tileCountsByCell: RegionLookupEngine.tileCountsByCell(tiles: tiles)
         )
     }
 
@@ -191,10 +171,6 @@ struct StatsEngine: Sendable {
     static func discoveryDateRange(tiles: [WorldTile]) -> (first: Date?, latest: Date?) {
         let dates = tiles.compactMap(\.firstVisitedAt)
         return (dates.min(), dates.max())
-    }
-
-    static func allDiscoveredTiles(from tilesBySize: [Int: [WorldTile]]) -> [WorldTile] {
-        tilesBySize.values.flatMap { $0.filter(\.isDiscovered) }
     }
 
     static func tileCenters(tiles: [WorldTile], tileSizeMeters: Int) -> [CLLocationCoordinate2D] {

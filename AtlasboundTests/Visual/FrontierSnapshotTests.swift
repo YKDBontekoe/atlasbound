@@ -55,7 +55,6 @@ final class FrontierSnapshotTests: XCTestCase {
         let view = MapMissionsStrip(
             controller: controller,
             store: store,
-            onHotspotsTap: {},
             onExpeditionsTap: {}
         )
         .frame(width: 390)
@@ -73,7 +72,6 @@ final class FrontierSnapshotTests: XCTestCase {
         let view = MapMissionsStrip(
             controller: controller,
             store: store,
-            onHotspotsTap: {},
             onExpeditionsTap: {}
         )
         .frame(width: 390)

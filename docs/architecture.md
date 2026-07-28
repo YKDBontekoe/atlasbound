@@ -7,17 +7,21 @@ Lightweight MV + engines. Not Clean Architecture — keep it small.
 ```
 AtlasboundApp
   ├─ TileStore (@MainActor ObservableObject)
-  │    persistence + tile size preference + active grid
+  │    persistence + canonical 20 m atlas
+  ├─ TreasureStore (@MainActor ObservableObject)
+  │    daily trail + weekly vault + relic persistence
   └─ WorldController (@MainActor ObservableObject)
-       ├─ ActivityRecorder     — GPS samples (filter → callback)
+       ├─ ActivityRecorder     — shared explicit/passive GPS samples
        ├─ TileEngine           — via store.tileEngine
+       ├─ LandmarkResolver     — MapKit public-landmark targets
+       ├─ TreasureEventEngine — pure trail/choice/reward rules
        └─ ProgressionEngine    — discovery / familiarity
             └─ Views (RootTabView → MainMapScreen → DiscoveryMapView)
 ```
 
 | Type | Role | Threading |
 |------|------|-----------|
-| `TileStore` | Load/save world; multi-size maps; totals | `@MainActor` |
+| `TileStore` | Load/save the 20 m atlas and totals | `@MainActor` |
 | `WorldController` | Session: start/pause/stop, live tiles, streak UI | `@MainActor` |
 | `ActivityRecorder` | `CLLocationManager` wrapper | `@MainActor` |
 | `TileEngine` | Projection + axial hex + polygons | `Sendable` value type |
@@ -26,17 +30,16 @@ AtlasboundApp
 
 ## Session flow
 
-1. User starts activity → `WorldController` → `ActivityRecorder.start`.
+1. Automatic exploration starts when the map opens; the user can optionally start activity tracking.
 2. Each accepted sample → tile IDs via engine (including `hexLine` fill) → `ProgressionEngine` on session-local tiles.
 3. Live discoveries upsert into the map mid-session.
-4. Stop → merge session into `TileStore.applySessionProgress` → persist JSON → show `ActivitySummary`.
+4. Stop → merge into `TileStore`; only tracked activities create `ActivitySummary` history.
 
 ## Persistence boundary
 
-- **Persisted:** tile IDs, axial `q`/`r`, mastery fields, activity stamps, dates, totals per size.
+- **Persisted:** 20 m tile IDs, axial `q`/`r`, mastery fields, activity stamps, dates, and totals.
 - **Derived at render:** hex polygons, map overlays, fog rings.
-- Save file: `Documents/atlasbound-world.json` (`WorldSaveFile`).
-- Tile size preference: UserDefaults key `atlasbound.tileSizeMeters`.
+- Save files: `Documents/atlasbound-world.json` and `atlasbound-treasures.json`.
 
 ## UI notes
 
@@ -66,20 +69,19 @@ Flow: lobby (Worldwide or Home Turf) → preparing (dynamic Look Around scouting
 
 Persistence: `Documents/atlasbound-pinpoint.json`. Leaderboard ID: `com.atlasbound.geoguessr.highscore`.
 
-## World events & map highlights
+## Treasure trails
 
-Client-scheduled loop layered like Frontier (no live ops server).
+Serverless daily exploration loop using nearby MapKit landmarks.
 
 | Type | Role | Threading |
 |------|------|-----------|
-| `WorldEventEngine` | Catalog windows, daily hotspots, visit scoring | `Sendable` value type |
-| `WorldEventModels` | Event kinds, instance, per-grid state, map hotspot/pin DTOs | `Sendable` |
-| `TileStore` (`eventsBySize`) | Persist progress per tile-size grid | `@MainActor` |
-| `WorldController` | Publish beacons / washes / hotspots; apply XP & frontier multipliers | `@MainActor` |
-| `WorldEventViews` | Banner, sheet, in-session tracker | SwiftUI |
-| `DiscoveryMapView` | Event wash, beacon, hotspot pins, optional places pins | SwiftUI |
+| `TreasureEventEngine` | Daily/weekly keys, choices, deterministic relic rolls | `Sendable` |
+| `LandmarkResolver` | Named-landmark search and pedestrian validation | async value type |
+| `TreasureStore` | Trail, vault, encounter, and relic persistence | `@MainActor` |
+| `DiscoveryMapView` | Tappable treasure destination marker | SwiftUI |
+| `JournalTabView` | Trail, relics, discoveries, optional activity history | SwiftUI |
 
-Kinds rotate by UTC day-of-year: Surge, Beacon Rush, Hotspot Circuit, Frontier Charge. Destination events run all day; bonus events run 14:00–20:00 UTC. Daily hotspots always appear near the frontier.
+Each local day produces a three-stage trail. Three daily keys unlock the ISO-week vault.
 
 ## Extension points
 

@@ -12,18 +12,14 @@ struct ProgressTabView: View {
     @State private var mapLayer: AtlasStatsMapLayer = .mastery
     @State private var showExplorerMap = false
 
-    private var tilesBySize: [Int: [WorldTile]] { store.allDiscoveredTilesBySize }
-
-    private var allTiles: [WorldTile] {
-        StatsEngine.allDiscoveredTiles(from: tilesBySize)
-    }
+    private var allTiles: [WorldTile] { store.discoveredTiles }
 
     private var territory: StatsEngine.TerritorySummary {
-        StatsEngine.totalUnlockedArea(tilesBySize: tilesBySize)
+        StatsEngine.totalUnlockedArea(tiles: allTiles)
     }
 
     private var placesVisited: StatsEngine.PlacesVisitedSummary {
-        regionLookup.placesVisited(tilesBySize: tilesBySize)
+        regionLookup.placesVisited(tiles: allTiles)
     }
 
     private var masteryBreakdown: [StatsEngine.MasteryEntry] {
@@ -35,9 +31,7 @@ struct ProgressTabView: View {
     }
 
     private var explorerCenters: [CLLocationCoordinate2D] {
-        tilesBySize.flatMap { size, tiles in
-            StatsEngine.tileCenters(tiles: tiles, tileSizeMeters: size)
-        }
+        StatsEngine.tileCenters(tiles: allTiles, tileSizeMeters: 20)
     }
 
     private var discoveryRange: (first: Date?, latest: Date?) {
@@ -74,20 +68,17 @@ struct ProgressTabView: View {
                         .staggeredAppear(index: 9)
                     masteryLadderCard
                         .staggeredAppear(index: 10)
-                    revealGridNote
-                        .staggeredAppear(index: 11)
                 }
                 .padding(20)
             }
             .background(AtlasTheme.canvas(for: colorScheme).ignoresSafeArea())
             .navigationTitle("Atlas Stats")
             .task(id: store.discoveredTiles.count) {
-                regionLookup.resolve(tilesBySize: tilesBySize)
+                regionLookup.resolve(tiles: allTiles)
             }
             .sheet(isPresented: $showExplorerMap) {
                 AtlasExplorerMapScreen(
-                    tilesBySize: tilesBySize,
-                    currentGridSize: store.tileSize.rawValue,
+                    tiles: allTiles,
                     layer: $mapLayer,
                     frontierChargedTileIDs: Set(store.frontierState.chargedTileIDs)
                 )
@@ -122,34 +113,13 @@ struct ProgressTabView: View {
 
                 HStack(spacing: 0) {
                     StatKPI(value: "\(territory.totalTileCount)", caption: "Tiles")
-                    StatKPI(
-                        value: "\(territory.gridBreakdown.count)",
-                        caption: "Grids",
-                        accent: AtlasTheme.blue
-                    )
+                    StatKPI(value: "20 m", caption: "Atlas", accent: AtlasTheme.blue)
                     StatKPI(
                         value: StatsFormat.areaSquareKilometers(territory.totalAreaSquareMeters),
                         caption: "Total"
                     )
                 }
 
-                if !territory.gridBreakdown.isEmpty {
-                    VStack(spacing: 6) {
-                        ForEach(territory.gridBreakdown, id: \.tileSizeMeters) { entry in
-                            HStack(spacing: 8) {
-                                Text("\(entry.tileSizeMeters) m grid")
-                                    .font(.caption.weight(.medium))
-                                Spacer()
-                                Text("\(entry.tileCount) tiles")
-                                    .font(.caption.weight(.bold).monospacedDigit())
-                                Text(StatsFormat.areaSquareKilometers(entry.areaSquareMeters))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .frame(width: 72, alignment: .trailing)
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -425,8 +395,7 @@ struct ProgressTabView: View {
                     .frame(height: 180)
                 } else {
                     AtlasStatsMapView(
-                        tilesBySize: tilesBySize,
-                        currentGridSize: store.tileSize.rawValue,
+                        tiles: allTiles,
                         layer: $mapLayer,
                         frontierChargedTileIDs: Set(store.frontierState.chargedTileIDs),
                         interactive: true,
@@ -613,23 +582,4 @@ struct ProgressTabView: View {
         }
     }
 
-    // MARK: - Reveal grid
-
-    private var revealGridNote: some View {
-        StatSectionCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Reveal grid")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Current width: \(store.tileSize.label)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Image(systemName: "hexagon.fill")
-                    .font(.title2)
-                    .foregroundStyle(AtlasTheme.teal.opacity(0.3))
-            }
-        }
-    }
 }

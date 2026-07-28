@@ -36,15 +36,6 @@ final class TileEngineTests: XCTestCase {
         XCTAssertTrue(first.hasPrefix("hex:20:"))
     }
 
-    func testDifferentSizesDoNotCollide() {
-        let coordinate = CLLocationCoordinate2D(latitude: 52.0907, longitude: 5.1214)
-        let fifteen = TileEngine(tileSizeMeters: 15).tileID(for: coordinate)
-        let twentyFive = TileEngine(tileSizeMeters: 25).tileID(for: coordinate)
-        XCTAssertNotEqual(fifteen, twentyFive)
-        XCTAssertTrue(fifteen.hasPrefix("hex:15:"))
-        XCTAssertTrue(twentyFive.hasPrefix("hex:25:"))
-    }
-
     func testHexLineIsContinuous() {
         let start = TileCoordinate(q: 0, r: 0)
         let end = TileCoordinate(q: 4, r: -2)

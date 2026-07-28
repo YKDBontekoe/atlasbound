@@ -1,21 +1,22 @@
 # Atlasbound
 
-Location-based exploration RPG prototype for iPhone. Walk, run, cycle, or drive — new hexagonal map tiles are **discovered**; revisiting awards **familiarity** XP instead of unlimited discovery.
+Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily landmark treasure trails, collect relics, and unlock a weekly vault. Fitness activity tracking is optional.
 
 **Docs:** [docs/](docs/) · **Agents:** [AGENTS.md](AGENTS.md)
 
 ## Current capabilities
 
-- SwiftUI app with four tabs: **Map**, **Pinpoint**, **Activity**, and **Progress (Atlas Stats)**
-- Foreground activity recording via Core Location; optional **background recording** when Always location is granted
-- Hex tile engine (~15 / **20** / 25 m flat-to-flat, chosen automatically per activity type)
+- SwiftUI app with four tabs: **Map**, **Pinpoint**, **Journal**, and **Progress (Atlas Stats)**
+- Automatic foreground exploration plus opt-in screen-locked exploration
+- Optional walk/run/cycle/hike/drive/transit tracking and activity history
+- One canonical **20 m** hex atlas
 - Fog vs discovered tile overlay on the map; mastery ladder and familiarity XP
 - **Frontier Expeditions** — weekly missions, combo scoring, Game Center leaderboards
-- **World events & hotspots** — daily client-scheduled events (XP surge, beacon rush, hotspot circuit, frontier charge) plus map highlights
+- **Treasure trails** — three daily landmark clues, route choices, collectible relics, and weekly vaults
 - **Pinpoint** — 5-round Look Around location guessing (dynamic Worldwide streets + Home Turf)
 - **Atlas Stats** — territory km², personal records, layered explorer map, Pinpoint stats
 - **Activity session history** — last 100 finished sessions with detail sheets
-- Local persistence (JSON in Documents; tile grids isolated per reveal width)
+- Local persistence (JSON in Documents)
 - First-run onboarding overlay on the map
 
 ## Open & run
@@ -25,7 +26,7 @@ Location-based exploration RPG prototype for iPhone. Walk, run, cycle, or drive 
 3. Set your **Team** under Signing & Capabilities (required for device; simulator usually works with automatic signing).
 4. Run (⌘R).
 5. Allow location access when prompted.
-6. Tap the activity on the bottom sheet to choose Walk / Run / Cycle / Hike / Drive / Transit, then **Start …**, move (or simulate location), and **Finish** for a summary.
+6. Move (or simulate location) to explore automatically. Use **Track an activity** only when you want route and fitness history.
 
 ### Simulator location
 
@@ -33,29 +34,23 @@ Features → Location → **City Run**, **City Bicycle Ride**, or a custom GPX. 
 
 ### Device
 
-Best validation for GPS noise vs activity reveal widths (walk/run vs cycle vs drive).
+Best validation for GPS noise, landmark routing, automatic exploration, and screen-locked discovery.
 
-## Reveal width (by activity)
+## Exploration modes
 
-Tile size is **not** a user setting. It follows the selected activity:
-
-| Activity | Reveal width | Flat-to-flat |
-|----------|--------------|--------------|
-| Walk, Run | Narrow | 15 m |
-| Cycle, Hike, Transit | Medium | 20 m |
-| Drive | Wide | 25 m |
-
-Tile IDs include size (`hex:{meters}:{q}:{r}`), so activity grids stay separate. Progress is stored per reveal grid.
+- **Automatic Explore:** discovery while the app is open; screen-locked discovery is a separate Always-location opt-in.
+- **Track Activity:** adds distance, route, duration, and an activity stamp while discovering the same 20 m atlas.
 
 ## Architecture
 
 | Component | Role |
 |-----------|------|
-| `ActivityRecorder` | CLLocationManager wrapper; accuracy/distance filtering |
+| `ActivityRecorder` | Shared CLLocationManager wrapper; explicit and passive sample filtering |
 | `TileEngine` | Lat/lon → Web Mercator → flat-top axial hex IDs + polygons |
 | `ProgressionEngine` | First visit = discovery XP; revisit = diminishing familiarity XP |
 | `TileStore` | JSON FileManager persistence (`Documents/atlasbound-world.json`) |
-| `WorldController` | Session orchestration; syncs tile size from activity |
+| `WorldController` | Exploration-mode, progression, Frontier, and treasure orchestration |
+| `TreasureEventEngine` / `TreasureStore` | Daily trails, choices, relics, vaults, and persistence |
 | `DiscoveryMapView` | MapKit overlay of discovered hexes + live route |
 
 Progress stores tile IDs and mastery fields only — hex geometry is derived at render time.
@@ -64,7 +59,7 @@ Deeper write-ups: [docs/architecture.md](docs/architecture.md), [docs/domain.md]
 
 ## Privacy
 
-Location is used on-device for tile discovery. Usage strings live in `Atlasbound/Info.plist`. Background recording is optional (Settings → “Record while screen is off”) and requires Always location access.
+Location is used for tile discovery, treasure arrivals, and optional activity tracking. Foreground and screen-locked automatic exploration are separate opt-ins; screen-locked use requires Always access.
 
 ## Requirements
 

@@ -37,7 +37,7 @@ Only advance forward; discovery sets discovered without jumping the ladder.
 ## Integration
 
 - Live session mutates **session-local** tiles in `WorldController`, then merges via `TileStore` on stop.
-- Lifetime totals: `discoveryXPTotal` / `familiarityXPTotal` per tile-size grid.
+- Lifetime totals: `discoveryXPTotal` / `familiarityXPTotal` for the single atlas.
 
 ## Do not
 

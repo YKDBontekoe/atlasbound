@@ -225,11 +225,6 @@ struct ActivitySessionDetailView: View {
         StatSectionCard {
             VStack(spacing: 8) {
                 NerdStat(
-                    label: "Reveal grid",
-                    value: "\(session.tileSizeMeters) m",
-                    icon: "hexagon.fill"
-                )
-                NerdStat(
                     label: "Started",
                     value: StatsFormat.sessionTimestamp(session.startedAt),
                     icon: "play.fill"

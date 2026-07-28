@@ -11,7 +11,7 @@
 1. Open `Atlasbound.xcodeproj`
 2. Scheme: **Atlasbound**
 3. Set Signing **Team** for physical devices (`DEVELOPMENT_TEAM` is empty in the project)
-4. ⌘R → allow location → pick an activity on the map sheet → **Start …**
+4. ⌘R → allow location → move to discover tiles automatically; pick an activity on the map sheet only when you want to track it.
 
 Simulator / DEBUG Sim GPS: set `ATLASBOUND_ENABLE_SIM_GPS=true` in `.env`, run `python3 scripts/sync-env.py`, rebuild, then enable **Show Sim GPS controls** in Settings. The on-map pad stays hidden otherwise.
 

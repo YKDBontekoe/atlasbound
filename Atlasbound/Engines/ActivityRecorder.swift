@@ -23,15 +23,19 @@ final class ActivityRecorder: NSObject, ObservableObject {
     }
     @Published private(set) var lastErrorMessage: String?
     @Published private(set) var prefersBackgroundRecording = false
+    @Published private(set) var automaticExplorationEnabled = false
+    @Published private(set) var automaticBackgroundEnabled = false
 
     private let manager = CLLocationManager()
     private var settings: ActivitySettings
     private var lastAcceptedLocation: CLLocation?
     private var pausedAt: Date?
     private var accumulatedPause: TimeInterval = 0
+    private var lastPassiveLocation: CLLocation?
 
     /// Invoked on the main actor when a new sample is accepted.
     var onSample: ((LocationSample) -> Void)?
+    var onPassiveSample: ((LocationSample) -> Void)?
 
     init(settings: ActivitySettings = .default) {
         self.settings = settings
@@ -47,6 +51,12 @@ final class ActivityRecorder: NSObject, ObservableObject {
         manager.showsBackgroundLocationIndicator = true
         prefersBackgroundRecording = UserDefaults.standard.bool(
             forKey: BackgroundRecordingPreference.storageKey
+        )
+        automaticExplorationEnabled = (
+            UserDefaults.standard.object(forKey: AutomaticExplorationPreference.foregroundKey) as? Bool
+        ) ?? true
+        automaticBackgroundEnabled = UserDefaults.standard.bool(
+            forKey: AutomaticExplorationPreference.backgroundKey
         )
     }
 
@@ -100,18 +110,40 @@ final class ActivityRecorder: NSObject, ObservableObject {
         applyBackgroundRecordingPreference()
     }
 
+    func requestAlwaysAuthorizationForAutomaticExploration() {
+        guard manager.authorizationStatus != .authorizedAlways else {
+            applyBackgroundRecordingPreference()
+            return
+        }
+        manager.requestAlwaysAuthorization()
+    }
+
     func setBackgroundRecordingEnabled(_ enabled: Bool) {
         prefersBackgroundRecording = enabled
         UserDefaults.standard.set(enabled, forKey: BackgroundRecordingPreference.storageKey)
         applyBackgroundRecordingPreference()
     }
 
+    func setAutomaticExploration(foreground: Bool, background: Bool) {
+        automaticExplorationEnabled = foreground
+        automaticBackgroundEnabled = foreground && background
+        UserDefaults.standard.set(foreground, forKey: AutomaticExplorationPreference.foregroundKey)
+        UserDefaults.standard.set(automaticBackgroundEnabled, forKey: AutomaticExplorationPreference.backgroundKey)
+        if foreground {
+            startMonitoringIfNeeded()
+        } else {
+            lastPassiveLocation = nil
+        }
+        applyBackgroundRecordingPreference()
+    }
+
     private func applyBackgroundRecordingPreference() {
-        let shouldEnable = prefersBackgroundRecording
+        let shouldEnable = (prefersBackgroundRecording && isRecording)
+            || (automaticExplorationEnabled && automaticBackgroundEnabled)
+        let canEnable = shouldEnable
             && manager.authorizationStatus == .authorizedAlways
-            && isRecording
             && !isSimulationActive
-        manager.allowsBackgroundLocationUpdates = shouldEnable
+        manager.allowsBackgroundLocationUpdates = canEnable
     }
 
     func start() {
@@ -230,8 +262,11 @@ final class ActivityRecorder: NSObject, ObservableObject {
     /// Push a location through the same filter path as GPS. Updates `lastLocation` even when idle.
     func ingestSimulatedLocation(_ location: CLLocation) {
         lastLocation = location
-        guard isRecording, !isPaused else { return }
-        accept(location)
+        if isRecording, !isPaused {
+            accept(location)
+        } else if automaticExplorationEnabled {
+            acceptPassive(location)
+        }
     }
 
     // MARK: - Filtering
@@ -260,6 +295,26 @@ final class ActivityRecorder: NSObject, ObservableObject {
         )
         samples.append(sample)
         onSample?(sample)
+    }
+
+    private func acceptPassive(_ location: CLLocation) {
+        guard location.horizontalAccuracy >= 0,
+              location.horizontalAccuracy <= settings.maxHorizontalAccuracy else { return }
+        if let previous = lastPassiveLocation,
+           location.distance(from: previous) < settings.minSampleDistance {
+            return
+        }
+        lastPassiveLocation = location
+        lastLocation = location
+        clearError()
+        onPassiveSample?(
+            LocationSample(
+                coordinate: location.coordinate,
+                timestamp: location.timestamp,
+                horizontalAccuracy: location.horizontalAccuracy,
+                speed: location.speed
+            )
+        )
     }
 
     func clearError() {
@@ -303,9 +358,14 @@ extension ActivityRecorder: CLLocationManagerDelegate {
             guard !self.isSimulationActive else { return }
             guard let latest = locations.last else { return }
             self.lastLocation = latest
-            guard self.isRecording, !self.isPaused else { return }
-            for location in locations {
-                self.accept(location)
+            if self.isRecording, !self.isPaused {
+                for location in locations {
+                    self.accept(location)
+                }
+            } else if self.automaticExplorationEnabled {
+                for location in locations {
+                    self.acceptPassive(location)
+                }
             }
         }
     }

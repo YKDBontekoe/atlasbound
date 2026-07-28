@@ -30,8 +30,8 @@ final class RegionLookupStore: ObservableObject {
         return result
     }
 
-    func placesVisited(tilesBySize: [Int: [WorldTile]]) -> RegionLookupEngine.PlacesVisitedSummary {
-        let counts = RegionLookupEngine.tileCountsByCell(tilesBySize: tilesBySize)
+    func placesVisited(tiles: [WorldTile]) -> RegionLookupEngine.PlacesVisitedSummary {
+        let counts = RegionLookupEngine.tileCountsByCell(tiles: tiles)
         return RegionLookupEngine.placesVisited(
             cellLabels: successfulLabels,
             tileCountsByCell: counts
@@ -39,8 +39,8 @@ final class RegionLookupStore: ObservableObject {
     }
 
     /// Resolve uncached / retryable cells for discovered tiles. Safe to call repeatedly.
-    func resolve(tilesBySize: [Int: [WorldTile]]) {
-        let counts = RegionLookupEngine.tileCountsByCell(tilesBySize: tilesBySize)
+    func resolve(tiles: [WorldTile]) {
+        let counts = RegionLookupEngine.tileCountsByCell(tiles: tiles)
         let pendingKeys = counts.keys.filter { needsResolve(cellKey: $0) }.sorted()
         guard !pendingKeys.isEmpty else { return }
 
@@ -95,13 +95,14 @@ final class RegionLookupStore: ObservableObject {
     // MARK: - Disk
 
     private struct SaveFile: Codable {
-        var version: Int?
+        var version: Int
         var cells: [PersistedRegionCell]
     }
 
     private func loadFromDisk() {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        guard let save = JSONFileStore.load(SaveFile.self, from: fileURL) else {
+        guard let save = JSONFileStore.load(SaveFile.self, from: fileURL),
+              save.version == JSONFileStore.currentSchemaVersion else {
             cells = [:]
             return
         }

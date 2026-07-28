@@ -1,49 +1,36 @@
 ---
 name: world-persistence
 description: >-
-  Atlasbound TileStore and JSON save format: multi-size grids, WorldSaveFile,
-  PersistedTileRecord, and UserDefaults tile size. Use when editing persistence,
-  clear-progress, tile-size switching, or save/load bugs.
+  Atlasbound TileStore and canonical 20 m JSON save format. Use when editing
+  persistence, clear-progress, or save/load behavior.
 ---
 
 # World persistence
 
-## Files / keys
+## Files
 
 | What | Where |
 |------|--------|
 | World JSON | `Documents/atlasbound-world.json` |
-| Regions JSON | `Documents/atlasbound-regions.json` (place labels only) |
-| Tile size pref | UserDefaults `atlasbound.tileSizeMeters` |
+| Regions JSON | `Documents/atlasbound-regions.json` |
 | Types | `Persistence/PersistedModels.swift`, `TileStore.swift`, `RegionLookupStore.swift` |
 
 ## Save shape (`WorldSaveFile`)
 
-- `tiles: [PersistedTileRecord]` — IDs, `q`/`r`, mastery fields, stamps, dates, `tileSizeMeters`
-- `progressBySize: [String: PersistedProgressRecord]` — totals keyed by size
-- `frontierBySize` (optional) — weekly expedition state per size
-- `eventsBySize` (optional) — world-event + daily hotspot progress per size
+- `version` — required exact schema contract
+- `tiles: [PersistedTileRecord]` — canonical 20 m IDs and mastery fields
+- `progress: PersistedProgressRecord` — lifetime atlas totals
+- `frontier: PersistedFrontierRecord` — weekly expedition state
 
-**No geometry** in the save file. Dates: ISO-8601 encode/decode.
+No geometry is persisted. Dates use ISO-8601 encoding.
 
-## Multi-size rules
+## Rules
 
-- In-memory: `allTilesBySize` + `progressBySize`
-- Active `tileSize` loads that grid into published `tiles` / totals
-- **Clear** = current size only
-- Changing size mid-record is blocked by the controller
-
-## Injectability
-
-`TileStore(fileURL:)` accepts a temp URL — use that for future tests.
-
-## Failure mode
-
-Write failures are currently soft (in-memory kept). If you harden this, surface errors without corrupting the in-memory grid.
-
-## Migration caution
-
-If you change `PersistedTileRecord` fields, keep decode backward-compatible or version the save file explicitly. Prefer additive optional fields.
+- There is one 20 m atlas and no grid switching.
+- Clearing wipes the atlas, its XP totals, activity count, and Frontier state.
+- A schema mismatch starts a fresh atlas; there are no migration or compatibility paths.
+- `TileStore(fileURL:)` accepts a temporary URL for tests.
+- Write failures remain soft: in-memory state stays authoritative.
 
 ## See also
 

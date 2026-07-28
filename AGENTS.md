@@ -27,7 +27,7 @@ Guidance for AI agents and contributors working in this repo.
 
 1. **Geometry is never persisted** — store tile IDs + mastery fields; polygons from `TileEngine.polygon(for:)`.
 2. **Tile ID format** — `hex:{sizeMeters}:{q}:{r}` (size in ID prevents grid collisions).
-3. **Progress is per tile-size grid** — switching 15/20/25 m loads a different grid; clear only clears the current size.
+3. **One atlas only** — all discovery, progress, Frontier, Pinpoint awards, and clearing use the 20 m grid.
 4. **Use `hexLine` between GPS samples** — high speed must not skip tiles (`tileIDsCoveringRoute`).
 5. **`@MainActor` + `ObservableObject`** for `TileStore`, `WorldController`, `ActivityRecorder`; pure math stays `Sendable` structs.
 6. **Folder-synced Xcode project** — files under `Atlasbound/` are picked up automatically; avoid manual pbxproj file lists.
@@ -48,7 +48,7 @@ Atlasbound/
     RegionLookupEngine.swift   # Coarse-cell place labels + places-visited aggregate
     GeocodeLimiter.swift       # Shared throttled CLGeocoder
     FrontierEngine.swift       # Weekly expeditions + frontier scoring
-    WorldEventEngine.swift     # Client-scheduled world events + daily hotspots
+    TreasureEventEngine.swift  # Daily trails, weekly vaults, and relic rewards
     PinpointController.swift   # Pinpoint game orchestration
     PinpointScoring.swift      # Distance + score math (Sendable)
     LookAroundLocationPool.swift # Coverage-region + Home Turf targets (Sendable)
@@ -58,7 +58,7 @@ Atlasbound/
     RegionLookupStore.swift    # Reverse-geocode place cache (JSON)
     PinpointStore.swift        # Pinpoint game history (JSON)
     ActivityHistoryStore.swift # Activity session history + per-type records
-  Models/                      # WorldTile, activity types, FrontierModels, WorldEventModels, PinpointModels
+  Models/                      # WorldTile, activity types, FrontierModels, TreasureModels, PinpointModels
   Map/                         # DiscoveryMapView, AtlasStatsMapView, GuessMapView (MapKit)
   Views/                       # MainMapScreen, summary, tabs, Pinpoint + preparing views
   Theme/                       # AtlasTheme
@@ -90,7 +90,7 @@ Load these when the task matches (under `.cursor/skills/`):
 | [hex-tiles](.cursor/skills/hex-tiles/SKILL.md) | TileEngine, hex math, IDs, polygons, route coverage |
 | [progression-xp](.cursor/skills/progression-xp/SKILL.md) | Discovery/familiarity XP, mastery states, visit logic |
 | [activity-recording](.cursor/skills/activity-recording/SKILL.md) | GPS sessions, ActivityRecorder, WorldController live path |
-| [world-persistence](.cursor/skills/world-persistence/SKILL.md) | TileStore, save format, multi-size grids |
+| [world-persistence](.cursor/skills/world-persistence/SKILL.md) | TileStore and canonical atlas save format |
 | [altstore-release](.cursor/skills/altstore-release/SKILL.md) | IPA build, semver, CI, AltStore `apps.json` |
 
 ## Cursor rules

@@ -42,26 +42,6 @@ enum ActivityType: String, Codable, Sendable, CaseIterable, Hashable {
         allCases.filter { $0 != .unknown }
     }
 
-    /// Hex flat-to-flat width for this activity's reveal corridor.
-    /// Narrow for foot travel, medium for bike/transit, wide for driving.
-    var tileSize: TileSizeOption {
-        switch self {
-        case .walk, .run:
-            return .fifteen
-        case .cycle, .hike, .publicTransport, .unknown:
-            return .twenty
-        case .drive:
-            return .twentyFive
-        }
-    }
-
-    var revealWidthLabel: String {
-        switch tileSize {
-        case .fifteen: "Narrow"
-        case .twenty: "Medium"
-        case .twentyFive: "Wide"
-        }
-    }
 }
 
 /// In-memory / domain tile. Geometry is derived from id + tile size, not stored.
@@ -105,4 +85,12 @@ struct WorldTile: Identifiable, Hashable, Sendable {
     }
 
     var isDiscovered: Bool { state != .fogged }
+}
+
+/// Places-visited pin for the optional map layer.
+struct PlaceMapPin: Identifiable, Sendable, Equatable {
+    let id: String
+    let name: String
+    let latitude: Double
+    let longitude: Double
 }

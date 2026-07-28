@@ -10,6 +10,7 @@ final class SmokeUITests: XCTestCase {
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US",
             "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryM",
+            "-atlasbound.onboardingVersion", "2",
         ]
         // Avoid first-run permission races; CI also grants via simctl.
         app.launchEnvironment["OS_ACTIVITY_MODE"] = "disable"
@@ -31,22 +32,21 @@ final class SmokeUITests: XCTestCase {
     func testLaunchShowsTabBar() {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 12), "Tab bar should appear after launch")
-        XCTAssertTrue(tabBar.buttons["Map"].exists || tabBar.buttons["Activity"].exists)
+        XCTAssertTrue(tabBar.buttons["Map"].exists || tabBar.buttons["Journal"].exists)
     }
 
-    func testActivityTabListsTypes() {
+    func testJournalShowsTreasureAndOptionalActivityHistory() {
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 12))
-        let activityTab = app.tabBars.buttons["Activity"]
-        XCTAssertTrue(activityTab.waitForExistence(timeout: 5))
-        activityTab.tap()
+        let journalTab = app.tabBars.buttons["Journal"]
+        XCTAssertTrue(journalTab.waitForExistence(timeout: 5))
+        journalTab.tap()
 
         XCTAssertTrue(
-            app.navigationBars["Activity"].waitForExistence(timeout: 8)
-                || app.staticTexts["Activity"].waitForExistence(timeout: 2)
+            app.navigationBars["Journal"].waitForExistence(timeout: 8)
+                || app.staticTexts["Today’s Trail"].waitForExistence(timeout: 2)
         )
-        XCTAssertTrue(app.staticTexts["Walk"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Run"].exists)
-        XCTAssertTrue(app.staticTexts["Drive"].exists)
+        XCTAssertTrue(app.staticTexts["Relic Collection"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Optional Activity History"].exists)
     }
 
     func testProgressTabShowsExplorerSection() {
@@ -71,7 +71,10 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 12))
         app.tabBars.buttons["Map"].tap()
 
-        let banner = app.buttons["frontierMissionBanner"]
+        let banner = firstExisting(
+            app.buttons["mapMissionsExpeditions"],
+            app.buttons["frontierMissionBanner"]
+        )
         guard banner.waitForExistence(timeout: 8) else {
             throw XCTSkip("Frontier banner not visible in this simulator session")
         }
@@ -106,14 +109,14 @@ final class SmokeUITests: XCTestCase {
         )
 
         guard settings.waitForExistence(timeout: 10) else {
-            // MapKit / location denial can hide map chrome on some simulators — Activity tab still covers smoke.
+            // MapKit / location denial can hide map chrome on some simulators — Journal still covers smoke.
             throw XCTSkip("Map settings control not available in this simulator session")
         }
 
         settings.tap()
         XCTAssertTrue(
             app.navigationBars["Settings"].waitForExistence(timeout: 5)
-                || app.staticTexts["Reveal width"].waitForExistence(timeout: 3)
+                || app.staticTexts["Automatic exploration"].waitForExistence(timeout: 3)
         )
 
         let done = firstExisting(app.buttons["settingsDone"], app.buttons["Done"])

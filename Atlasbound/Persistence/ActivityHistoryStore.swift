@@ -21,8 +21,8 @@ final class ActivityHistoryStore: ObservableObject {
         loadFromDisk()
     }
 
-    func record(_ summary: ActivitySummary, tileSizeMeters: Int) {
-        let record = PersistedActivityRecord(from: summary, tileSizeMeters: tileSizeMeters)
+    func record(_ summary: ActivitySummary) {
+        let record = PersistedActivityRecord(from: summary)
         sessions.append(record)
         if sessions.count > Self.maxSessions {
             sessions.removeFirst(sessions.count - Self.maxSessions)
@@ -52,7 +52,7 @@ final class ActivityHistoryStore: ObservableObject {
     // MARK: - Disk
 
     private struct SaveFile: Codable {
-        var version: Int?
+        var version: Int
         var sessions: [PersistedActivityRecord]
         var longestDistanceByActivity: [String: Double]
         var totalDistanceByActivity: [String: Double]
@@ -62,7 +62,8 @@ final class ActivityHistoryStore: ObservableObject {
 
     private func loadFromDisk() {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        guard let save = JSONFileStore.load(SaveFile.self, from: fileURL) else {
+        guard let save = JSONFileStore.load(SaveFile.self, from: fileURL),
+              save.version == JSONFileStore.currentSchemaVersion else {
             sessions = []
             longestDistanceByActivity = [:]
             totalDistanceByActivity = [:]

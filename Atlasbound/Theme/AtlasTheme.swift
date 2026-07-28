@@ -24,18 +24,10 @@ enum AtlasTheme {
     /// Soft gold wash for undiscovered frontier neighbors (fill-only; territory stroke carries the edge).
     static let frontierWashFill = Color(red: 0.95, green: 0.75, blue: 0.20).opacity(0.10)
 
-    /// Magenta-coral accent for world events (distinct from frontier gold / expedition blue).
-    static let eventAccent = Color(red: 0.86, green: 0.32, blue: 0.48)
-    static let eventWashFill = Color(red: 0.86, green: 0.32, blue: 0.48).opacity(0.12)
-    static let eventBoundaryStroke = Color(red: 0.86, green: 0.32, blue: 0.48).opacity(0.82)
-    static let eventBoundaryStrokeWidth: CGFloat = 1.7
-
     /// Expedition target sector outline — kept thinner than territory perimeter strokes.
     static let targetBoundaryStroke = Color(red: 0.20, green: 0.48, blue: 0.98).opacity(0.78)
     static let targetBoundaryStrokeWidth: CGFloat = 1.7
 
-    /// Cap for daily hotspot annotations on the discovery map.
-    static let maxVisibleHotspots = 8
     /// Cap for places-visited pins when layers are enabled.
     static let maxVisiblePlacePins = 12
 

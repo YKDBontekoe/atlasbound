@@ -1,17 +1,12 @@
 import SwiftUI
 
-/// Combined hotspots + expeditions strip for the idle map screen.
+/// Frontier expedition shortcut beneath the primary treasure adventure.
 struct MapMissionsStrip: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
-    let onHotspotsTap: () -> Void
     let onExpeditionsTap: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
-
-    private var worldLabels: WorldEventBannerLabels {
-        WorldEventBannerLabels.make(controller: controller, store: store)
-    }
 
     private var frontierLabels: FrontierMissionBannerLabels {
         FrontierMissionBannerLabels.make(controller: controller)
@@ -19,24 +14,6 @@ struct MapMissionsStrip: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            missionSegment(
-                icon: worldLabels.iconName,
-                tint: AtlasTheme.eventAccent,
-                title: "Hotspots",
-                label: worldLabels.compactLabel,
-                badge: worldLabels.trailingBadge,
-                badgeTint: AtlasTheme.eventAccent,
-                action: onHotspotsTap
-            )
-            .accessibilityIdentifier("mapMissionsHotspots")
-            .accessibilityLabel("Hotspots, \(worldLabels.compactLabel)")
-            .accessibilityHint("Opens world event details")
-
-            Rectangle()
-                .fill(AtlasTheme.divider(for: colorScheme))
-                .frame(width: 1, height: 44)
-                .padding(.vertical, 8)
-
             missionSegment(
                 icon: frontierLabels.iconName,
                 tint: frontierLabels.tint,

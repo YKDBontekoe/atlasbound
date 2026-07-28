@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// First-run walkthrough explaining the three core game loops.
+/// Versioned walkthrough explaining the exploration-first game loop.
 struct OnboardingOverlay: View {
     @Binding var step: Int
     let onComplete: () -> Void
@@ -12,22 +12,22 @@ struct OnboardingOverlay: View {
         (
             "hexagon.fill",
             "Discover your atlas",
-            "Start an activity and move through the world. New hex tiles are revealed as you go — revisits build familiarity XP and mastery."
+            "Move through the world to reveal new hex tiles automatically — no fitness activity is required."
         ),
         (
-            "flag.2.crossed.fill",
-            "Frontier expeditions",
-            "Each week, pick a mission on the map. Push into new sectors, chain combos, and climb the weekly leaderboard."
+            "map.fill",
+            "Follow treasure trails",
+            "Chase three nearby landmark clues each day. Choose a quick route or a longer detour with better rare-relic odds."
         ),
         (
-            "sparkles",
-            "World events & hotspots",
-            "Daily hotspots mark things to chase nearby. Time-limited world events boost XP, charge the frontier, or send you on a beacon rush."
+            "lock.open.fill",
+            "Unlock the weekly vault",
+            "Daily trails earn keys. Collect three to reveal a weekly vault and a guaranteed rare-or-better relic."
         ),
         (
-            "scope",
-            "Play Pinpoint",
-            "Guess where you are from Apple Look Around. Worldwide mode is always open; Home Turf unlocks as you discover tiles nearby."
+            "location.fill",
+            "Explore your way",
+            "Exploration runs automatically while the app is open. You can optionally enable screen-locked exploration in Settings."
         )
     ]
 

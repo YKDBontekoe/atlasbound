@@ -27,15 +27,16 @@ struct RootTabView: View {
                 .accessibilityIdentifier("pinpointTab")
                 .tag(1)
 
-            ActivityTabView(
+            JournalTabView(
                 controller: controller,
                 store: store,
-                activityHistory: activityHistory
+                activityHistory: activityHistory,
+                treasureStore: controller.treasureStore
             )
                 .tabItem {
-                    Label("Activity", systemImage: "waveform.path.ecg")
+                    Label("Journal", systemImage: "book.closed.fill")
                 }
-                .accessibilityIdentifier("activityTab")
+                .accessibilityIdentifier("journalTab")
                 .tag(2)
 
             ProgressTabView(

@@ -61,22 +61,23 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | Places visited | Progress tab after discovering tiles (network) | Countries / provinces / cities appear as MapKit reverse-geocode resolves |
 | Session history | Activity tab → Recent activities | Past sessions listed; tap for detail sheet |
 | Background recording | Settings → Record while screen is off; grant Always; Drive sim with screen locked | Recording continues; tiles still discovered |
-| Activity switch | Map idle sheet / Activity tab | Walk → Cycle etc.; reveal width + grid update |
+| Activity switch | Map idle sheet / Journal | Walk → Cycle etc.; activity metadata changes, atlas stays 20 m |
 | Activity mid-record | Try change while recording | Blocked until finish |
 | Activity persistence | Pick Run, relaunch app | Still Run; Start button says Start Run |
-| Clear progress | Clear for current size | Only active size wiped |
-| Size mid-record | Try change while recording | Blocked |
-| Device GPS noise | Real device, try 15 vs 25 m | Finer grids more jitter-sensitive |
-| World event window | Map idle → World Events banner during catalog window (UTC) | Banner + sheet show live event; map beacon / wash / hotspots appear |
-| Daily hotspots | Open map with location | Up to 6 hotspot pins near frontier; visiting marks them and may toast |
-| Event persistence | Progress an event, force-quit, relaunch | Same day progress restored for the current tile size |
+| Clear progress | Clear atlas | All atlas tiles and exploration totals are wiped |
+| Device GPS noise | Explore on a real device | Samples outside the accuracy threshold are discarded |
 | Layers places pins | Toggle layers with resolved places | Locality pins appear; no Apple POIs |
+| Automatic foreground | Open Map and move with app open | Tiles reveal without an explicit session or fitness record |
+| Automatic background | Enable screen-locked exploration and grant Always | Discovery continues with the iOS location indicator |
+| Daily treasure trail | Reach marker with Sim GPS and choose routes | Each target advances once; final target grants relic + key |
+| Weekly vault | Complete three daily trails | Vault target appears and awards rare-or-better relic once |
+| Landmark fallback | Disable network before generating trail | Procedural cache remains playable and can be rerolled once |
 
 ## Agent checklist after behavioral changes
 
 - [ ] Discovery still awards once per tile ID
 - [ ] Route coverage still uses line fill between samples
 - [ ] Save file still has no geometry
-- [ ] Tile size switch still isolates grids
+- [ ] All new discovery uses the canonical 20 m tile namespace
 - [ ] Privacy / AltStore permission copy still aligned if strings changed
 - [ ] Unit / visual / UI tests still pass (`xcodebuild test` or CI)

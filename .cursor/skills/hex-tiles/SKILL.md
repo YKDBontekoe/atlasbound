@@ -11,8 +11,8 @@ description: >-
 ## Invariants
 
 - Flat-top axial (`q`, `r`); `s = -q - r`
-- Flat-to-flat width = `tileSizeMeters` (15 / 20 / 25)
-- ID: `hex:{sizeMeters}:{q}:{r}` via `TileEngine.makeTileID`
+- Flat-to-flat width = 20 m
+- ID: `hex:20:{q}:{r}` via `TileEngine.makeTileID`
 - **Never persist polygons** — derive with `polygon(for:)` / `polygon(forID:)`
 
 ## API map (`Engines/TileEngine.swift`)
@@ -31,9 +31,9 @@ description: >-
 
 For live recording and session finalize, prefer **`tileIDsCoveringRoute`**. Point-only IDs skip hexes at cycle/drive speed.
 
-## Multi-size
+## Canonical atlas
 
-Changing meters changes the ID namespace. Do not strip size from IDs. Progress grids are isolated in `TileStore`.
+Production tile IDs use `hex:20:{q}:{r}`. There is no runtime grid switching.
 
 ## When adding map visuals
 

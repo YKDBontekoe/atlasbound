@@ -137,18 +137,14 @@ struct RegionLookupEngine: Sendable {
         )
     }
 
-    /// Count discovered tiles per coarse cell across all tile sizes.
-    static func tileCountsByCell(
-        tilesBySize: [Int: [WorldTile]]
-    ) -> [String: Int] {
+    /// Count canonical atlas tiles per coarse place-label cell.
+    static func tileCountsByCell(tiles: [WorldTile]) -> [String: Int] {
         var counts: [String: Int] = [:]
-        for (size, tiles) in tilesBySize {
-            let engine = TileEngine(tileSizeMeters: Double(size))
-            for tile in tiles where tile.isDiscovered {
-                let center = engine.centerCoordinate(for: tile.coordinate)
-                let key = cellKey(for: center)
-                counts[key, default: 0] += 1
-            }
+        let engine = TileEngine(option: .twenty)
+        for tile in tiles where tile.isDiscovered {
+            let center = engine.centerCoordinate(for: tile.coordinate)
+            let key = cellKey(for: center)
+            counts[key, default: 0] += 1
         }
         return counts
     }

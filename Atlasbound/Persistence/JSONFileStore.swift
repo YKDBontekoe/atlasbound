@@ -6,8 +6,8 @@ import os
 enum JSONFileStore {
     private static let logger = Logger(subsystem: "com.atlasbound.app", category: "persistence")
 
-    /// Bump when a save root gains breaking fields; keep optional on decode for legacy files.
-    static let currentSchemaVersion = 1
+    /// Exact save contract. Mismatched versions start a fresh atlas.
+    static let currentSchemaVersion = 3
 
     static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()

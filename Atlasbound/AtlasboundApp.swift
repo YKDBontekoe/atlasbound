@@ -6,6 +6,7 @@ struct AtlasboundApp: App {
     @StateObject private var activityHistory = ActivityHistoryStore()
     @StateObject private var regionLookup = RegionLookupStore()
     @StateObject private var gameCenterManager = GameCenterManager()
+    @StateObject private var treasureStore = TreasureStore()
     @StateObject private var controllerHolder = ControllerHolder()
     @StateObject private var pinpointHolder = PinpointHolder()
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
@@ -35,7 +36,8 @@ struct AtlasboundApp: App {
                     store: store,
                     activityHistory: activityHistory,
                     regionLookup: regionLookup,
-                    gameCenterManager: gameCenterManager
+                    gameCenterManager: gameCenterManager,
+                    treasureStore: treasureStore
                 )
                 pinpointHolder.bootstrap(tileStore: store, gameCenterManager: gameCenterManager)
             }
@@ -51,14 +53,16 @@ final class ControllerHolder: ObservableObject {
         store: TileStore,
         activityHistory: ActivityHistoryStore,
         regionLookup: RegionLookupStore,
-        gameCenterManager: GameCenterManager
+        gameCenterManager: GameCenterManager,
+        treasureStore: TreasureStore
     ) {
         guard controller == nil else { return }
         controller = WorldController(
             store: store,
             activityHistory: activityHistory,
             regionLookup: regionLookup,
-            gameCenterManager: gameCenterManager
+            gameCenterManager: gameCenterManager,
+            treasureStore: treasureStore
         )
     }
 }

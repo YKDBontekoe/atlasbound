@@ -14,7 +14,7 @@
       "bundleIdentifier": "com.atlasbound.app",
       "developerName": "Youri Bontekoe",
       "subtitle": "Discover the world, one hex at a time",
-      "localizedDescription": "Atlasbound is a location-based exploration RPG for iPhone.\n\n• Discover hexagonal tiles as you walk, run, cycle, or drive\n• Earn familiarity XP when revisiting tiles\n• Reveal width follows activity type (15 / 20 / 25 m grids)\n• Frontier expeditions, Pinpoint guessing, and Atlas Stats\n• All progress stored on-device",
+      "localizedDescription": "Atlasbound is a location-based exploration RPG for iPhone.\n\n• Reveal one shared hex atlas with Quick or optional automatic exploration\n• Follow daily landmark treasure trails and unlock weekly vaults\n• Collect themed relics and earn familiarity XP\n• Optionally track walks, rides, and other activities\n• Frontier expeditions, Pinpoint guessing, and Atlas Stats\n• All progress stored on-device",
       "iconURL": "https://ykdbontekoe.github.io/atlasbound/icon.png",
       "tintColor": "#2E8F6B",
       "category": "games",
@@ -24,11 +24,11 @@
         "privacy": [
           {
             "name": "NSLocationWhenInUseUsageDescription",
-            "usageDescription": "Atlasbound uses your location while recording an activity to discover map tiles along your route."
+            "usageDescription": "Atlasbound uses your location to discover map tiles, guide treasure hunts, and optionally track activities."
           },
           {
             "name": "NSLocationAlwaysAndWhenInUseUsageDescription",
-            "usageDescription": "Atlasbound can continue recording your route in the background so driving and walking stay passive—no phone interaction required while moving. Location is used only for tile discovery on your device."
+            "usageDescription": "Atlasbound can continue an activity or optional automatic exploration while the screen is locked. Location is used on-device for tile discovery and treasure arrivals."
           }
         ]
       }

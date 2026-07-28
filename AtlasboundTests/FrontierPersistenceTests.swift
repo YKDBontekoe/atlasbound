@@ -17,66 +17,8 @@ final class FrontierPersistenceTests: XCTestCase {
         super.tearDown()
     }
 
-    func testPreUpdateSaveDecodesWithoutFrontierPayload() throws {
-        let legacyJSON = """
-        {
-          "progressBySize": {
-            "20": {
-              "activitiesCompleted": 2,
-              "discoveryXPTotal": 200,
-              "familiarityXPTotal": 25,
-              "tileSizeMeters": 20
-            }
-          },
-          "tiles": [
-            {
-              "activityStampsRaw": ["walk"],
-              "firstVisitedAt": "2024-01-01T00:00:00Z",
-              "id": "hex:20:0:0",
-              "lastVisitedAt": "2024-01-02T00:00:00Z",
-              "masteryXP": 100,
-              "q": 0,
-              "r": 0,
-              "regionIDs": [],
-              "stateRaw": 1,
-              "tileSizeMeters": 20,
-              "uniqueVisitDays": 1,
-              "visitCount": 1,
-              "weeklyCharge": 0
-            }
-          ]
-        }
-        """
-        try legacyJSON.write(to: tempURL, atomically: true, encoding: .utf8)
-
-        let store = TileStore(fileURL: tempURL, installationID: "migration-test")
-        store.tileSize = .twenty
-        XCTAssertEqual(store.discoveredTiles.count, 1)
-        XCTAssertEqual(store.discoveryXPTotal, 200)
-        XCTAssertEqual(store.frontierState.offers.count, 0)
-        XCTAssertEqual(store.frontierState.weeklyScore, 0)
-    }
-
-    func testFrontierStateIsolatedPerGrid() {
-        let store = TileStore(fileURL: tempURL, installationID: "grid-test")
-
-        store.tileSize = .fifteen
-        store.updateFrontierState({ state in
-            var next = state
-            next.weeklyScore = 120
-            return next
-        }, playerTile: TileCoordinate(q: 0, r: 0))
-
-        store.tileSize = .twentyFive
-        XCTAssertEqual(store.frontierState.weeklyScore, 0)
-
-        store.tileSize = .fifteen
-        XCTAssertEqual(store.frontierState.weeklyScore, 120)
-    }
-
     func testWeeklyRolloverResetsChargeNotDiscovery() {
         let store = TileStore(fileURL: tempURL, installationID: "rollover-test")
-        store.tileSize = .twenty
         store.upsert(
             WorldTile(
                 id: "hex:20:1:0",
@@ -107,7 +49,6 @@ final class FrontierPersistenceTests: XCTestCase {
 
     func testPersistedPayloadContainsIDsOnly() throws {
         let store = TileStore(fileURL: tempURL, installationID: "payload-test")
-        store.tileSize = .twenty
         store.updateFrontierState({ state in
             var next = state
             next.weekKey = FrontierEngine.isoWeekKey()
@@ -117,8 +58,7 @@ final class FrontierPersistenceTests: XCTestCase {
 
         let data = try Data(contentsOf: tempURL)
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let frontier = object?["frontierBySize"] as? [String: Any]
-        let record = (frontier?["20"] as? [String: Any]) ?? [:]
+        let record = object?["frontier"] as? [String: Any] ?? [:]
         let keys = Set(record.keys)
         let allowed: Set<String> = [
             "weekKey", "offers", "activeOfferID", "completedOfferIDs",

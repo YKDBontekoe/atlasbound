@@ -2,9 +2,7 @@ import Foundation
 import CoreLocation
 
 enum TileSizeOption: Int, CaseIterable, Identifiable, Codable, Sendable {
-    case fifteen = 15
     case twenty = 20
-    case twentyFive = 25
 
     var id: Int { rawValue }
 
@@ -12,19 +10,17 @@ enum TileSizeOption: Int, CaseIterable, Identifiable, Codable, Sendable {
 
     var label: String { "\(rawValue) m" }
 
-    /// Default matches walking / running until an activity is chosen.
-    static let `default`: TileSizeOption = ActivityType.walk.tileSize
+    /// All new exploration uses one coherent canonical atlas.
+    static let `default`: TileSizeOption = .twenty
 }
 
 struct ActivitySettings: Codable, Sendable {
-    var tileSize: TileSizeOption
     /// Horizontal accuracy worse than this (meters) is discarded.
     var maxHorizontalAccuracy: Double
     /// Minimum movement between accepted samples (meters).
     var minSampleDistance: Double
 
     static let `default` = ActivitySettings(
-        tileSize: .default,
         maxHorizontalAccuracy: 25,
         minSampleDistance: 4
     )
@@ -56,7 +52,6 @@ struct PersistedActivityRecord: Codable, Identifiable, Sendable, Hashable {
     let duration: TimeInterval
     let tilesDiscovered: Int
     let totalXP: Int
-    let tileSizeMeters: Int
     let startedAt: Date
     let endedAt: Date
     var frontierPoints: Int?
@@ -64,14 +59,13 @@ struct PersistedActivityRecord: Codable, Identifiable, Sendable, Hashable {
     var frontierCompletionBonus: Int?
     var frontierWeeklyTotal: Int?
 
-    init(from summary: ActivitySummary, tileSizeMeters: Int) {
+    init(from summary: ActivitySummary) {
         self.id = summary.id
         self.activityType = summary.activityType
         self.distanceMeters = summary.distanceMeters
         self.duration = summary.duration
         self.tilesDiscovered = summary.tilesDiscovered
         self.totalXP = summary.totalXP
-        self.tileSizeMeters = tileSizeMeters
         self.startedAt = summary.startedAt
         self.endedAt = summary.endedAt
         if let frontier = summary.frontierContribution, frontier.sessionTotal > 0 {
@@ -91,8 +85,14 @@ enum BackgroundRecordingPreference {
     static let storageKey = "atlasbound.backgroundRecordingEnabled"
 }
 
+enum AutomaticExplorationPreference {
+    static let foregroundKey = "atlasbound.automaticExplorationForeground"
+    static let backgroundKey = "atlasbound.automaticExplorationBackground"
+}
+
 enum OnboardingPreference {
-    static let storageKey = "atlasbound.hasCompletedOnboarding"
+    static let storageKey = "atlasbound.onboardingVersion"
+    static let currentVersion = 2
 }
 
 struct LocationSample: Sendable {

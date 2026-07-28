@@ -6,6 +6,7 @@ struct MainMapScreen: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     @ObservedObject private var recorder: ActivityRecorder
+    @ObservedObject private var treasureStore: TreasureStore
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
@@ -13,17 +14,18 @@ struct MainMapScreen: View {
     @State private var showSettings = false
     @State private var showActivityPicker = false
     @State private var showExpeditionSheet = false
-    @State private var showWorldEventSheet = false
     @State private var showLayers = false
+    @State private var showTreasureSheet = false
     @State private var presentedSummary: ActivitySummary?
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
-    @AppStorage(OnboardingPreference.storageKey) private var hasCompletedOnboarding = false
+    @AppStorage(OnboardingPreference.storageKey) private var onboardingVersion = 0
     @State private var onboardingStep = 0
 
     init(controller: WorldController, store: TileStore) {
         self.controller = controller
         self.store = store
         self._recorder = ObservedObject(wrappedValue: controller.recorder)
+        self._treasureStore = ObservedObject(wrappedValue: controller.treasureStore)
     }
 
     private var showsSimGPSPad: Bool {
@@ -42,7 +44,8 @@ struct MainMapScreen: View {
                 recorder: recorder,
                 position: $position,
                 followsUser: $followsUser,
-                showLayers: showLayers
+                showLayers: showLayers,
+                onTreasureTap: { showTreasureSheet = true }
             )
             .ignoresSafeArea()
 
@@ -95,10 +98,13 @@ struct MainMapScreen: View {
                     activeBottomPanel
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 } else {
+                    TreasureAdventureCard(store: treasureStore) {
+                        showTreasureSheet = true
+                    }
+                    .padding(.horizontal, 12)
                     MapMissionsStrip(
                         controller: controller,
                         store: store,
-                        onHotspotsTap: { showWorldEventSheet = true },
                         onExpeditionsTap: { showExpeditionSheet = true }
                     )
                     idleBottomSheet
@@ -108,12 +114,11 @@ struct MainMapScreen: View {
             .padding(.bottom, 8)
             .animation(AtlasMotion.chrome, value: controller.isRecording)
             .animation(AtlasMotion.fade, value: controller.sessionFeedback.map(\.id))
-            .animation(AtlasMotion.fade, value: controller.liveWorldEvent?.id)
         }
         .overlay {
-            if !hasCompletedOnboarding {
+            if onboardingVersion < OnboardingPreference.currentVersion {
                 OnboardingOverlay(step: $onboardingStep) {
-                    hasCompletedOnboarding = true
+                    onboardingVersion = OnboardingPreference.currentVersion
                 }
             }
         }
@@ -137,15 +142,28 @@ struct MainMapScreen: View {
             .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showActivityPicker) {
-            ActivityPickerSheet(controller: controller)
+            ActivityPickerSheet(controller: controller, startsTrackingOnSelection: true)
                 .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showTreasureSheet) {
+            TreasureDetailSheet(controller: controller, store: treasureStore)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $treasureStore.pendingEncounter) { encounter in
+            TreasureEncounterSheet(encounter: encounter) { choice in
+                controller.resolveTreasureEncounter(choice: choice)
+            }
+            .presentationDetents([.medium])
+            .interactiveDismissDisabled()
+        }
+        .sheet(item: $treasureStore.latestReward) { reward in
+            RelicRewardSheet(reward: reward) {
+                treasureStore.latestReward = nil
+            }
+            .presentationDetents([.medium])
         }
         .sheet(isPresented: $showExpeditionSheet) {
             ExpeditionSheet(controller: controller, store: store)
-                .presentationDetents([.medium, .large])
-        }
-        .sheet(isPresented: $showWorldEventSheet) {
-            WorldEventSheet(controller: controller, store: store)
                 .presentationDetents([.medium, .large])
         }
         .onChange(of: showSimGPSControls) { _, enabled in
@@ -164,13 +182,6 @@ struct MainMapScreen: View {
             }
             #endif
         }
-        .task {
-            // Pick up UTC event window open/close while the map stays foregrounded.
-            while !Task.isCancelled {
-                controller.refreshWorldEventPresentation()
-                try? await Task.sleep(for: .seconds(60))
-            }
-        }
         .task(id: recorder.lastErrorMessage) {
             guard recorder.lastErrorMessage != nil else { return }
             try? await Task.sleep(for: .seconds(5))
@@ -188,7 +199,7 @@ struct MainMapScreen: View {
                 showSettings = true
             } label: {
                 HStack(spacing: 6) {
-                    Text("\(controller.currentSectorName) · \(controller.currentSectorCompletionPercent)% · \(controller.currentGridLabel)")
+                    Text("\(controller.currentSectorName) · \(controller.currentSectorCompletionPercent)% · 20 m")
                         .font(.subheadline.weight(.semibold))
                     Image(systemName: "chevron.down")
                         .font(.caption.weight(.bold))
@@ -219,55 +230,17 @@ struct MainMapScreen: View {
     }
 
     private var idleBottomSheet: some View {
-        HStack(spacing: 14) {
+        VStack(spacing: 10) {
             Button {
                 showActivityPicker = true
             } label: {
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(AtlasTheme.blue.opacity(0.12))
-                            .frame(width: 40, height: 40)
-                        Image(systemName: recorder.activityType.symbolName)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(AtlasTheme.blue)
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 4) {
-                            Text(recorder.activityType.displayName)
-                                .font(.headline)
-                                .foregroundStyle(.primary)
-                            Image(systemName: "chevron.down")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.secondary)
-                        }
-                        Text("\(recorder.activityType.revealWidthLabel) reveal · \(recorder.activityType.tileSize.label)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
+                Label("Track an activity (optional)", systemImage: "figure.walk.motion")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
-            .accessibilityIdentifier("activityPickerButton")
-            .accessibilityLabel("Activity type")
-            .accessibilityValue(recorder.activityType.displayName)
-            .accessibilityHint("Double tap to change activity")
-
-            Spacer(minLength: 8)
-
-            Button {
-                controller.startActivity()
-                followsUser = true
-                AtlasHaptics.success()
-            } label: {
-                Text(recorder.activityType.startButtonTitle)
-                    .font(.subheadline.weight(.bold))
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 14)
-            }
-            .buttonStyle(TintedGlassButtonStyle(tint: AtlasTheme.blue, shape: .capsule))
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("trackActivityButton")
         }
         .padding(12)
         .background {
@@ -284,7 +257,7 @@ struct MainMapScreen: View {
     private var activeHeader: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(recorder.activityType.activeTitle)
+                Text(controller.isQuickExploring ? "Exploring" : recorder.activityType.activeTitle)
                     .font(.system(size: 28, weight: .bold))
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text(formatDuration(recorder.elapsedActive))
@@ -325,11 +298,19 @@ struct MainMapScreen: View {
                     unit: distanceUnit
                 )
                 divider
-                liveStat(
-                    icon: "gauge.with.needle",
-                    value: String(format: "%.1f", recorder.speedKmh),
-                    unit: "km/h"
-                )
+                if controller.isTrackingActivity {
+                    liveStat(
+                        icon: "gauge.with.needle",
+                        value: String(format: "%.1f", recorder.speedKmh),
+                        unit: "km/h"
+                    )
+                } else {
+                    liveStat(
+                        icon: "map.fill",
+                        value: treasureStore.trailProgressLabel,
+                        unit: "treasure trail"
+                    )
+                }
                 divider
                 liveStat(
                     icon: "hexagon.fill",
@@ -344,7 +325,20 @@ struct MainMapScreen: View {
             .animation(AtlasMotion.number, value: controller.sessionDiscoveredCount)
             .animation(AtlasMotion.number, value: distanceValue)
 
-            ActiveWorldEventTracker(controller: controller, compact: true)
+            if let target = treasureStore.currentTarget {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(AtlasTheme.gold)
+                    Text(target.name)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer()
+                    Text(treasureStore.trailProgressLabel)
+                        .font(.caption.weight(.bold).monospacedDigit())
+                        .foregroundStyle(AtlasTheme.gold)
+                }
+                .padding(.horizontal, 12)
+            }
             ActiveFrontierTracker(controller: controller, compact: true)
 
             HStack(spacing: 14) {
@@ -481,6 +475,7 @@ struct SettingsSheet: View {
     @Binding var showSimGPSControls: Bool
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
     @AppStorage(BackgroundRecordingPreference.storageKey) private var backgroundRecordingEnabled = false
+    @AppStorage(AutomaticExplorationPreference.backgroundKey) private var automaticBackgroundEnabled = false
     @Environment(\.dismiss) private var dismiss
 
     private var appearanceBinding: Binding<AppearancePreference> {
@@ -526,6 +521,23 @@ struct SettingsSheet: View {
                     }
                 }
 
+                Section("Automatic exploration") {
+                    Toggle("Continue with screen locked", isOn: $automaticBackgroundEnabled)
+                        .onChange(of: automaticBackgroundEnabled) { _, enabled in
+                            if enabled {
+                                controller.recorder.requestAlwaysAuthorizationForAutomaticExploration()
+                            }
+                            controller.setAutomaticExploration(
+                                foreground: true,
+                                background: enabled
+                            )
+                        }
+                        .accessibilityIdentifier("automaticBackgroundToggle")
+                    Text("Exploration starts automatically while the app is open and never creates fitness records. Screen-locked discovery requires Always location permission and shows the iOS location indicator.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 #if DEBUG
                 if DevConfig.isSimGPSFeatureAvailable {
                     Section("Developer") {
@@ -539,7 +551,7 @@ struct SettingsSheet: View {
 
                 Section {
                     Button("Clear discovered tiles", role: .destructive) {
-                        store.clearCurrentGrid()
+                        store.clearAtlas()
                     }
                     .disabled(controller.isRecording)
                 }

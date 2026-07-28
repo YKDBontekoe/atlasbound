@@ -2,32 +2,23 @@ import XCTest
 @testable import Atlasbound
 
 final class StatsEngineTests: XCTestCase {
-    func testHexAreaFormula15m() {
-        let area = StatsEngine.areaSquareMeters(tileCount: 1, flatToFlatMeters: 15)
-        XCTAssertEqual(area, (sqrt(3) / 2) * 15 * 15, accuracy: 0.01)
-    }
-
     func testHexAreaFormula20m() {
         let area = StatsEngine.areaSquareMeters(tileCount: 2, flatToFlatMeters: 20)
         XCTAssertEqual(area, 2 * (sqrt(3) / 2) * 20 * 20, accuracy: 0.01)
     }
 
-    func testTotalUnlockedAreaAcrossGrids() {
-        let fifteen = makeTile(size: 15, q: 0, r: 0)
-        let twentyFive = makeTile(size: 25, q: 1, r: 0)
-        let summary = StatsEngine.totalUnlockedArea(tilesBySize: [
-            15: [fifteen],
-            25: [twentyFive]
+    func testTotalUnlockedAreaUsesCanonicalWidth() {
+        let summary = StatsEngine.totalUnlockedArea(tiles: [
+            makeTile(size: 20, q: 0, r: 0),
+            makeTile(size: 20, q: 1, r: 0)
         ])
 
         XCTAssertEqual(summary.totalTileCount, 2)
         XCTAssertEqual(
             summary.totalAreaSquareMeters,
-            StatsEngine.areaSquareMeters(tileCount: 1, flatToFlatMeters: 15)
-                + StatsEngine.areaSquareMeters(tileCount: 1, flatToFlatMeters: 25),
+            StatsEngine.areaSquareMeters(tileCount: 2, flatToFlatMeters: 20),
             accuracy: 0.01
         )
-        XCTAssertEqual(summary.gridBreakdown.count, 2)
     }
 
     func testActivityFootprintCountsStamps() {
@@ -58,18 +49,18 @@ final class StatsEngineTests: XCTestCase {
     }
 
     func testActiveExplorationDays() {
-        var tile = makeTile(size: 15, q: 0, r: 0)
+        var tile = makeTile(size: 20, q: 0, r: 0)
         tile.firstVisitedAt = Date(timeIntervalSince1970: 1_700_000_000)
         tile.lastVisitedAt = Date(timeIntervalSince1970: 1_700_086_400)
         XCTAssertEqual(StatsEngine.activeExplorationDays(tiles: [tile]), 2)
     }
 
     func testDeepMasteryCount() {
-        var mastered = makeTile(size: 15, q: 0, r: 0)
+        var mastered = makeTile(size: 20, q: 0, r: 0)
         mastered.state = .mastered
-        var legendary = makeTile(size: 15, q: 1, r: 0)
+        var legendary = makeTile(size: 20, q: 1, r: 0)
         legendary.state = .legendary
-        var discovered = makeTile(size: 15, q: 2, r: 0)
+        var discovered = makeTile(size: 20, q: 2, r: 0)
         discovered.state = .discovered
 
         XCTAssertEqual(StatsEngine.deepMasteryCount(tiles: [mastered, legendary, discovered]), 2)

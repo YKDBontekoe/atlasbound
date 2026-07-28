@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Atlasbound uses your location while recording an activity to discover map tiles along your route.</string>
+	<string>Atlasbound uses your location to discover map tiles, guide treasure hunts, and optionally track activities.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Atlasbound can continue recording your route in the background so driving and walking stay passive—no phone interaction required while moving. Location is used only for tile discovery on your device.</string>
+	<string>Atlasbound can continue an activity or optional automatic exploration while the screen is locked. Location is used on-device for tile discovery and treasure arrivals.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

@@ -123,7 +123,7 @@ final class RegionLookupEngineTests: XCTestCase {
             makeTile(size: 20, q: 1, r: 0),
             makeTile(size: 20, q: 0, r: 1)
         ]
-        let counts = RegionLookupEngine.tileCountsByCell(tilesBySize: [20: tiles])
+        let counts = RegionLookupEngine.tileCountsByCell(tiles: tiles)
         XCTAssertEqual(counts.values.reduce(0, +), 3)
         XCTAssertEqual(counts[RegionLookupEngine.cellKey(for: origin)], 3)
     }
@@ -214,7 +214,7 @@ final class RegionLookupStoreTests: XCTestCase {
             coordinate: TileCoordinate(q: 0, r: 0),
             state: .discovered
         )
-        let summary = store.placesVisited(tilesBySize: [20: [tile]])
+        let summary = store.placesVisited(tiles: [tile])
         XCTAssertEqual(summary.countries.map(\.name), ["Netherlands"])
         XCTAssertEqual(summary.provinces.map(\.name), ["Zuid-Holland"])
         XCTAssertEqual(summary.cities.map(\.name), ["Dordrecht"])
@@ -224,5 +224,6 @@ final class RegionLookupStoreTests: XCTestCase {
 
 /// Mirrors RegionLookupStore.SaveFile for test fixture writes.
 private struct RegionSaveFileStub: Codable {
+    var version = JSONFileStore.currentSchemaVersion
     var cells: [PersistedRegionCell]
 }

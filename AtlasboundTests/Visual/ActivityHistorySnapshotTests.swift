@@ -27,7 +27,6 @@ final class ActivityHistorySnapshotTests: XCTestCase {
             tilesDiscovered: 7,
             discoveryXP: 700,
             familiarityXP: 85,
-            tileSizeMeters: 15,
             startedAt: Date(timeIntervalSince1970: 1_700_000_000),
             endedAt: Date(timeIntervalSince1970: 1_700_001_800),
             frontier: FrontierSessionContribution(
@@ -56,7 +55,6 @@ final class ActivityHistorySnapshotTests: XCTestCase {
             tilesDiscovered: 15,
             discoveryXP: 1500,
             familiarityXP: 0,
-            tileSizeMeters: 25,
             startedAt: Date(timeIntervalSince1970: 1_700_000_000),
             endedAt: Date(timeIntervalSince1970: 1_700_000_900),
             frontier: FrontierSessionContribution(
@@ -91,7 +89,6 @@ final class ActivityHistorySnapshotTests: XCTestCase {
         tilesDiscovered: Int,
         discoveryXP: Int,
         familiarityXP: Int,
-        tileSizeMeters: Int,
         startedAt: Date,
         endedAt: Date,
         frontier: FrontierSessionContribution?
@@ -109,6 +106,6 @@ final class ActivityHistorySnapshotTests: XCTestCase {
             activityType: activity,
             frontierContribution: frontier
         )
-        return PersistedActivityRecord(from: summary, tileSizeMeters: tileSizeMeters)
+        return PersistedActivityRecord(from: summary)
     }
 }

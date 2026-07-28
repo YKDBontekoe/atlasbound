@@ -56,7 +56,7 @@ final class PinpointStore: ObservableObject {
     // MARK: - Disk
 
     private struct SaveFile: Codable {
-        var version: Int?
+        var version: Int
         let games: [PinpointGame]
         let highScoreWorldwide: Int
         let highScoreHomeTurf: Int
@@ -65,7 +65,8 @@ final class PinpointStore: ObservableObject {
 
     private func loadFromDisk() {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        guard let save = JSONFileStore.load(SaveFile.self, from: fileURL) else {
+        guard let save = JSONFileStore.load(SaveFile.self, from: fileURL),
+              save.version == JSONFileStore.currentSchemaVersion else {
             gameHistory = []
             return
         }

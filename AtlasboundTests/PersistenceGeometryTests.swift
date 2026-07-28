@@ -17,7 +17,7 @@ final class PersistenceGeometryTests: XCTestCase {
             regionIDs: ["stub"]
         )
 
-        let record = PersistedTileRecord(from: original, tileSizeMeters: 20)
+        let record = PersistedTileRecord(from: original)
         let restored = record.asWorldTile()
 
         XCTAssertEqual(restored.id, original.id)
@@ -30,7 +30,7 @@ final class PersistenceGeometryTests: XCTestCase {
 
     func testWorldSaveFileEncodesWithoutGeometryKeys() throws {
         let tile = WorldTile(
-            id: "hex:15:1:1",
+            id: "hex:20:1:1",
             coordinate: TileCoordinate(q: 1, r: 1),
             state: .discovered,
             masteryXP: 100,
@@ -39,15 +39,13 @@ final class PersistenceGeometryTests: XCTestCase {
             lastVisitedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
         let save = WorldSaveFile(
-            tiles: [PersistedTileRecord(from: tile, tileSizeMeters: 15)],
-            progressBySize: [
-                "15": PersistedProgressRecord(
-                    discoveryXPTotal: 100,
-                    familiarityXPTotal: 0,
-                    activitiesCompleted: 1,
-                    tileSizeMeters: 15
-                )
-            ]
+            tiles: [PersistedTileRecord(from: tile)],
+            progress: PersistedProgressRecord(
+                discoveryXPTotal: 100,
+                familiarityXPTotal: 0,
+                activitiesCompleted: 1
+            ),
+            frontier: PersistedFrontierRecord(from: .empty)
         )
 
         let encoder = JSONEncoder()
@@ -62,7 +60,7 @@ final class PersistenceGeometryTests: XCTestCase {
         let allowed: Set<String> = [
             "id", "q", "r", "stateRaw", "masteryXP", "visitCount", "uniqueVisitDays",
             "activityStampsRaw", "firstVisitedAt", "lastVisitedAt", "weeklyCharge",
-            "regionIDs", "tileSizeMeters",
+            "regionIDs",
         ]
         XCTAssertEqual(keys.subtracting(allowed), [], "unexpected persisted tile keys")
 
@@ -74,6 +72,5 @@ final class PersistenceGeometryTests: XCTestCase {
         XCTAssertTrue(keys.contains("id"))
         XCTAssertTrue(keys.contains("q"))
         XCTAssertTrue(keys.contains("r"))
-        XCTAssertTrue(keys.contains("tileSizeMeters"))
     }
 }

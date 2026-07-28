@@ -20,9 +20,9 @@ final class ActivityHistoryStoreTests: XCTestCase {
     func testRecordUpdatesLongestDistance() {
         let store = ActivityHistoryStore(fileURL: tempURL)
 
-        store.record(makeSummary(activity: .cycle, distance: 1200), tileSizeMeters: 20)
-        store.record(makeSummary(activity: .cycle, distance: 3500), tileSizeMeters: 20)
-        store.record(makeSummary(activity: .walk, distance: 900), tileSizeMeters: 15)
+        store.record(makeSummary(activity: .cycle, distance: 1200))
+        store.record(makeSummary(activity: .cycle, distance: 3500))
+        store.record(makeSummary(activity: .walk, distance: 900))
 
         XCTAssertEqual(store.longestDistance(for: .cycle), 3500, accuracy: 0.01)
         XCTAssertEqual(store.longestDistance(for: .walk), 900, accuracy: 0.01)
@@ -34,10 +34,7 @@ final class ActivityHistoryStoreTests: XCTestCase {
     func testSessionCapEvictsOldest() {
         let store = ActivityHistoryStore(fileURL: tempURL)
         for index in 0..<(ActivityHistoryStore.maxSessions + 5) {
-            store.record(
-                makeSummary(activity: .walk, distance: Double(index + 1)),
-                tileSizeMeters: 15
-            )
+            store.record(makeSummary(activity: .walk, distance: Double(index + 1)))
         }
         XCTAssertEqual(store.sessions.count, ActivityHistoryStore.maxSessions)
         XCTAssertEqual(store.sessions.first?.distanceMeters ?? -1, 6, accuracy: 0.01)
@@ -45,7 +42,7 @@ final class ActivityHistoryStoreTests: XCTestCase {
 
     func testJSONRoundtrip() {
         let store = ActivityHistoryStore(fileURL: tempURL)
-        store.record(makeSummary(activity: .hike, distance: 2400), tileSizeMeters: 20)
+        store.record(makeSummary(activity: .hike, distance: 2400))
 
         let reloaded = ActivityHistoryStore(fileURL: tempURL)
         XCTAssertEqual(reloaded.sessions.count, 1)
@@ -78,7 +75,7 @@ final class ActivityHistoryStoreTests: XCTestCase {
             )
         )
         let store = ActivityHistoryStore(fileURL: tempURL)
-        store.record(summary, tileSizeMeters: 20)
+        store.record(summary)
         XCTAssertEqual(store.sessions.first?.frontierSessionTotal, 45)
     }
 

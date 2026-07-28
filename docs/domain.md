@@ -3,7 +3,7 @@
 ## Hex tiles
 
 - Flat-top axial hexes (`q`, `r`; `s = -q - r`).
-- Flat-to-flat width: **15 / 20 (default) / 25** m (`TileSizeOption`).
+- Flat-to-flat width: **20 m**.
 - Projection: lat/lon → Web Mercator meters → axial.
 - **ID:** `hex:{sizeMeters}:{q}:{r}` — size is part of identity so grids never collide.
 
@@ -35,24 +35,20 @@ Thresholds live in `ProgressionEngine.advanceStateIfNeeded`. These are intention
 
 `familiarityXP(forVisitCount:)` uses visit count *before* the revisit (at least 1 after discovery).
 
-Session totals: `SessionProgress` (discovered / revisited / XP splits). Lifetime totals: `TileStore` per tile-size grid.
+Session totals: `SessionProgress` (discovered / revisited / XP splits). Lifetime totals live in `TileStore`.
 
-## Activity types
+## Exploration and activity types
 
 `walk` | `run` | `cycle` | `hike` | `drive` | `publicTransport` | `unknown` — stamped on tiles (`activityStamps`).
 
-Players pick an activity before recording (map idle sheet or Activity tab). Selection is remembered across launches. Changing activity while recording is blocked; each activity maps to a reveal width (15 / 20 / 25 m).
+Automatic Explore discovers without fitness history while the app is open. Screen-locked exploration is independently opt-in. Activity types are optional stamps and history metadata; every mode uses the same 20 m atlas.
 
 ## Session extras
 
 - **Frontier combo:** during an active expedition, consecutive qualifying frontier tiles within **20 minutes** build a combo multiplier on frontier scoring (see `FrontierEngine`).
-- **World events:** client-scheduled daily catalog (`WorldEventEngine`) — XP Surge, Beacon Rush, Hotspot Circuit, Frontier Charge. Windows are UTC; progress is per tile-size grid in `eventsBySize` inside `atlasbound-world.json` (IDs + counters only).
-- **Daily hotspots:** procedural frontier hex highlights regenerated each UTC day; shown on the discovery map even outside an event window.
+- **Treasure trails:** three local-day landmark targets with direct/detour choices. Completion grants a relic and weekly key.
+- **Weekly vault:** three keys reveal a once-per-ISO-week destination with rare-or-better loot.
 - **Nearby fog / undiscovered counts:** rings around user via `TileEngine.ring`.
-
-## Multi-size progress
-
-`TileStore` keeps `allTilesBySize` and `progressBySize`. Changing size mid-record is blocked. Switching size loads another grid. Clearing progress clears only the **current** size.
 
 ## Activity history & territory stats
 
@@ -64,7 +60,7 @@ Finished sessions are persisted in `Documents/atlasbound-activities.json` (`Acti
 areaPerTile = (√3 / 2) × W²   // square meters
 ```
 
-`StatsEngine.totalUnlockedArea` sums discovered tile counts across all three grids (15 / 20 / 25 m). The Progress tab ("Atlas Stats") shows km² totals, personal records per activity, activity footprint from tile stamps, a layered exploration map, and **places visited** (countries / provinces / cities) when reverse-geocoded labels are available.
+`StatsEngine.totalUnlockedArea` derives area from the single 20 m atlas. The Progress tab ("Atlas Stats") shows km² totals, personal records per activity, activity footprint from tile stamps, a layered exploration map, and **places visited** (countries / provinces / cities) when reverse-geocoded labels are available.
 
 ### Places visited
 

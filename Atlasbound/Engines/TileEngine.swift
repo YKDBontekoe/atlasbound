@@ -3,8 +3,8 @@ import CoreLocation
 
 /// Converts geographic coordinates into stable hexagonal tile IDs.
 ///
-/// Uses flat-top hexes with axial coordinates. `tileSizeMeters` is the
-/// flat-to-flat width (~15–25 m). Tile IDs include the size so grids never collide.
+/// Uses flat-top hexes with axial coordinates. Production discovery uses a fixed
+/// 20 m width, retained in each tile ID as an integrity check.
 struct TileEngine: Sendable {
     let tileSizeMeters: Double
 
