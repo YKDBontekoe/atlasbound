@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 struct ProgressTabView: View {
     @ObservedObject var store: TileStore
