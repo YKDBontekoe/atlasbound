@@ -74,23 +74,31 @@ final class WorldEventEngineTests: XCTestCase {
 
     func testHotspotsChangeWithDayKey() {
         let player = TileCoordinate(q: 0, r: 0)
+        var tiles: [String: WorldTile] = [:]
+        var discoveredIDs: Set<String> = []
+        for axial in tileEngine.ring(around: player, radius: 1) {
+            let id = TileEngine.makeTileID(q: axial.q, r: axial.r, sizeMeters: tileEngine.tileSizeMeters)
+            discoveredIDs.insert(id)
+            tiles[id] = WorldTile(id: id, coordinate: axial, state: .discovered)
+        }
+
         let a = engine.generateDailyHotspots(
             playerTile: player,
-            discoveredTileIDs: [],
-            tiles: [:],
+            discoveredTileIDs: discoveredIDs,
+            tiles: tiles,
             tileEngine: tileEngine,
             installationID: "install-a",
             dayKey: "2026-07-28"
         )
         let b = engine.generateDailyHotspots(
             playerTile: player,
-            discoveredTileIDs: [],
-            tiles: [:],
+            discoveredTileIDs: discoveredIDs,
+            tiles: tiles,
             tileEngine: tileEngine,
             installationID: "install-a",
             dayKey: "2026-07-29"
         )
-        XCTAssertNotEqual(a, b)
+        XCTAssertNotEqual(Set(a), Set(b))
     }
 
     func testEnsureStateCreatesLiveHotspotCircuit() {
