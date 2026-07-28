@@ -34,7 +34,7 @@ struct MapMissionsStrip: View {
 
             Rectangle()
                 .fill(AtlasTheme.divider(for: colorScheme))
-                .frame(width: 1)
+                .frame(width: 1, height: 44)
                 .padding(.vertical, 8)
 
             missionSegment(
@@ -50,6 +50,7 @@ struct MapMissionsStrip: View {
             .accessibilityLabel("Expeditions, \(frontierLabels.compactLabel)")
             .accessibilityHint("Opens weekly frontier expeditions")
         }
+        .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 10)
         .padding(.vertical, 10)
         .background {
@@ -100,7 +101,7 @@ struct MapMissionsStrip: View {
                         .foregroundStyle(badgeTint)
                 }
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
