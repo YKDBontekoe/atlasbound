@@ -5,24 +5,49 @@ struct JournalTabView: View {
     @ObservedObject var store: TileStore
     @ObservedObject var activityHistory: ActivityHistoryStore
     @ObservedObject var treasureStore: TreasureStore
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedSession: PersistedActivityRecord?
 
     var body: some View {
         NavigationStack {
-            List {
-                Section("Today’s Trail") {
-                    TreasureAdventureCard(store: treasureStore) {}
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
-                    LabeledContent("Progress", value: treasureStore.trailProgressLabel)
-                    LabeledContent(
-                        "Vault keys",
-                        value: "\(treasureStore.weeklyVault.keys)/\(TreasureConstants.keysRequiredForVault)"
-                    )
-                }
+            ZStack {
+                AtlasTheme.canvas(for: colorScheme)
+                    .ignoresSafeArea()
 
-                Section("Relic Collection") {
+                List {
+                    Section("Today’s Trail") {
+                        TreasureAdventureCard(store: treasureStore) {}
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                        LabeledContent("Progress", value: treasureStore.trailProgressLabel)
+                        LabeledContent(
+                            "Vault keys",
+                            value: "\(treasureStore.weeklyVault.keys)/\(TreasureConstants.keysRequiredForVault)"
+                        )
+                    }
+
+                    Section("Optional Activity History") {
+                        if activityHistory.sessions.isEmpty {
+                            Text("Track a walk, ride, or other activity from the Map when you want fitness details.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(Array(activityHistory.sessions.suffix(3).reversed())) { session in
+                                Button {
+                                    selectedSession = session
+                                } label: {
+                                    ActivityHistoryRow(session: session)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            NavigationLink("See all tracked activities") {
+                                ActivityHistoryView(activityHistory: activityHistory)
+                            }
+                        }
+                    }
+
+                    Section("Relic Collection") {
                     if treasureStore.relics.isEmpty {
                         ContentUnavailableView {
                             Label("No relics yet", systemImage: "sparkles")
@@ -51,36 +76,18 @@ struct JournalTabView: View {
                             }
                         }
                     }
-                }
-
-                Section("Recent Discoveries") {
-                    ForEach(Array(store.discoveredTiles.suffix(5).reversed())) { tile in
-                        LabeledContent(
-                            tile.state.displayName,
-                            value: tile.firstVisitedAt?.formatted(date: .abbreviated, time: .omitted) ?? "Today"
-                        )
                     }
-                }
 
-                Section("Optional Activity History") {
-                    if activityHistory.sessions.isEmpty {
-                        Text("Track a walk, ride, or other activity from the Map when you want fitness details.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(Array(activityHistory.sessions.suffix(3).reversed())) { session in
-                            Button {
-                                selectedSession = session
-                            } label: {
-                                ActivityHistoryRow(session: session)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        NavigationLink("See all tracked activities") {
-                            ActivityHistoryView(activityHistory: activityHistory)
+                    Section("Recent Discoveries") {
+                        ForEach(Array(store.discoveredTiles.suffix(5).reversed())) { tile in
+                            LabeledContent(
+                                tile.state.displayName,
+                                value: tile.firstVisitedAt?.formatted(date: .abbreviated, time: .omitted) ?? "Today"
+                            )
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("Journal")
             .sheet(item: $selectedSession) { session in

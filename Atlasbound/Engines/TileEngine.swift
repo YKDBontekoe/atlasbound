@@ -8,6 +8,12 @@ import CoreLocation
 struct TileEngine: Sendable {
     let tileSizeMeters: Double
 
+    /// A GPS update can occasionally jump across cities (or continents) while
+    /// still reporting a deceptively good horizontal accuracy.  Fill normal
+    /// high-speed gaps, but never turn one such outlier into an unbounded row
+    /// of persisted tiles.
+    static let maximumRouteSegmentMeters = 1_000.0
+
     /// Distance from hex center to a vertex (redblobgames `size`).
     private var hexSize: Double { tileSizeMeters / sqrt(3.0) }
 
@@ -53,7 +59,10 @@ struct TileEngine: Sendable {
     }
 
     /// Also walk intermediate hexes between consecutive samples to avoid skipping tiles at speed.
-    func tileIDsCoveringRoute(_ samples: [LocationSample]) -> [String] {
+    func tileIDsCoveringRoute(
+        _ samples: [LocationSample],
+        maximumSegmentMeters: CLLocationDistance = Self.maximumRouteSegmentMeters
+    ) -> [String] {
         guard !samples.isEmpty else { return [] }
 
         var seen = Set<String>()
@@ -68,8 +77,20 @@ struct TileEngine: Sendable {
         append(tileID(for: samples[0].coordinate))
 
         for index in 1..<samples.count {
-            let previous = axialCoordinate(for: samples[index - 1].coordinate)
-            let current = axialCoordinate(for: samples[index].coordinate)
+            let previousSample = samples[index - 1]
+            let currentSample = samples[index]
+            let previous = axialCoordinate(for: previousSample.coordinate)
+            let current = axialCoordinate(for: currentSample.coordinate)
+
+            let segmentLength = CLLocation(latitude: previousSample.coordinate.latitude,
+                                           longitude: previousSample.coordinate.longitude)
+                .distance(from: CLLocation(latitude: currentSample.coordinate.latitude,
+                                           longitude: currentSample.coordinate.longitude))
+            guard segmentLength <= maximumSegmentMeters else {
+                append(Self.makeTileID(q: current.q, r: current.r, sizeMeters: tileSizeMeters))
+                continue
+            }
+
             let line = Self.hexLine(from: previous, to: current)
             for coord in line {
                 append(Self.makeTileID(q: coord.q, r: coord.r, sizeMeters: tileSizeMeters))

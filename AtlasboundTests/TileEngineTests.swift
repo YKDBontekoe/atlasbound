@@ -71,6 +71,19 @@ final class TileEngineTests: XCTestCase {
         XCTAssertEqual(covered.last, pointOnly.last)
     }
 
+    func testTileIDsCoveringRouteDoesNotFillAnImplausibleGPSJump() {
+        let start = CLLocationCoordinate2D(latitude: 52.0907, longitude: 5.1214)
+        let end = CLLocationCoordinate2D(latitude: 40.7128, longitude: -74.0060)
+        let samples = [
+            LocationSample(coordinate: start, timestamp: .now, horizontalAccuracy: 5, speed: 10),
+            LocationSample(coordinate: end, timestamp: .now, horizontalAccuracy: 5, speed: 10),
+        ]
+
+        let covered = engine.tileIDsCoveringRoute(samples)
+
+        XCTAssertEqual(covered, engine.tileIDs(along: samples))
+    }
+
     func testPolygonHasSixVertices() {
         let polygon = engine.polygon(for: TileCoordinate(q: 1, r: -1))
         XCTAssertEqual(polygon.count, 6)
