@@ -60,7 +60,7 @@ struct FrontierEngine: Sendable {
 
             while let current = queue.popLast() {
                 component.append(current)
-                for neighbor in axialNeighbors(of: current) where remaining.contains(neighbor) {
+                for neighbor in TileEngine.neighbors(of: current) where remaining.contains(neighbor) {
                     remaining.remove(neighbor)
                     queue.append(neighbor)
                 }
@@ -99,7 +99,7 @@ struct FrontierEngine: Sendable {
     ) -> Set<TileCoordinate> {
         var frontier: Set<TileCoordinate> = []
         for tile in territory {
-            for neighbor in axialNeighbors(of: tile) where !discovered.contains(neighbor) {
+            for neighbor in TileEngine.neighbors(of: tile) where !discovered.contains(neighbor) {
                 frontier.insert(neighbor)
             }
         }
@@ -119,7 +119,7 @@ struct FrontierEngine: Sendable {
         var queue = Array(territory)
         while let current = queue.popLast() {
             guard visited.insert(current).inserted else { continue }
-            for neighbor in axialNeighbors(of: current) where world.contains(neighbor) && !visited.contains(neighbor) {
+            for neighbor in TileEngine.neighbors(of: current) where world.contains(neighbor) && !visited.contains(neighbor) {
                 queue.append(neighbor)
             }
         }
@@ -418,14 +418,4 @@ struct FrontierEngine: Sendable {
         return "expedition:\(abs(hasher.finalize()))"
     }
 
-    private func axialNeighbors(of tile: TileCoordinate) -> [TileCoordinate] {
-        [
-            TileCoordinate(q: tile.q + 1, r: tile.r),
-            TileCoordinate(q: tile.q + 1, r: tile.r - 1),
-            TileCoordinate(q: tile.q, r: tile.r - 1),
-            TileCoordinate(q: tile.q - 1, r: tile.r),
-            TileCoordinate(q: tile.q - 1, r: tile.r + 1),
-            TileCoordinate(q: tile.q, r: tile.r + 1),
-        ]
-    }
 }

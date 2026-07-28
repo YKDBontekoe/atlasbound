@@ -33,9 +33,7 @@ struct StatsEngine: Sendable {
 
     /// Flat-top hex area from flat-to-flat width in meters.
     static func areaSquareMeters(tileCount: Int, flatToFlatMeters: Double) -> Double {
-        guard tileCount > 0, flatToFlatMeters > 0 else { return 0 }
-        let perTile = (sqrt(3) / 2) * flatToFlatMeters * flatToFlatMeters
-        return Double(tileCount) * perTile
+        TileEngine.areaSquareMeters(tileCount: tileCount, flatToFlatMeters: flatToFlatMeters)
     }
 
     static func totalUnlockedArea(tilesBySize: [Int: [WorldTile]]) -> TerritorySummary {

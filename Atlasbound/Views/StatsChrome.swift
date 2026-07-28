@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 // MARK: - StatKPI
 
@@ -48,6 +49,25 @@ struct StatSectionCard<Content: View>: View {
                     }
                     .shadow(color: AtlasTheme.cardShadow(for: colorScheme), radius: 10, y: 3)
             }
+    }
+}
+
+// MARK: - ActivityFootprintChart
+
+struct ActivityFootprintChart: View {
+    let entries: [StatsEngine.ActivityFootprintEntry]
+
+    var body: some View {
+        Chart(entries, id: \.activity) { entry in
+            BarMark(
+                x: .value("Tiles", entry.tileCount),
+                y: .value("Footprint", "All")
+            )
+            .foregroundStyle(entry.activity.statsMapColor)
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(.hidden)
     }
 }
 

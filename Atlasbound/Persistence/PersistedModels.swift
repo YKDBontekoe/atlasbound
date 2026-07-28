@@ -130,6 +130,7 @@ struct PersistedWorldEventRecord: Codable, Hashable, Sendable {
 }
 
 struct WorldSaveFile: Codable, Sendable {
+    var version: Int?
     var tiles: [PersistedTileRecord]
     var progressBySize: [String: PersistedProgressRecord]
     var frontierBySize: [String: PersistedFrontierRecord]?
@@ -139,8 +140,10 @@ struct WorldSaveFile: Codable, Sendable {
         tiles: [PersistedTileRecord],
         progressBySize: [String: PersistedProgressRecord],
         frontierBySize: [String: PersistedFrontierRecord]? = nil,
-        eventsBySize: [String: PersistedWorldEventRecord]? = nil
+        eventsBySize: [String: PersistedWorldEventRecord]? = nil,
+        version: Int = JSONFileStore.currentSchemaVersion
     ) {
+        self.version = version
         self.tiles = tiles
         self.progressBySize = progressBySize
         self.frontierBySize = frontierBySize

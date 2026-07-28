@@ -148,6 +148,7 @@
 			);
 			name = AtlasboundTests;
 			packageProductDependencies = (
+				A10000000000000000000081 /* SnapshotTesting */,
 			);
 			productName = AtlasboundTests;
 			productReference = A10000000000000000000002 /* AtlasboundTests.xctest */;
@@ -208,6 +209,9 @@
 			);
 			mainGroup = A10000000000000000000030;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A10000000000000000000080 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000031 /* Products */;
 			projectDirPath = "";
@@ -591,6 +595,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A10000000000000000000080 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-snapshot-testing";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.17.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A10000000000000000000081 /* SnapshotTesting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000080 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */;
+			productName = SnapshotTesting;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A10000000000000000000000 /* Project object */;
 }

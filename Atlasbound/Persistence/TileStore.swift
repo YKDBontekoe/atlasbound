@@ -25,6 +25,8 @@ final class TileStore: ObservableObject {
     private var eventsBySize: [Int: WorldEventState] = [:]
     private let fileURL: URL
     private let installationID: String
+    private var deferPersistence = false
+    private var persistenceDirty = false
 
     private static let saveFileName = "atlasbound-world.json"
     private static let installationIDKey = "atlasbound.installationID"
@@ -235,7 +237,22 @@ final class TileStore: ObservableObject {
             activitiesCompleted: 0,
             tileSizeMeters: tileSize.rawValue
         )
-        persistToDisk()
+        persistToDisk(force: true)
+    }
+
+    /// While recording, skip atomic rewrites; memory stays authoritative until flush.
+    func setDeferPersistence(_ defer: Bool, flush: Bool = true) {
+        if deferPersistence && !defer && flush {
+            flushToDiskIfNeeded()
+        }
+        deferPersistence = defer
+    }
+
+    /// Write pending changes after pause, background, or session end.
+    func flushToDiskIfNeeded() {
+        guard persistenceDirty else { return }
+        persistenceDirty = false
+        writeSaveToDisk()
     }
 
     // MARK: - Disk
@@ -303,10 +320,20 @@ final class TileStore: ObservableObject {
         worldEventState = eventsBySize[size] ?? .empty
     }
 
-    private func persistToDisk() {
+    private func persistToDisk(force: Bool = false) {
         allTilesBySize[tileSize.rawValue] = tiles
         frontierBySize[tileSize.rawValue] = frontierState
         eventsBySize[tileSize.rawValue] = worldEventState
+
+        if deferPersistence && !force {
+            persistenceDirty = true
+            return
+        }
+        persistenceDirty = false
+        writeSaveToDisk()
+    }
+
+    private func writeSaveToDisk() {
 
         var records: [PersistedTileRecord] = []
         for (size, map) in allTilesBySize {
