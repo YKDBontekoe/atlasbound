@@ -1,5 +1,4 @@
 import SwiftUI
-import CoreLocation
 
 struct RootTabView: View {
     @ObservedObject var controller: WorldController
