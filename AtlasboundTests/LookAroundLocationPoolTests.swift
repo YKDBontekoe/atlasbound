@@ -61,7 +61,7 @@ final class LookAroundLocationPoolTests: XCTestCase {
 
     func testCoverageRegionsAreNonEmptyAndValid() {
         let regions = LookAroundLocationPool.lookAroundCoverageRegions
-        XCTAssertGreaterThanOrEqual(regions.count, 8)
+        XCTAssertGreaterThanOrEqual(regions.count, 25)
         for region in regions {
             XCTAssertLessThan(region.minLatitude, region.maxLatitude)
             XCTAssertLessThan(region.minLongitude, region.maxLongitude)
@@ -84,6 +84,22 @@ final class LookAroundLocationPoolTests: XCTestCase {
             let hits = LookAroundLocationPool.lookAroundCoverageRegions.contains { $0.contains(probe) }
             XCTAssertTrue(hits)
         }
+    }
+
+    func testSeparatedCoverageProbeAvoidsExistingTarget() {
+        let existing = [CLLocationCoordinate2D(latitude: 37.78, longitude: -122.41)]
+        let probe = LookAroundLocationPool.randomCoverageProbe(
+            excluding: existing,
+            minSeparationMeters: 150_000
+        )
+
+        XCTAssertTrue(
+            LookAroundLocationPool.isSufficientlyDistant(
+                probe,
+                from: existing,
+                minMeters: 150_000
+            )
+        )
     }
 
     func testDiversityRejectsNearbyAndAcceptsFar() {
@@ -118,4 +134,20 @@ final class LookAroundLocationPoolTests: XCTestCase {
         XCTAssertFalse(PinpointGameMode.worldwide.subtitle.localizedCaseInsensitiveContains("anywhere on Earth"))
         XCTAssertTrue(PinpointGameMode.worldwide.subtitle.localizedCaseInsensitiveContains("Look Around"))
     }
+
+    func testRandomStreetProbeStaysNearAnchor() {
+        let anchor = CLLocationCoordinate2D(latitude: 51.5098, longitude: -0.1340)
+
+        for _ in 0..<100 {
+            let probe = LookAroundLocationPool.randomStreetProbe(
+                around: anchor,
+                maxOffsetMeters: 1_500
+            )
+            XCTAssertLessThanOrEqual(
+                PinpointScoring.distanceMeters(from: anchor, to: probe),
+                2_200
+            )
+        }
+    }
+
 }

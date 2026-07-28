@@ -77,7 +77,7 @@ final class PinpointController: ObservableObject {
         unlockedAreaM2AtGameStart = unlockedAreaM2
         sessionFamiliarityXP = 0
         preparationFoundCount = 0
-        preparationTargetCount = PinpointConstants.roundsPerGame
+        preparationTargetCount = mode == .worldwide ? 1 : PinpointConstants.roundsPerGame
         atlasRegionConstraint = mode == .homeTurf
             ? LookAroundLocationPool.atlasRegion(for: tileStore.discoveredTiles, engine: tileStore.tileEngine)
             : nil
@@ -164,8 +164,10 @@ final class PinpointController: ObservableObject {
                 }
             }
             phase = .gameOver
-        } else {
+        } else if currentRound < targets.count {
             phase = .playing
+        } else {
+            prepareNextWorldwideRound()
         }
     }
 
@@ -178,38 +180,83 @@ final class PinpointController: ObservableObject {
     // MARK: - Preparation
 
     private func prepareTargets(mode: PinpointGameMode, preparationID: UUID) async throws -> [CLLocationCoordinate2D] {
-        var collected: [CLLocationCoordinate2D] = []
+        try Task.checkCancellation()
+        guard self.preparationID == preparationID else { throw CancellationError() }
+
         switch mode {
         case .worldwide:
-            for _ in 0..<PinpointConstants.roundsPerGame {
-                try Task.checkCancellation()
-                guard self.preparationID == preparationID else {
-                    throw CancellationError()
-                }
-                let coordinate = try await LookAroundLocationPool.generateWorldwideTarget(excluding: collected)
-                collected.append(coordinate)
-                preparationFoundCount = collected.count
-            }
+            let target = try await generateWorldwideTargetWithBackoff(excluding: [])
+            preparationFoundCount = 1
+            return [target]
+
         case .homeTurf:
             let tiles = tileStore.discoveredTiles
-            guard tiles.count >= PinpointConstants.homeTurfMinTiles else {
-                throw LookAroundLocationPool.GenerationError.insufficientHomeTurfCoverage
-            }
-            var usedTileIDs = Set<String>()
-            for _ in 0..<PinpointConstants.roundsPerGame {
-                try Task.checkCancellation()
-                guard self.preparationID == preparationID else {
-                    throw CancellationError()
-                }
-                let coordinate = try await LookAroundLocationPool.generateHomeTurfTarget(
-                    discoveredTiles: tiles,
-                    engine: tileStore.tileEngine,
-                    usedTileIDs: &usedTileIDs
+            let targets = try LookAroundLocationPool.immediateHomeTurfTargets(
+                discoveredTiles: tiles,
+                engine: tileStore.tileEngine,
+                count: PinpointConstants.roundsPerGame
+            )
+            preparationFoundCount = targets.count
+            return targets
+        }
+    }
+
+    private func prepareNextWorldwideRound() {
+        guard currentMode == .worldwide else {
+            phase = .playing
+            return
+        }
+
+        preparationTask?.cancel()
+        let preparationID = UUID()
+        self.preparationID = preparationID
+        preparationFoundCount = 0
+        preparationTargetCount = 1
+        preparationError = nil
+        phase = .preparing
+
+        preparationTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let target = try await generateWorldwideTargetWithBackoff(
+                    excluding: targets
                 )
-                collected.append(coordinate)
-                preparationFoundCount = collected.count
+                try Task.checkCancellation()
+                guard self.preparationID == preparationID else { return }
+                targets.append(target)
+                preparationFoundCount = 1
+                phase = .playing
+            } catch {
+                guard !Task.isCancelled, self.preparationID == preparationID else { return }
+                preparationError = error.localizedDescription
+                preparationFoundCount = 0
+                phase = .lobby
+            }
+
+            if self.preparationID == preparationID {
+                preparationTask = nil
+                self.preparationID = nil
             }
         }
-        return collected
+    }
+
+    private func generateWorldwideTargetWithBackoff(
+        excluding existing: [CLLocationCoordinate2D]
+    ) async throws -> CLLocationCoordinate2D {
+        let retryDelays = [1, 2, 3]
+
+        for attempt in 0...retryDelays.count {
+            try Task.checkCancellation()
+            do {
+                return try await LookAroundLocationPool.generateWorldwideTarget(
+                    excluding: existing
+                )
+            } catch let error as LookAroundLocationPool.GenerationError {
+                guard attempt < retryDelays.count else { throw error }
+                try await Task.sleep(for: .seconds(retryDelays[attempt]))
+            }
+        }
+
+        throw LookAroundLocationPool.GenerationError.worldwideGenerationFailed
     }
 }

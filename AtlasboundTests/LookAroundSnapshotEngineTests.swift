@@ -78,6 +78,6 @@ final class LookAroundSnapshotEngineTests: XCTestCase {
     }
 
     func testMaxGalleryImagesCap() {
-        XCTAssertEqual(LookAroundSnapshotEngine.maxGalleryImages, 8)
+        XCTAssertEqual(LookAroundSnapshotEngine.maxGalleryImages, 1)
     }
 }

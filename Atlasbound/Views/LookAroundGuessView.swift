@@ -328,13 +328,13 @@ struct LookAroundGuessView: View {
     private func loadGallery() async {
         let size = await MainActor.run { () -> CGSize in
             let screen = UIScreen.main.bounds.size
-            let scale = UIScreen.main.scale
             return CGSize(
-                width: max(screen.width * scale, 1),
-                height: max(screen.height * scale, 1)
+                width: max(screen.width, 1),
+                height: max(screen.height, 1)
             )
         }
         let images = await snapshotEngine.gallerySnapshots(around: target, size: size)
+        guard !Task.isCancelled else { return }
         await MainActor.run {
             if images.isEmpty {
                 galleryImages = []

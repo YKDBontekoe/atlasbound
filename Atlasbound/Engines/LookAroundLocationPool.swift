@@ -23,6 +23,23 @@ struct LookAroundLocationPool: Sendable {
     /// Minimum Haversine separation between Worldwide targets in one game.
     static let minimumWorldwideSeparationMeters: CLLocationDistance = 150_000
 
+    /// Use distinct atlas tile centers as Home Turf targets. Look Around
+    /// validation belongs to scene loading, where failure has a safe map-only
+    /// fallback rather than blocking the game lobby.
+    static func immediateHomeTurfTargets(
+        discoveredTiles: [WorldTile],
+        engine: TileEngine,
+        count: Int
+    ) throws -> [CLLocationCoordinate2D] {
+        guard discoveredTiles.count >= PinpointConstants.homeTurfMinTiles else {
+            throw GenerationError.insufficientHomeTurfCoverage
+        }
+        return discoveredTiles
+            .shuffled()
+            .prefix(max(0, count))
+            .map { engine.centerCoordinate(for: $0.coordinate) }
+    }
+
     // MARK: - Worldwide
 
     /// Generate round targets by sampling Look Around coverage regions dynamically.
@@ -40,18 +57,34 @@ struct LookAroundLocationPool: Sendable {
     static func generateWorldwideTarget(
         excluding existing: [CLLocationCoordinate2D],
         minSeparationMeters: CLLocationDistance = minimumWorldwideSeparationMeters,
-        maxAttempts: Int = 48
+        maxAttempts: Int = 5
     ) async throws -> CLLocationCoordinate2D {
-        for _ in 0..<maxAttempts {
+        for _ in 0..<max(1, maxAttempts) {
             try Task.checkCancellation()
-            guard let candidate = await findWorldwideCoordinate(maxAttempts: 4) else {
-                continue
-            }
-            if isSufficientlyDistant(candidate, from: existing, minMeters: minSeparationMeters) {
+            if let candidate = await findWorldwideCoordinate(
+                excluding: existing,
+                minSeparationMeters: minSeparationMeters
+            ),
+               isSufficientlyDistant(candidate, from: existing, minMeters: minSeparationMeters) {
                 return candidate
             }
         }
         throw GenerationError.worldwideGenerationFailed
+    }
+
+    static func randomStreetProbe(
+        around anchor: CLLocationCoordinate2D,
+        maxOffsetMeters: Double = 1_500
+    ) -> CLLocationCoordinate2D {
+        let northMeters = Double.random(in: -maxOffsetMeters...maxOffsetMeters)
+        let eastMeters = Double.random(in: -maxOffsetMeters...maxOffsetMeters)
+        let latitude = anchor.latitude + northMeters / 111_320
+        let longitudeScale = max(cos(anchor.latitude * .pi / 180), 0.01)
+        let longitude = anchor.longitude + eastMeters / (111_320 * longitudeScale)
+        return CLLocationCoordinate2D(
+            latitude: max(-85, min(85, latitude)),
+            longitude: max(-180, min(180, longitude))
+        )
     }
 
     // MARK: - Home Turf
@@ -114,8 +147,8 @@ struct LookAroundLocationPool: Sendable {
 
     // MARK: - Coverage regions
 
-    /// Approximate envelopes where Apple Look Around coverage exists.
-    /// Used only as random sampling bounds — not tourist landmark seeds.
+    /// Approximate envelopes for Apple's advertised Look Around countries and
+    /// regions. Used only as random sampling bounds — never as fixed targets.
     struct CoverageRegion: Sendable, Equatable {
         let minLatitude: Double
         let maxLatitude: Double
@@ -161,11 +194,64 @@ struct LookAroundLocationPool: Sendable {
         // Singapore
         CoverageRegion(minLatitude: 1.16, maxLatitude: 1.47, minLongitude: 103.60, maxLongitude: 104.10),
         // Southern Canada corridors
-        CoverageRegion(minLatitude: 42.0, maxLatitude: 53.0, minLongitude: -123.5, maxLongitude: -59.5)
+        CoverageRegion(minLatitude: 42.0, maxLatitude: 53.0, minLongitude: -123.5, maxLongitude: -59.5),
+        // Andorra
+        CoverageRegion(minLatitude: 42.42, maxLatitude: 42.66, minLongitude: 1.41, maxLongitude: 1.79),
+        // Belgium
+        CoverageRegion(minLatitude: 49.49, maxLatitude: 51.51, minLongitude: 2.54, maxLongitude: 6.41),
+        // Croatia
+        CoverageRegion(minLatitude: 42.39, maxLatitude: 46.56, minLongitude: 13.49, maxLongitude: 19.45),
+        // Czechia
+        CoverageRegion(minLatitude: 48.55, maxLatitude: 51.06, minLongitude: 12.09, maxLongitude: 18.87),
+        // Finland
+        CoverageRegion(minLatitude: 59.70, maxLatitude: 70.10, minLongitude: 20.50, maxLongitude: 31.60),
+        // Germany
+        CoverageRegion(minLatitude: 47.27, maxLatitude: 55.06, minLongitude: 5.87, maxLongitude: 15.04),
+        // Gibraltar
+        CoverageRegion(minLatitude: 36.10, maxLatitude: 36.16, minLongitude: -5.37, maxLongitude: -5.33),
+        // Hong Kong
+        CoverageRegion(minLatitude: 22.15, maxLatitude: 22.57, minLongitude: 113.83, maxLongitude: 114.44),
+        // Hungary
+        CoverageRegion(minLatitude: 45.74, maxLatitude: 48.59, minLongitude: 16.11, maxLongitude: 22.90),
+        // Israel
+        CoverageRegion(minLatitude: 29.49, maxLatitude: 33.34, minLongitude: 34.27, maxLongitude: 35.90),
+        // Liechtenstein
+        CoverageRegion(minLatitude: 47.05, maxLatitude: 47.29, minLongitude: 9.47, maxLongitude: 9.64),
+        // Luxembourg
+        CoverageRegion(minLatitude: 49.44, maxLatitude: 50.18, minLongitude: 5.73, maxLongitude: 6.53),
+        // Mexico
+        CoverageRegion(minLatitude: 14.50, maxLatitude: 32.72, minLongitude: -118.40, maxLongitude: -86.70),
+        // Netherlands
+        CoverageRegion(minLatitude: 50.75, maxLatitude: 53.56, minLongitude: 3.36, maxLongitude: 7.23),
+        // Norway
+        CoverageRegion(minLatitude: 57.90, maxLatitude: 71.20, minLongitude: 4.50, maxLongitude: 31.20),
+        // Poland
+        CoverageRegion(minLatitude: 49.00, maxLatitude: 54.84, minLongitude: 14.12, maxLongitude: 24.15),
+        // Slovenia
+        CoverageRegion(minLatitude: 45.42, maxLatitude: 46.88, minLongitude: 13.38, maxLongitude: 16.61),
+        // Sweden
+        CoverageRegion(minLatitude: 55.34, maxLatitude: 69.06, minLongitude: 11.11, maxLongitude: 24.17),
+        // Switzerland
+        CoverageRegion(minLatitude: 45.82, maxLatitude: 47.81, minLongitude: 5.96, maxLongitude: 10.49),
+        // Taiwan
+        CoverageRegion(minLatitude: 21.90, maxLatitude: 25.30, minLongitude: 120.00, maxLongitude: 122.10)
     ]
 
     static func randomCoverageProbe() -> CLLocationCoordinate2D {
-        weightedRandomRegion().randomCoordinate()
+        lookAroundCoverageRegions.randomElement()!.randomCoordinate()
+    }
+
+    static func randomCoverageProbe(
+        excluding existing: [CLLocationCoordinate2D],
+        minSeparationMeters: CLLocationDistance
+    ) -> CLLocationCoordinate2D {
+        for region in lookAroundCoverageRegions.shuffled() {
+            let candidate = region.randomCoordinate()
+            if isSufficientlyDistant(candidate, from: existing, minMeters: minSeparationMeters) {
+                return candidate
+            }
+        }
+        return randomCoverageProbe()
     }
 
     static func isSufficientlyDistant(
@@ -178,39 +264,24 @@ struct LookAroundLocationPool: Sendable {
 
     // MARK: - Private
 
-    private static func weightedRandomRegion() -> CoverageRegion {
-        let regions = lookAroundCoverageRegions
-        let total = regions.reduce(0.0) { $0 + $1.areaWeight }
-        guard total > 0 else { return regions[0] }
-
-        var ticket = Double.random(in: 0..<total)
-        for region in regions {
-            ticket -= region.areaWeight
-            if ticket < 0 {
-                return region
-            }
+    /// Resolve one random regional probe through nearby mapped places, then
+    /// confirm it with a real Look Around scene request. Searches are paced
+    /// because GeoServices throttles bursts of simultaneous local searches.
+    private static func findWorldwideCoordinate(
+        excluding existing: [CLLocationCoordinate2D],
+        minSeparationMeters: CLLocationDistance
+    ) async -> CLLocationCoordinate2D? {
+        let probe = randomCoverageProbe(
+            excluding: existing,
+            minSeparationMeters: minSeparationMeters
+        )
+        if await hasLookAround(at: probe) {
+            return probe
         }
-        return regions[regions.count - 1]
-    }
-
-    private static func findWorldwideCoordinate(maxAttempts: Int) async -> CLLocationCoordinate2D? {
-        for _ in 0..<maxAttempts {
-            guard !Task.isCancelled else { return nil }
-            let probe = randomCoverageProbe()
-
-            // POI-first: works for towns of any size and avoids geocoder throttling.
-            if let coordinate = await findLookAroundFromMappedPlaces(center: probe, radius: 25_000) {
-                return coordinate
-            }
-
-            // Soft fallback: reverse-geocode only when POI search was empty.
-            if let placemark = await reverseGeocodePlacemark(at: probe),
-               let anchor = placemark.location?.coordinate,
-               let coordinate = await findLookAroundNear(anchor, placemark: placemark) {
-                return coordinate
-            }
-        }
-        return nil
+        return await findLookAroundFromMappedPlaces(
+            center: probe,
+            radius: 75_000
+        )
     }
 
     /// Try mapped places first, then the anchor, then nearby street offsets.
@@ -330,7 +401,7 @@ struct LookAroundLocationPool: Sendable {
     private static func firstLookAroundMapItemMatch(in items: [MKMapItem]) async -> CLLocationCoordinate2D? {
         let batchSize = 2
         var index = 0
-        let candidates = items.shuffled()
+        let candidates = Array(items.shuffled().prefix(3))
 
         while index < candidates.count {
             let end = min(index + batchSize, candidates.count)

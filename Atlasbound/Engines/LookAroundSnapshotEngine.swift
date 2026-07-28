@@ -36,7 +36,9 @@ struct LookAroundGalleryProbe: Sendable, Equatable {
 
 /// Pure helper for rendering spoiler-free Look Around imagery via MapKit snapshots.
 struct LookAroundSnapshotEngine: Sendable {
-    static let maxGalleryImages = 8
+    /// One strong panorama keeps both memory and MapKit scene requests bounded.
+    /// Extra scene probes can exhaust GeoServices before the next round scouts.
+    static let maxGalleryImages = 1
     static let galleryProbeDistanceMeters: Double = 20
 
     /// Offset a coordinate by meters north/east (negative = south/west).
@@ -92,25 +94,19 @@ struct LookAroundSnapshotEngine: Sendable {
 
         let candidates = Self.probeCoordinates(around: coordinate, probes: probes)
         var images: [UIImage] = []
+        images.reserveCapacity(min(maxImages, candidates.count))
 
-        await withTaskGroup(of: (Int, UIImage?).self) { group in
-            for (index, candidate) in candidates.enumerated() {
-                group.addTask {
-                    let image = await self.snapshotIfAvailable(at: candidate, size: size)
-                    return (index, image)
+        // MapKit snapshotters are expensive and do not provide a reliable
+        // concurrency budget. Running all probes together could retain more
+        // than a hundred megabytes of decoded imagery during one round.
+        for candidate in candidates {
+            guard !Task.isCancelled else { return images }
+            if let image = await snapshotIfAvailable(at: candidate, size: size) {
+                images.append(image)
+                if images.count == maxImages {
+                    break
                 }
             }
-
-            var ordered: [(Int, UIImage)] = []
-            for await (index, image) in group {
-                if let image {
-                    ordered.append((index, image))
-                }
-            }
-            images = ordered
-                .sorted { $0.0 < $1.0 }
-                .prefix(maxImages)
-                .map(\.1)
         }
 
         return images

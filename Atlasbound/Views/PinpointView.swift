@@ -5,10 +5,14 @@ import MapKit
 struct PinpointView: View {
     @ObservedObject var controller: PinpointController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack {
             ZStack {
+                AtlasTheme.canvas(for: colorScheme)
+                    .ignoresSafeArea()
+
                 phaseContent
                     .id(phaseIdentity)
                     .transition(phaseTransition)

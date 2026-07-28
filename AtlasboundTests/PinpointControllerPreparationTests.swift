@@ -28,7 +28,7 @@ final class PinpointControllerPreparationTests: XCTestCase {
         controller.startNewGame(mode: .worldwide)
         XCTAssertEqual(controller.phase, .preparing)
         XCTAssertEqual(controller.preparationFoundCount, 0)
-        XCTAssertEqual(controller.preparationTargetCount, PinpointConstants.roundsPerGame)
+        XCTAssertEqual(controller.preparationTargetCount, 1)
         XCTAssertEqual(controller.currentMode, .worldwide)
 
         controller.cancelPreparation()
