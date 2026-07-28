@@ -23,6 +23,7 @@ final class WorldController: ObservableObject {
     let gameCenterManager: GameCenterManager
     private let progression = ProgressionEngine()
     private let frontierEngine = FrontierEngine()
+    private let worldEventEngine = WorldEventEngine()
     private let sectorEngine = HexSectorEngine()
 
     /// Tiles mutated during the active session (merged into store on stop).
@@ -30,6 +31,7 @@ final class WorldController: ObservableObject {
     private var sessionProgress = SessionProgress.empty
     private var sessionFrontier = FrontierSessionContribution.empty
     private var scoredFrontierTiles: Set<String> = []
+    private var scoredWorldEventTiles: Set<String> = []
 
     private static let selectedActivityKey = "atlasbound.selectedActivityType"
 
@@ -53,6 +55,7 @@ final class WorldController: ObservableObject {
         }
         syncTileSizeToActivity()
         refreshFrontierPresentation()
+        refreshWorldEventPresentation()
     }
 
     var isRecording: Bool { recorder.isRecording }
@@ -67,6 +70,12 @@ final class WorldController: ObservableObject {
     var availableExpeditions: [ExpeditionOffer] { store.frontierState.availableOffers }
 
     var weeklyFrontierScore: Int { store.frontierState.weeklyScore }
+
+    var worldEventState: WorldEventState { store.worldEventState }
+
+    var liveWorldEvent: WorldEventInstance? {
+        worldEventEngine.liveEvent(from: store.worldEventState)
+    }
 
     var currentSectorName: String {
         guard let coordinate = playerTileCoordinate else { return "Frontier" }
@@ -167,6 +176,93 @@ final class WorldController: ObservableObject {
         return tileEngine.centerCoordinate(for: center)
     }
 
+    var eventBeaconCoordinate: CLLocationCoordinate2D? {
+        guard let event = liveWorldEvent else { return nil }
+        if let sectorID = event.targetSectorID,
+           let parsed = sectorEngine.parseSectorID(sectorID) {
+            let center = sectorEngine.centerTile(for: parsed.sector)
+            return tileEngine.centerCoordinate(for: center)
+        }
+        // For hotspot circuits, point at the first unvisited hotspot.
+        let visited = store.worldEventState.visitedHotspotSet
+        let hotspotID = event.hotspotTileIDs.first { !visited.contains($0) }
+            ?? event.hotspotTileIDs.first
+            ?? store.worldEventState.dailyHotspotTileIDs.first
+        guard let hotspotID, let axial = tileEngine.parseTileID(hotspotID) else { return nil }
+        return tileEngine.centerCoordinate(for: axial)
+    }
+
+    var eventSectorBoundaryTileIDs: Set<String> {
+        guard let event = liveWorldEvent,
+              let sectorID = event.targetSectorID,
+              let parsed = sectorEngine.parseSectorID(sectorID) else {
+            return []
+        }
+        return Set(sectorEngine.boundaryTiles(for: parsed.sector).map {
+            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: tileEngine.tileSizeMeters)
+        })
+    }
+
+    var eventHighlightTileIDs: Set<String> {
+        guard let event = liveWorldEvent,
+              let sectorID = event.targetSectorID,
+              let parsed = sectorEngine.parseSectorID(sectorID) else {
+            return []
+        }
+        // Soft wash: sample a subset of sector members for overlay budget.
+        let members = Array(sectorEngine.tiles(in: parsed.sector))
+        let discovered = store.discoveredTileIDs
+        return Set(members.prefix(80).compactMap { tile -> String? in
+            let id = TileEngine.makeTileID(q: tile.q, r: tile.r, sizeMeters: tileEngine.tileSizeMeters)
+            return discovered.contains(id) ? nil : id
+        })
+    }
+
+    var mapHotspots: [MapHotspot] {
+        let state = store.worldEventState
+        let eventTargets = Set(liveWorldEvent?.hotspotTileIDs ?? [])
+        let visited = state.visitedHotspotSet
+        let ids = state.dailyHotspotTileIDs.isEmpty
+            ? Array(eventTargets)
+            : state.dailyHotspotTileIDs
+        return ids.prefix(WorldEventConstants.maxVisibleHotspots).map { tileID in
+            MapHotspot(
+                id: tileID,
+                tileID: tileID,
+                isVisited: visited.contains(tileID),
+                isEventTarget: eventTargets.contains(tileID) || liveWorldEvent?.kind == .hotspotCircuit
+            )
+        }
+    }
+
+    var placeMapPins: [PlaceMapPin] {
+        let labels = regionLookup.successfulLabels
+        var pins: [PlaceMapPin] = []
+        for (cellKey, place) in labels {
+            guard let name = place.locality ?? place.administrativeArea else { continue }
+            guard let coordinate = RegionLookupEngine.representativeCoordinate(forCellKey: cellKey) else { continue }
+            pins.append(
+                PlaceMapPin(
+                    id: cellKey,
+                    name: name,
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+            )
+            if pins.count >= WorldEventConstants.maxPlacePins { break }
+        }
+        return pins.sorted { $0.name < $1.name }
+    }
+
+    var worldEventProgressLabel: String {
+        guard let event = store.worldEventState.activeEvent else { return "" }
+        let progress = worldEventEngine.progressToward(active: event, state: store.worldEventState)
+        if event.tilesRequired > 0 {
+            return "\(min(progress, event.tilesRequired))/\(event.tilesRequired)"
+        }
+        return event.kind.displayName
+    }
+
     private var playerTileCoordinate: TileCoordinate? {
         recorder.lastLocation.map { tileEngine.axialCoordinate(for: $0.coordinate) }
     }
@@ -201,12 +297,20 @@ final class WorldController: ObservableObject {
         }
     }
 
+    func sectorDisplayName(forSectorID sectorID: String) -> String {
+        guard let parsed = sectorEngine.parseSectorID(sectorID) else {
+            return "Event sector"
+        }
+        return sectorEngine.displayName(for: parsed.sector)
+    }
+
     func prepareLocation() {
         recorder.requestAuthorization()
         recorder.startMonitoringIfNeeded()
         syncTileSizeToActivity()
         store.applyWeeklyChargeResetIfNeeded()
         refreshFrontierPresentation()
+        refreshWorldEventPresentation()
         gameCenterManager.authenticate()
     }
 
@@ -217,6 +321,7 @@ final class WorldController: ObservableObject {
         UserDefaults.standard.set(type.rawValue, forKey: Self.selectedActivityKey)
         syncTileSizeToActivity()
         refreshFrontierPresentation()
+        refreshWorldEventPresentation()
     }
 
     func selectExpedition(_ offer: ExpeditionOffer) {
@@ -252,6 +357,7 @@ final class WorldController: ObservableObject {
         syncTileSizeToActivity()
         store.applyWeeklyChargeResetIfNeeded()
         refreshFrontierPresentation()
+        refreshWorldEventPresentation()
         liveRoute = []
         sessionVisitedTileIDs = []
         sessionDiscoveredIDs = []
@@ -264,6 +370,7 @@ final class WorldController: ObservableObject {
         sessionProgress = .empty
         sessionFrontier = .empty
         scoredFrontierTiles = []
+        scoredWorldEventTiles = []
         if let offer = activeExpedition {
             sessionFrontier.targetTilesRequired = offer.tilesRequired
             sessionFrontier.targetTilesDiscovered = targetSectorDiscoveredCount
@@ -337,6 +444,10 @@ final class WorldController: ObservableObject {
         store.refreshFrontierState(playerTile: playerTileCoordinate)
     }
 
+    func refreshWorldEventPresentation() {
+        store.refreshWorldEventState(playerTile: playerTileCoordinate)
+    }
+
     func showMatchingFrontierLeaderboard() {
         gameCenterManager.showFrontierLeaderboard(tileSize: store.tileSize)
     }
@@ -404,6 +515,11 @@ final class WorldController: ObservableObject {
             activity: activity
         )
 
+        let liveEvent = worldEventEngine.liveEvent(from: store.worldEventState, at: date)
+        let multipliers = worldEventEngine.xpMultipliers(for: liveEvent)
+        let boostedDiscoveryXP = Int((Double(progress.discoveryXP) * multipliers.discovery).rounded())
+        let boostedFamiliarityXP = Int((Double(progress.familiarityXP) * multipliers.familiarity).rounded())
+
         var discovered = sessionDiscoveredIDs
         for id in discoveryCandidates {
             if let tile = sessionTiles[id], tile.isDiscovered {
@@ -415,8 +531,8 @@ final class WorldController: ObservableObject {
         sessionProgress.tilesVisited = sessionVisitedTileIDs.count
         sessionProgress.tilesDiscovered += progress.tilesDiscovered
         sessionProgress.tilesRevisited += progress.tilesRevisited
-        sessionProgress.discoveryXP += progress.discoveryXP
-        sessionProgress.familiarityXP += progress.familiarityXP
+        sessionProgress.discoveryXP += boostedDiscoveryXP
+        sessionProgress.familiarityXP += boostedFamiliarityXP
         sessionDiscoveredCount = sessionProgress.tilesDiscovered
 
         emitSessionFeedback(
@@ -426,6 +542,7 @@ final class WorldController: ObservableObject {
             at: date
         )
 
+        processWorldEventScoring(visitedIDs: newIDs, discoveryCandidateIDs: Array(discoveryCandidates), at: date)
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
 
         let discoveredUpdates = newIDs.compactMap { id -> WorldTile? in
@@ -434,9 +551,61 @@ final class WorldController: ObservableObject {
         }
         store.applyLiveVisitProgress(
             updatedTiles: discoveredUpdates,
-            discoveryXP: progress.discoveryXP,
-            familiarityXP: progress.familiarityXP
+            discoveryXP: boostedDiscoveryXP,
+            familiarityXP: boostedFamiliarityXP
         )
+    }
+
+    private func processWorldEventScoring(visitedIDs: [String], discoveryCandidateIDs: [String], at date: Date) {
+        guard !visitedIDs.isEmpty else { return }
+        let discoverySet = Set(discoveryCandidateIDs)
+        var bonusFamiliarity = 0
+        var feedbackEvents: [SessionFeedbackEvent] = []
+
+        store.updateWorldEventState({ state in
+            var next = state
+            for id in visitedIDs {
+                guard !scoredWorldEventTiles.contains(id) else { continue }
+                guard let coordinate = tileEngine.parseTileID(id) else { continue }
+                let isNew = discoverySet.contains(id)
+                let result = worldEventEngine.processVisit(
+                    tileID: id,
+                    tile: coordinate,
+                    isNewDiscovery: isNew,
+                    state: next,
+                    at: date,
+                    tileEngine: tileEngine
+                )
+                next = result.state
+                scoredWorldEventTiles.insert(id)
+                guard let award = result.award else { continue }
+                bonusFamiliarity += award.familiarityXPBonus
+                if award.didComplete {
+                    feedbackEvents.append(
+                        SessionFeedbackEvent(
+                            kind: .worldEvent(title: award.kind.displayName, detail: "Event complete"),
+                            createdAt: date
+                        )
+                    )
+                } else if award.wasHotspotVisit {
+                    feedbackEvents.append(SessionFeedbackEvent(kind: .hotspot, createdAt: date))
+                }
+            }
+            return next
+        }, playerTile: playerTileCoordinate)
+
+        if bonusFamiliarity > 0 {
+            sessionProgress.familiarityXP += bonusFamiliarity
+            store.addXP(discovery: 0, familiarity: bonusFamiliarity)
+        }
+
+        if !feedbackEvents.isEmpty {
+            // Keep toasts light — show at most one event toast per batch.
+            let toast = feedbackEvents.last!
+            sessionFeedback.append(toast)
+            pruneSessionFeedback(after: [toast.id])
+            AtlasHaptics.light()
+        }
     }
 
     private func processFrontierScoring(newDiscoveryIDs: [String], at date: Date) {
@@ -482,8 +651,12 @@ final class WorldController: ObservableObject {
             frontierCombo = result.combo
             guard let award = result.award else { continue }
 
+            let liveEvent = worldEventEngine.liveEvent(from: store.worldEventState, at: date)
+            let eventMultiplier = worldEventEngine.frontierScoreMultiplier(for: liveEvent)
+            let scaledPoints = Int((Double(award.totalPoints) * eventMultiplier).rounded())
+
             scoredFrontierTiles.insert(id)
-            batchTilePoints += award.totalPoints
+            batchTilePoints += scaledPoints
             sessionFrontier.comboPeak = max(sessionFrontier.comboPeak, award.comboMultiplier)
 
             if let offer = activeOffer,
@@ -505,13 +678,17 @@ final class WorldController: ObservableObject {
             }
 
             var updatedTile = tile
-            updatedTile.weeklyCharge = min(FrontierConstants.maxWeeklyCharge, updatedTile.weeklyCharge + 1)
+            var chargeGain = 1
+            if liveEvent?.kind == .frontierCharge {
+                chargeGain += WorldEventConstants.frontierChargeBonus
+            }
+            updatedTile.weeklyCharge = min(FrontierConstants.maxWeeklyCharge, updatedTile.weeklyCharge + chargeGain)
             sessionTiles[id] = updatedTile
 
             let calloutID = UUID()
             newCalloutIDs.append(calloutID)
             frontierScoreCallouts.append(
-                FrontierScoreCallout(id: calloutID, tileID: id, points: award.totalPoints, createdAt: date)
+                FrontierScoreCallout(id: calloutID, tileID: id, points: scaledPoints, createdAt: date)
             )
         }
 

@@ -9,6 +9,7 @@ final class TileStore: ObservableObject {
     @Published private(set) var familiarityXPTotal: Int = 0
     @Published private(set) var activitiesCompleted: Int = 0
     @Published private(set) var frontierState: FrontierState = .empty
+    @Published private(set) var worldEventState: WorldEventState = .empty
     /// Active reveal grid — always driven by the current activity type, never a user preference.
     @Published var tileSize: TileSizeOption = .default {
         didSet {
@@ -21,6 +22,7 @@ final class TileStore: ObservableObject {
     private var allTilesBySize: [Int: [String: WorldTile]] = [:]
     private var progressBySize: [Int: PersistedProgressRecord] = [:]
     private var frontierBySize: [Int: FrontierState] = [:]
+    private var eventsBySize: [Int: WorldEventState] = [:]
     private let fileURL: URL
     private let installationID: String
 
@@ -53,6 +55,10 @@ final class TileStore: ObservableObject {
 
     func frontierState(for size: Int) -> FrontierState {
         frontierBySize[size] ?? .empty
+    }
+
+    func worldEventState(for size: Int) -> WorldEventState {
+        eventsBySize[size] ?? .empty
     }
 
     init(fileURL: URL? = nil, installationID: String? = nil) {
@@ -164,6 +170,27 @@ final class TileStore: ObservableObject {
         updateFrontierState({ $0 }, playerTile: playerTile)
     }
 
+    func updateWorldEventState(_ transform: (WorldEventState) -> WorldEventState, playerTile: TileCoordinate?) {
+        let engine = WorldEventEngine()
+        var state = worldEventState
+        state = engine.ensureState(
+            state: state,
+            playerTile: playerTile,
+            discoveredTileIDs: discoveredTileIDs,
+            tiles: tiles,
+            tileEngine: tileEngine,
+            installationID: installationID
+        )
+        state = transform(state)
+        worldEventState = state
+        eventsBySize[tileSize.rawValue] = state
+        persistToDisk()
+    }
+
+    func refreshWorldEventState(playerTile: TileCoordinate?) {
+        updateWorldEventState({ $0 }, playerTile: playerTile)
+    }
+
     func applyWeeklyChargeResetIfNeeded() {
         let weekKey = FrontierEngine.isoWeekKey()
         guard frontierState.weekKey != weekKey else { return }
@@ -200,6 +227,8 @@ final class TileStore: ObservableObject {
         activitiesCompleted = 0
         frontierState = .empty
         frontierBySize[tileSize.rawValue] = .empty
+        worldEventState = .empty
+        eventsBySize[tileSize.rawValue] = .empty
         progressBySize[tileSize.rawValue] = PersistedProgressRecord(
             discoveryXPTotal: 0,
             familiarityXPTotal: 0,
@@ -217,6 +246,7 @@ final class TileStore: ObservableObject {
             allTilesBySize = [:]
             progressBySize = [:]
             frontierBySize = [:]
+            eventsBySize = [:]
             return
         }
 
@@ -245,6 +275,16 @@ final class TileStore: ObservableObject {
             }
         }
         frontierBySize = frontier
+
+        var events: [Int: WorldEventState] = [:]
+        if let eventsPayload = save.eventsBySize {
+            for (key, value) in eventsPayload {
+                if let size = Int(key) {
+                    events[size] = value.asWorldEventState()
+                }
+            }
+        }
+        eventsBySize = events
     }
 
     private func loadForCurrentTileSize() {
@@ -260,11 +300,13 @@ final class TileStore: ObservableObject {
             activitiesCompleted = 0
         }
         frontierState = frontierBySize[size] ?? .empty
+        worldEventState = eventsBySize[size] ?? .empty
     }
 
     private func persistToDisk() {
         allTilesBySize[tileSize.rawValue] = tiles
         frontierBySize[tileSize.rawValue] = frontierState
+        eventsBySize[tileSize.rawValue] = worldEventState
 
         var records: [PersistedTileRecord] = []
         for (size, map) in allTilesBySize {
@@ -283,10 +325,16 @@ final class TileStore: ObservableObject {
             frontierPayload[String(size)] = PersistedFrontierRecord(from: state)
         }
 
+        var eventsPayload: [String: PersistedWorldEventRecord] = [:]
+        for (size, state) in eventsBySize where !state.dayKey.isEmpty || state.lifetimeEventsCompleted > 0 || !state.dailyHotspotTileIDs.isEmpty {
+            eventsPayload[String(size)] = PersistedWorldEventRecord(from: state)
+        }
+
         let save = WorldSaveFile(
             tiles: records,
             progressBySize: progressPayload,
-            frontierBySize: frontierPayload.isEmpty ? nil : frontierPayload
+            frontierBySize: frontierPayload.isEmpty ? nil : frontierPayload,
+            eventsBySize: eventsPayload.isEmpty ? nil : eventsPayload
         )
         JSONFileStore.save(save, to: fileURL)
     }

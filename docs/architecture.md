@@ -66,7 +66,22 @@ Flow: lobby (Worldwide or Home Turf) → preparing (dynamic Look Around scouting
 
 Persistence: `Documents/atlasbound-pinpoint.json`. Leaderboard ID: `com.atlasbound.geoguessr.highscore`.
 
+## World events & map highlights
+
+Client-scheduled loop layered like Frontier (no live ops server).
+
+| Type | Role | Threading |
+|------|------|-----------|
+| `WorldEventEngine` | Catalog windows, daily hotspots, visit scoring | `Sendable` value type |
+| `WorldEventModels` | Event kinds, instance, per-grid state, map hotspot/pin DTOs | `Sendable` |
+| `TileStore` (`eventsBySize`) | Persist progress per tile-size grid | `@MainActor` |
+| `WorldController` | Publish beacons / washes / hotspots; apply XP & frontier multipliers | `@MainActor` |
+| `WorldEventViews` | Banner, sheet, in-session tracker | SwiftUI |
+| `DiscoveryMapView` | Event wash, beacon, hotspot pins, optional places pins | SwiftUI |
+
+Kinds rotate by UTC day-of-year: Surge, Beacon Rush, Hotspot Circuit, Frontier Charge. Destination events run all day; bonus events run 14:00–20:00 UTC. Daily hotspots always appear near the frontier.
+
 ## Extension points
 
 - Region Engine (map-header sector names → richer geo coverage UI; stats already use reverse-geocode places)
-- CloudKit integration
+- CloudKit integration / live-ops event schedules

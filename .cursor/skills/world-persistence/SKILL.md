@@ -21,6 +21,8 @@ description: >-
 
 - `tiles: [PersistedTileRecord]` — IDs, `q`/`r`, mastery fields, stamps, dates, `tileSizeMeters`
 - `progressBySize: [String: PersistedProgressRecord]` — totals keyed by size
+- `frontierBySize` (optional) — weekly expedition state per size
+- `eventsBySize` (optional) — world-event + daily hotspot progress per size
 
 **No geometry** in the save file. Dates: ISO-8601 encode/decode.
 

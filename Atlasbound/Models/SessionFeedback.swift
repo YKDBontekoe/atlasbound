@@ -1,10 +1,12 @@
 import Foundation
 
-/// Ephemeral session HUD event for discovery / mastery celebration.
+/// Ephemeral session HUD event for discovery / mastery / world-event celebration.
 struct SessionFeedbackEvent: Identifiable, Sendable, Equatable {
     enum Kind: Sendable, Equatable {
         case discovery(count: Int)
         case mastery(state: TileState)
+        case worldEvent(title: String, detail: String)
+        case hotspot
     }
 
     let id: UUID
@@ -17,6 +19,10 @@ struct SessionFeedbackEvent: Identifiable, Sendable, Equatable {
             return count == 1 ? "+1 tile" : "+\(count) tiles"
         case .mastery(let state):
             return state.displayName
+        case .worldEvent(let title, _):
+            return title
+        case .hotspot:
+            return "Hotspot"
         }
     }
 
@@ -26,6 +32,10 @@ struct SessionFeedbackEvent: Identifiable, Sendable, Equatable {
             return "Discovered"
         case .mastery:
             return "Mastery up"
+        case .worldEvent(_, let detail):
+            return detail
+        case .hotspot:
+            return "Highlight visited"
         }
     }
 

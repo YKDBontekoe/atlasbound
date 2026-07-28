@@ -46,6 +46,8 @@ Players pick an activity before recording (map idle sheet or Activity tab). Sele
 ## Session extras
 
 - **Frontier combo:** during an active expedition, consecutive qualifying frontier tiles within **20 minutes** build a combo multiplier on frontier scoring (see `FrontierEngine`).
+- **World events:** client-scheduled daily catalog (`WorldEventEngine`) — XP Surge, Beacon Rush, Hotspot Circuit, Frontier Charge. Windows are UTC; progress is per tile-size grid in `eventsBySize` inside `atlasbound-world.json` (IDs + counters only).
+- **Daily hotspots:** procedural frontier hex highlights regenerated each UTC day; shown on the discovery map even outside an event window.
 - **Nearby fog / undiscovered counts:** rings around user via `TileEngine.ring`.
 
 ## Multi-size progress
