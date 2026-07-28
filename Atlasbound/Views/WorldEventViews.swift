@@ -1,10 +1,86 @@
 import SwiftUI
 
+struct WorldEventBannerLabels: Sendable {
+    let primaryLabel: String
+    let secondaryLabel: String
+    let trailingBadge: String?
+    let iconName: String
+    let isLiveEvent: Bool
+    let visitedHotspotCount: Int
+    let hotspotCount: Int
+
+    /// Short label for the combined map missions strip.
+    var compactLabel: String {
+        if isLiveEvent {
+            return primaryLabel
+        }
+        let total = max(1, hotspotCount)
+        return "\(visitedHotspotCount)/\(total)"
+    }
+
+    @MainActor
+    static func make(controller: WorldController, store: TileStore) -> WorldEventBannerLabels {
+        let visited = store.worldEventState.visitedHotspotIDs.count
+        let hotspots = store.worldEventState.dailyHotspotTileIDs.count
+
+        let primary: String
+        if let live = controller.liveWorldEvent {
+            primary = live.title
+        } else if let active = store.worldEventState.activeEvent {
+            primary = active.title
+        } else {
+            primary = hotspots > 0 ? "\(hotspots) daily hotspots" : "World events"
+        }
+
+        let secondary: String
+        if let live = controller.liveWorldEvent {
+            let progress = controller.worldEventProgressLabel
+            let remaining = WorldEventEngine.remainingLabel(until: live.windowEnd)
+            if live.tilesRequired > 0 {
+                secondary = "\(progress) · \(remaining)"
+            } else {
+                secondary = "\(live.subtitle) · \(remaining)"
+            }
+        } else if store.worldEventState.isActiveCompleted {
+            secondary = "Completed — see you next window"
+        } else {
+            let total = max(1, hotspots)
+            secondary = "Hotspots \(visited)/\(total) · tap for schedule"
+        }
+
+        let trailing: String?
+        if controller.liveWorldEvent != nil {
+            let label = controller.worldEventProgressLabel
+            trailing = label.isEmpty ? nil : label
+        } else {
+            trailing = nil
+        }
+
+        let icon = controller.liveWorldEvent?.kind.iconName
+            ?? store.worldEventState.activeEvent?.kind.iconName
+            ?? "sparkles"
+
+        return WorldEventBannerLabels(
+            primaryLabel: primary,
+            secondaryLabel: secondary,
+            trailingBadge: trailing,
+            iconName: icon,
+            isLiveEvent: controller.liveWorldEvent != nil,
+            visitedHotspotCount: visited,
+            hotspotCount: hotspots
+        )
+    }
+}
+
 /// Compact map banner for the live client-scheduled world event.
 struct WorldEventBanner: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     let onTap: () -> Void
+
+    private var labels: WorldEventBannerLabels {
+        WorldEventBannerLabels.make(controller: controller, store: store)
+    }
 
     var body: some View {
         Button(action: onTap) {
@@ -13,17 +89,17 @@ struct WorldEventBanner: View {
                     Circle()
                         .fill(AtlasTheme.eventAccent.opacity(0.15))
                         .frame(width: 40, height: 40)
-                    Image(systemName: bannerIcon)
+                    Image(systemName: labels.iconName)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(AtlasTheme.eventAccent)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(primaryLabel)
+                    Text(labels.primaryLabel)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-                    Text(secondaryLabel)
+                    Text(labels.secondaryLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -31,7 +107,7 @@ struct WorldEventBanner: View {
 
                 Spacer(minLength: 8)
 
-                if let trailing = trailingBadge {
+                if let trailing = labels.trailingBadge {
                     Text(trailing)
                         .font(.caption.weight(.bold).monospacedDigit())
                         .foregroundStyle(AtlasTheme.eventAccent)
@@ -53,51 +129,8 @@ struct WorldEventBanner: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("worldEventBanner")
-        .accessibilityLabel(primaryLabel)
+        .accessibilityLabel(labels.primaryLabel)
         .accessibilityHint("Opens world event details")
-    }
-
-    private var primaryLabel: String {
-        if let live = controller.liveWorldEvent {
-            return live.title
-        }
-        if let active = store.worldEventState.activeEvent {
-            return active.title
-        }
-        let hotspots = store.worldEventState.dailyHotspotTileIDs.count
-        if hotspots > 0 {
-            return "\(hotspots) daily hotspots"
-        }
-        return "World events"
-    }
-
-    private var secondaryLabel: String {
-        if let live = controller.liveWorldEvent {
-            let progress = controller.worldEventProgressLabel
-            let remaining = WorldEventEngine.remainingLabel(until: live.windowEnd)
-            if live.tilesRequired > 0 {
-                return "\(progress) · \(remaining)"
-            }
-            return "\(live.subtitle) · \(remaining)"
-        }
-        if store.worldEventState.isActiveCompleted {
-            return "Completed — see you next window"
-        }
-        let visited = store.worldEventState.visitedHotspotIDs.count
-        let total = max(1, store.worldEventState.dailyHotspotTileIDs.count)
-        return "Hotspots \(visited)/\(total) · tap for schedule"
-    }
-
-    private var trailingBadge: String? {
-        guard controller.liveWorldEvent != nil else { return nil }
-        let label = controller.worldEventProgressLabel
-        return label.isEmpty ? nil : label
-    }
-
-    private var bannerIcon: String {
-        controller.liveWorldEvent?.kind.iconName
-            ?? store.worldEventState.activeEvent?.kind.iconName
-            ?? "sparkles"
     }
 }
 

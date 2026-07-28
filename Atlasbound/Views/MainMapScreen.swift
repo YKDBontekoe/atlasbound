@@ -61,14 +61,14 @@ struct MainMapScreen: View {
 
             mapSideControls
                 .padding(.trailing, 16)
-                .padding(.bottom, controller.isRecording ? 240 : 100)
+                .padding(.bottom, controller.isRecording ? 240 : 72)
                 .animation(AtlasMotion.chrome, value: controller.isRecording)
 
             #if DEBUG
             if showsSimGPSPad {
                 DebugLocationPad(controller: controller, followsUser: $followsUser)
                     .padding(.leading, 16)
-                    .padding(.bottom, controller.isRecording ? 240 : 100)
+                    .padding(.bottom, controller.isRecording ? 240 : 72)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                     .animation(AtlasMotion.chrome, value: controller.isRecording)
             }
@@ -95,12 +95,12 @@ struct MainMapScreen: View {
                     activeBottomPanel
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 } else {
-                    WorldEventBanner(controller: controller, store: store) {
-                        showWorldEventSheet = true
-                    }
-                    FrontierMissionBanner(controller: controller, store: store) {
-                        showExpeditionSheet = true
-                    }
+                    MapMissionsStrip(
+                        controller: controller,
+                        store: store,
+                        onHotspotsTap: { showWorldEventSheet = true },
+                        onExpeditionsTap: { showExpeditionSheet = true }
+                    )
                     idleBottomSheet
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -181,65 +181,40 @@ struct MainMapScreen: View {
     // MARK: - Idle chrome
 
     private var idleHeader: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [AtlasTheme.blue, AtlasTheme.teal],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 40, height: 40)
-                    .overlay {
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+        HStack(spacing: 12) {
+            Spacer(minLength: 0)
 
-                Spacer(minLength: 0)
-
-                Button {
-                    showSettings = true
-                } label: {
-                    VStack(spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text("\(controller.currentSectorName) · \(controller.currentSectorCompletionPercent)% · \(controller.currentGridLabel)")
-                                .font(.subheadline.weight(.semibold))
-                            Image(systemName: "chevron.down")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.secondary)
-                        }
-                        if nearbyCount > 0 {
-                            Text("\(nearbyCount) tiles nearby")
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                }
-                .buttonStyle(GlassButtonStyle(shape: .capsule))
-
-                Spacer(minLength: 0)
-
-                Button {
-                    showSettings = true
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 16, weight: .semibold))
+            Button {
+                showSettings = true
+            } label: {
+                HStack(spacing: 6) {
+                    Text("\(controller.currentSectorName) · \(controller.currentSectorCompletionPercent)% · \(controller.currentGridLabel)")
+                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 40, height: 40)
                 }
-                .buttonStyle(GlassButtonStyle(shape: .circle))
-                .accessibilityIdentifier("settingsButton")
-                .accessibilityLabel("Settings")
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             }
-            .padding(.horizontal, 16)
+            .buttonStyle(GlassButtonStyle(shape: .capsule))
+
+            Spacer(minLength: 0)
+
+            Button {
+                showSettings = true
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 40, height: 40)
+            }
+            .buttonStyle(GlassButtonStyle(shape: .circle))
+            .accessibilityIdentifier("settingsButton")
+            .accessibilityLabel("Settings")
         }
+        .padding(.horizontal, 16)
         .padding(.top, 8)
     }
 
@@ -252,9 +227,9 @@ struct MainMapScreen: View {
                     ZStack {
                         Circle()
                             .fill(AtlasTheme.blue.opacity(0.12))
-                            .frame(width: 48, height: 48)
+                            .frame(width: 40, height: 40)
                         Image(systemName: recorder.activityType.symbolName)
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(AtlasTheme.blue)
                     }
 
@@ -294,7 +269,7 @@ struct MainMapScreen: View {
             }
             .buttonStyle(TintedGlassButtonStyle(tint: AtlasTheme.blue, shape: .capsule))
         }
-        .padding(16)
+        .padding(12)
         .background {
             GlassChrome(
                 shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
@@ -434,10 +409,6 @@ struct MainMapScreen: View {
     }
 
     // MARK: - Helpers
-
-    private var nearbyCount: Int {
-        controller.nearbyUndiscoveredCount(around: recorder.lastLocation?.coordinate)
-    }
 
     private var cardBackground: some View {
         GlassChrome(

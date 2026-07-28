@@ -276,29 +276,112 @@ struct ExpeditionSheet: View {
 }
 
 /// Compact map banner — tap to open the full expedition sheet.
+struct FrontierMissionBannerLabels {
+    let primaryLabel: String
+    let secondaryLabel: String
+    let trailingBadge: String?
+    let iconName: String
+    let tint: Color
+    let isActive: Bool
+    let availableCount: Int
+
+    /// Short label for the combined map missions strip.
+    var compactLabel: String {
+        if isActive {
+            return primaryLabel
+        }
+        if availableCount > 0 {
+            return "\(availableCount)"
+        }
+        return "Done"
+    }
+
+    @MainActor
+    static func make(controller: WorldController) -> FrontierMissionBannerLabels {
+        let active = controller.activeExpedition
+        let count = controller.availableExpeditions.count
+
+        let primary: String
+        if let active {
+            primary = controller.sectorDisplayName(for: active)
+        } else if count > 0 {
+            primary = count == 1 ? "1 weekly expedition" : "\(count) weekly expeditions"
+        } else {
+            primary = "Week complete"
+        }
+
+        let secondary: String
+        if let active {
+            secondary = "\(active.difficulty.displayName) · \(controller.targetSectorDiscoveredCount)/\(active.tilesRequired) tiles"
+        } else if count > 0 {
+            secondary = "Tap to choose a target sector"
+        } else {
+            secondary = "\(controller.weeklyFrontierScore) pts this week"
+        }
+
+        let trailing: String?
+        if active != nil {
+            trailing = nil
+        } else if count > 0 {
+            trailing = "\(controller.weeklyFrontierScore) pts"
+        } else {
+            trailing = nil
+        }
+
+        let icon: String
+        if active != nil {
+            icon = active?.difficulty.iconName ?? "flag.fill"
+        } else {
+            icon = count == 0 ? "checkmark.seal.fill" : "flag.fill"
+        }
+
+        let tint: Color
+        if let active {
+            tint = active.difficulty.tint
+        } else {
+            tint = count == 0 ? AtlasTheme.teal : AtlasTheme.gold
+        }
+
+        return FrontierMissionBannerLabels(
+            primaryLabel: primary,
+            secondaryLabel: secondary,
+            trailingBadge: trailing,
+            iconName: icon,
+            tint: tint,
+            isActive: active != nil,
+            availableCount: count
+        )
+    }
+}
+
+/// Compact map banner — tap to open the full expedition sheet.
 struct FrontierMissionBanner: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     let onTap: () -> Void
+
+    private var labels: FrontierMissionBannerLabels {
+        FrontierMissionBannerLabels.make(controller: controller)
+    }
 
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(bannerTint.opacity(0.15))
+                        .fill(labels.tint.opacity(0.15))
                         .frame(width: 40, height: 40)
-                    Image(systemName: bannerIcon)
+                    Image(systemName: labels.iconName)
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(bannerTint)
+                        .foregroundStyle(labels.tint)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(primaryLabel)
+                    Text(labels.primaryLabel)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-                    Text(secondaryLabel)
+                    Text(labels.secondaryLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -306,7 +389,7 @@ struct FrontierMissionBanner: View {
 
                 Spacer(minLength: 8)
 
-                if let trailing = trailingBadge {
+                if let trailing = labels.trailingBadge {
                     Text(trailing)
                         .font(.caption.weight(.bold).monospacedDigit())
                         .foregroundStyle(AtlasTheme.gold)
@@ -328,53 +411,8 @@ struct FrontierMissionBanner: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("frontierMissionBanner")
-        .accessibilityLabel(primaryLabel)
+        .accessibilityLabel(labels.primaryLabel)
         .accessibilityHint("Opens weekly frontier expeditions")
-    }
-
-    private var primaryLabel: String {
-        if let active = controller.activeExpedition {
-            return controller.sectorDisplayName(for: active)
-        }
-        let count = controller.availableExpeditions.count
-        if count > 0 {
-            return count == 1 ? "1 weekly expedition" : "\(count) weekly expeditions"
-        }
-        return "Week complete"
-    }
-
-    private var secondaryLabel: String {
-        if let active = controller.activeExpedition {
-            return "\(active.difficulty.displayName) · \(controller.targetSectorDiscoveredCount)/\(active.tilesRequired) tiles"
-        }
-        if !controller.availableExpeditions.isEmpty {
-            return "Tap to choose a target sector"
-        }
-        return "\(controller.weeklyFrontierScore) pts this week"
-    }
-
-    private var trailingBadge: String? {
-        if controller.activeExpedition != nil {
-            return nil
-        }
-        if !controller.availableExpeditions.isEmpty {
-            return "\(controller.weeklyFrontierScore) pts"
-        }
-        return nil
-    }
-
-    private var bannerIcon: String {
-        if controller.activeExpedition != nil {
-            return controller.activeExpedition?.difficulty.iconName ?? "flag.fill"
-        }
-        return controller.availableExpeditions.isEmpty ? "checkmark.seal.fill" : "flag.fill"
-    }
-
-    private var bannerTint: Color {
-        if let active = controller.activeExpedition {
-            return active.difficulty.tint
-        }
-        return controller.availableExpeditions.isEmpty ? AtlasTheme.teal : AtlasTheme.gold
     }
 }
 
