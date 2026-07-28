@@ -122,6 +122,8 @@ struct SessionFeedbackToast: View {
         switch event.kind {
         case .discovery: "hexagon.fill"
         case .mastery: "star.fill"
+        case .worldEvent: "sparkles"
+        case .hotspot: "circle.hexagongrid.fill"
         }
     }
 
@@ -129,6 +131,8 @@ struct SessionFeedbackToast: View {
         switch event.kind {
         case .discovery: AtlasTheme.teal
         case .mastery: AtlasTheme.gold
+        case .worldEvent: AtlasTheme.eventAccent
+        case .hotspot: AtlasTheme.eventAccent.opacity(0.92)
         }
     }
 }

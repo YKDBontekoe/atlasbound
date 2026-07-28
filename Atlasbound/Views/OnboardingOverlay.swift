@@ -20,6 +20,11 @@ struct OnboardingOverlay: View {
             "Each week, pick a mission on the map. Push into new sectors, chain combos, and climb the weekly leaderboard."
         ),
         (
+            "sparkles",
+            "World events & hotspots",
+            "Daily hotspots mark things to chase nearby. Time-limited world events boost XP, charge the frontier, or send you on a beacon rush."
+        ),
+        (
             "scope",
             "Play Pinpoint",
             "Guess where you are from Apple Look Around. Worldwide mode is always open; Home Turf unlocks as you discover tiles nearby."

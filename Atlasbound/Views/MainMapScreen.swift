@@ -13,6 +13,7 @@ struct MainMapScreen: View {
     @State private var showSettings = false
     @State private var showActivityPicker = false
     @State private var showExpeditionSheet = false
+    @State private var showWorldEventSheet = false
     @State private var showLayers = false
     @State private var presentedSummary: ActivitySummary?
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
@@ -94,6 +95,9 @@ struct MainMapScreen: View {
                     activeBottomPanel
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 } else {
+                    WorldEventBanner(controller: controller, store: store) {
+                        showWorldEventSheet = true
+                    }
                     FrontierMissionBanner(controller: controller, store: store) {
                         showExpeditionSheet = true
                     }
@@ -104,6 +108,7 @@ struct MainMapScreen: View {
             .padding(.bottom, 8)
             .animation(AtlasMotion.chrome, value: controller.isRecording)
             .animation(AtlasMotion.fade, value: controller.sessionFeedback.map(\.id))
+            .animation(AtlasMotion.fade, value: controller.liveWorldEvent?.id)
         }
         .overlay {
             if !hasCompletedOnboarding {
@@ -139,6 +144,10 @@ struct MainMapScreen: View {
             ExpeditionSheet(controller: controller, store: store)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showWorldEventSheet) {
+            WorldEventSheet(controller: controller, store: store)
+                .presentationDetents([.medium, .large])
+        }
         .onChange(of: showSimGPSControls) { _, enabled in
             #if DEBUG
             if !enabled {
@@ -154,6 +163,13 @@ struct MainMapScreen: View {
                 controller.debugDisableSimulation()
             }
             #endif
+        }
+        .task {
+            // Pick up UTC event window open/close while the map stays foregrounded.
+            while !Task.isCancelled {
+                controller.refreshWorldEventPresentation()
+                try? await Task.sleep(for: .seconds(60))
+            }
         }
         .task(id: recorder.lastErrorMessage) {
             guard recorder.lastErrorMessage != nil else { return }
@@ -353,6 +369,7 @@ struct MainMapScreen: View {
             .animation(AtlasMotion.number, value: controller.sessionDiscoveredCount)
             .animation(AtlasMotion.number, value: distanceValue)
 
+            ActiveWorldEventTracker(controller: controller, compact: true)
             ActiveFrontierTracker(controller: controller, compact: true)
 
             HStack(spacing: 14) {

@@ -96,18 +96,54 @@ struct PersistedFrontierRecord: Codable, Hashable, Sendable {
     }
 }
 
+/// Optional per-grid world-event state — IDs and counters only, no geometry.
+struct PersistedWorldEventRecord: Codable, Hashable, Sendable {
+    var dayKey: String
+    var activeEvent: WorldEventInstance?
+    var visitedHotspotIDs: [String]
+    var eventProgressCount: Int
+    var completedEventIDs: [String]
+    var lifetimeEventsCompleted: Int
+    var dailyHotspotTileIDs: [String]
+
+    init(from state: WorldEventState) {
+        dayKey = state.dayKey
+        activeEvent = state.activeEvent
+        visitedHotspotIDs = state.visitedHotspotIDs
+        eventProgressCount = state.eventProgressCount
+        completedEventIDs = state.completedEventIDs
+        lifetimeEventsCompleted = state.lifetimeEventsCompleted
+        dailyHotspotTileIDs = state.dailyHotspotTileIDs
+    }
+
+    func asWorldEventState() -> WorldEventState {
+        WorldEventState(
+            dayKey: dayKey,
+            activeEvent: activeEvent,
+            visitedHotspotIDs: visitedHotspotIDs,
+            eventProgressCount: eventProgressCount,
+            completedEventIDs: completedEventIDs,
+            lifetimeEventsCompleted: lifetimeEventsCompleted,
+            dailyHotspotTileIDs: dailyHotspotTileIDs
+        )
+    }
+}
+
 struct WorldSaveFile: Codable, Sendable {
     var tiles: [PersistedTileRecord]
     var progressBySize: [String: PersistedProgressRecord]
     var frontierBySize: [String: PersistedFrontierRecord]?
+    var eventsBySize: [String: PersistedWorldEventRecord]?
 
     init(
         tiles: [PersistedTileRecord],
         progressBySize: [String: PersistedProgressRecord],
-        frontierBySize: [String: PersistedFrontierRecord]? = nil
+        frontierBySize: [String: PersistedFrontierRecord]? = nil,
+        eventsBySize: [String: PersistedWorldEventRecord]? = nil
     ) {
         self.tiles = tiles
         self.progressBySize = progressBySize
         self.frontierBySize = frontierBySize
+        self.eventsBySize = eventsBySize
     }
 }

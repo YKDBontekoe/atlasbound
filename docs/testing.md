@@ -67,6 +67,10 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | Clear progress | Clear for current size | Only active size wiped |
 | Size mid-record | Try change while recording | Blocked |
 | Device GPS noise | Real device, try 15 vs 25 m | Finer grids more jitter-sensitive |
+| World event window | Map idle → World Events banner during catalog window (UTC) | Banner + sheet show live event; map beacon / wash / hotspots appear |
+| Daily hotspots | Open map with location | Up to 6 hotspot pins near frontier; visiting marks them and may toast |
+| Event persistence | Progress an event, force-quit, relaunch | Same day progress restored for the current tile size |
+| Layers places pins | Toggle layers with resolved places | Locality pins appear; no Apple POIs |
 
 ## Agent checklist after behavioral changes
 

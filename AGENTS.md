@@ -47,6 +47,8 @@ Atlasbound/
     StatsEngine.swift          # Territory area, footprints, explorer metrics
     RegionLookupEngine.swift   # Coarse-cell place labels + places-visited aggregate
     GeocodeLimiter.swift       # Shared throttled CLGeocoder
+    FrontierEngine.swift       # Weekly expeditions + frontier scoring
+    WorldEventEngine.swift     # Client-scheduled world events + daily hotspots
     PinpointController.swift   # Pinpoint game orchestration
     PinpointScoring.swift      # Distance + score math (Sendable)
     LookAroundLocationPool.swift # Coverage-region + Home Turf targets (Sendable)
@@ -56,7 +58,7 @@ Atlasbound/
     RegionLookupStore.swift    # Reverse-geocode place cache (JSON)
     PinpointStore.swift        # Pinpoint game history (JSON)
     ActivityHistoryStore.swift # Activity session history + per-type records
-  Models/                      # WorldTile, activity types, PinpointModels
+  Models/                      # WorldTile, activity types, FrontierModels, WorldEventModels, PinpointModels
   Map/                         # DiscoveryMapView, AtlasStatsMapView, GuessMapView (MapKit)
   Views/                       # MainMapScreen, summary, tabs, Pinpoint + preparing views
   Theme/                       # AtlasTheme

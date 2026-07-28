@@ -19,6 +19,10 @@ struct DiscoveryMapView: View {
     @State private var cachedMarkers: [WorldTile] = []
     @State private var cachedFrontierEdge: [TileCoordinate] = []
     @State private var cachedTargetBoundary: [TileCoordinate] = []
+    @State private var cachedEventBoundary: [TileCoordinate] = []
+    @State private var cachedEventHighlight: [TileCoordinate] = []
+    @State private var cachedHotspots: [MapHotspot] = []
+    @State private var cachedPlacePins: [PlaceMapPin] = []
     @State private var cachedPerimeterIDs: Set<String> = []
 
     private var engine: TileEngine { store.tileEngine }
@@ -66,6 +70,15 @@ struct DiscoveryMapView: View {
                 }
             }
 
+            // World-event sector wash (distinct from frontier gold).
+            ForEach(cachedEventHighlight, id: \.self) { axial in
+                let vertices = engine.polygon(for: axial)
+                if vertices.count >= 3 {
+                    MapPolygon(coordinates: vertices)
+                        .foregroundStyle(AtlasTheme.eventWashFill)
+                }
+            }
+
             ForEach(cachedTargetBoundary, id: \.self) { axial in
                 let vertices = engine.polygon(for: axial)
                 if vertices.count >= 3 {
@@ -75,9 +88,24 @@ struct DiscoveryMapView: View {
                 }
             }
 
+            ForEach(cachedEventBoundary, id: \.self) { axial in
+                let vertices = engine.polygon(for: axial)
+                if vertices.count >= 3 {
+                    MapPolygon(coordinates: vertices)
+                        .foregroundStyle(Color.clear)
+                        .stroke(AtlasTheme.eventBoundaryStroke, lineWidth: AtlasTheme.eventBoundaryStrokeWidth)
+                }
+            }
+
             if let beacon = controller.expeditionBeaconCoordinate {
                 Annotation("", coordinate: beacon, anchor: .center) {
                     ExpeditionBeaconView()
+                }
+            }
+
+            if let eventBeacon = controller.eventBeaconCoordinate {
+                Annotation("", coordinate: eventBeacon, anchor: .center) {
+                    WorldEventBeaconView()
                 }
             }
 
@@ -86,6 +114,20 @@ struct DiscoveryMapView: View {
                     Annotation("", coordinate: coordinate, anchor: .bottom) {
                         FrontierScoreCalloutView(points: callout.points)
                     }
+                }
+            }
+
+            ForEach(cachedHotspots) { hotspot in
+                if let axial = engine.parseTileID(hotspot.tileID) {
+                    Annotation("", coordinate: engine.centerCoordinate(for: axial), anchor: .center) {
+                        HotspotMarkerView(isVisited: hotspot.isVisited, isEventTarget: hotspot.isEventTarget)
+                    }
+                }
+            }
+
+            ForEach(cachedPlacePins) { pin in
+                Annotation(pin.name, coordinate: CLLocationCoordinate2D(latitude: pin.latitude, longitude: pin.longitude), anchor: .bottom) {
+                    PlaceVisitedPinView(name: pin.name)
                 }
             }
 
@@ -129,6 +171,15 @@ struct DiscoveryMapView: View {
         .onChange(of: controller.targetSectorBoundaryTileIDs.count) { _, _ in
             refreshOverlays()
         }
+        .onChange(of: controller.eventSectorBoundaryTileIDs.count) { _, _ in
+            refreshOverlays()
+        }
+        .onChange(of: controller.mapHotspots.map(\.id)) { _, _ in
+            refreshOverlays()
+        }
+        .onChange(of: controller.regionLookup.resolvedCellCount) { _, _ in
+            refreshOverlays()
+        }
         .onChange(of: showLayers) { _, _ in
             refreshOverlays()
         }
@@ -136,6 +187,7 @@ struct DiscoveryMapView: View {
             refreshOverlays()
         }
         .onChange(of: recorder.lastLocation?.coordinate.latitude) { _, _ in
+            controller.refreshWorldEventPresentation()
             refreshOverlays()
             guard followsUser, let location = recorder.lastLocation else { return }
             let span = controller.isRecording
@@ -162,6 +214,12 @@ struct DiscoveryMapView: View {
         cachedFog = buildFog(engine: engine)
         cachedFrontierEdge = controller.frontierEdgeTileIDs.compactMap { engine.parseTileID($0) }
         cachedTargetBoundary = controller.targetSectorBoundaryTileIDs.compactMap { engine.parseTileID($0) }
+        cachedEventBoundary = controller.eventSectorBoundaryTileIDs.compactMap { engine.parseTileID($0) }
+        cachedEventHighlight = controller.eventHighlightTileIDs.compactMap { engine.parseTileID($0) }
+        cachedHotspots = Array(controller.mapHotspots.prefix(AtlasTheme.maxVisibleHotspots))
+        cachedPlacePins = showLayers
+            ? Array(controller.placeMapPins.prefix(AtlasTheme.maxVisiblePlacePins))
+            : []
         cachedMarkers = showLayers
             ? Array(
                 discovered
@@ -242,6 +300,85 @@ struct ExpeditionBeaconView: View {
             withAnimation(AtlasMotion.ambient.repeatForever(autoreverses: true)) {
                 pulse = true
             }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct WorldEventBeaconView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(AtlasTheme.eventAccent.opacity(0.4), lineWidth: 2)
+                .frame(width: pulse ? 38 : 26, height: pulse ? 38 : 26)
+                .opacity(pulse ? 0.2 : 0.65)
+            Image(systemName: "sparkles")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(AtlasTheme.eventAccent, in: Circle())
+                .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(AtlasMotion.ambient.repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct HotspotMarkerView: View {
+    let isVisited: Bool
+    let isEventTarget: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(isVisited ? AtlasTheme.teal.opacity(0.85) : AtlasTheme.eventAccent.opacity(isEventTarget ? 0.95 : 0.75))
+                .frame(width: 18, height: 18)
+                .overlay {
+                    Circle()
+                        .stroke(Color.white.opacity(0.9), lineWidth: 2)
+                }
+                .shadow(color: .black.opacity(0.16), radius: 2, y: 1)
+            Image(systemName: isVisited ? "checkmark" : "circle.hexagongrid.fill")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(.white)
+        }
+        .scaleEffect(appeared || reduceMotion ? 1 : 0.6)
+        .opacity(appeared || reduceMotion ? 1 : 0)
+        .onAppear {
+            AtlasMotion.withOptionalAnimation(AtlasMotion.celebrate, reduceMotion: reduceMotion) {
+                appeared = true
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct PlaceVisitedPinView: View {
+    let name: String
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Image(systemName: "mappin.circle.fill")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(AtlasTheme.slate)
+                .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
+            Text(name)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(.ultraThinMaterial, in: Capsule())
+                .lineLimit(1)
         }
         .allowsHitTesting(false)
     }
