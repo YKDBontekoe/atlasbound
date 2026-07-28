@@ -95,6 +95,32 @@ final class TileStoreTests: XCTestCase {
         XCTAssertEqual(store.discoveryXPTotal, 100)
     }
 
+    func testDeferredPersistenceFlushesOnDemand() {
+        let store = TileStore(fileURL: tempURL)
+        store.tileSize = .twenty
+
+        store.setDeferPersistence(true)
+        store.upsert(
+            WorldTile(
+                id: "hex:20:1:0",
+                coordinate: TileCoordinate(q: 1, r: 0),
+                state: .discovered,
+                masteryXP: 100,
+                visitCount: 1,
+                firstVisitedAt: .now,
+                lastVisitedAt: .now
+            )
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempURL.path))
+
+        store.flushToDiskIfNeeded()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: tempURL.path))
+
+        let reloaded = TileStore(fileURL: tempURL)
+        reloaded.tileSize = .twenty
+        XCTAssertEqual(reloaded.discoveredTiles.count, 1)
+    }
+
     func testPersistsAcrossReload() {
         do {
             let store = TileStore(fileURL: tempURL)

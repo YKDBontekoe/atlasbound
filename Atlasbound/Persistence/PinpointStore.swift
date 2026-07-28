@@ -56,6 +56,7 @@ final class PinpointStore: ObservableObject {
     // MARK: - Disk
 
     private struct SaveFile: Codable {
+        var version: Int?
         let games: [PinpointGame]
         let highScoreWorldwide: Int
         let highScoreHomeTurf: Int
@@ -77,6 +78,7 @@ final class PinpointStore: ObservableObject {
 
     private func persistToDisk() {
         let save = SaveFile(
+            version: JSONFileStore.currentSchemaVersion,
             games: gameHistory,
             highScoreWorldwide: highScoreWorldwide,
             highScoreHomeTurf: highScoreHomeTurf,

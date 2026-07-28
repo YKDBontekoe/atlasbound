@@ -52,6 +52,7 @@ final class ActivityHistoryStore: ObservableObject {
     // MARK: - Disk
 
     private struct SaveFile: Codable {
+        var version: Int?
         var sessions: [PersistedActivityRecord]
         var longestDistanceByActivity: [String: Double]
         var totalDistanceByActivity: [String: Double]
@@ -78,6 +79,7 @@ final class ActivityHistoryStore: ObservableObject {
 
     private func persistToDisk() {
         let save = SaveFile(
+            version: JSONFileStore.currentSchemaVersion,
             sessions: sessions,
             longestDistanceByActivity: Self.encodeActivityMap(longestDistanceByActivity),
             totalDistanceByActivity: Self.encodeActivityMap(totalDistanceByActivity),

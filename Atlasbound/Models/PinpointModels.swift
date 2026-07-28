@@ -58,7 +58,7 @@ struct PinpointRound: Sendable, Codable, Identifiable {
         self.target = target
         self.guess = guess
         self.roundIndex = roundIndex
-        self.distanceMeters = PinpointScoring.haversine(from: target, to: guess)
+        self.distanceMeters = PinpointScoring.distanceMeters(from: target, to: guess)
 
         let targetTileID = tileEngine.tileID(for: target)
         let guessTileID = tileEngine.tileID(for: guess)

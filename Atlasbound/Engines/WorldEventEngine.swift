@@ -287,7 +287,9 @@ struct WorldEventEngine: Sendable {
         }
 
         if picks.count < count {
-            for tile in sorted where picks.count < count {
+            let start = Int(seed % UInt64(sorted.count))
+            for step in 0..<sorted.count where picks.count < count {
+                let tile = sorted[(start + step) % sorted.count]
                 let id = TileEngine.makeTileID(q: tile.q, r: tile.r, sizeMeters: tileEngine.tileSizeMeters)
                 if !picks.contains(id) {
                     picks.append(id)

@@ -377,6 +377,7 @@ final class WorldController: ObservableObject {
         }
         lastSummary = nil
         AtlasHaptics.prepare()
+        store.setDeferPersistence(true)
         recorder.start()
     }
 
@@ -391,6 +392,7 @@ final class WorldController: ObservableObject {
     }
 
     func pauseActivity() {
+        store.flushToDiskIfNeeded()
         recorder.pause()
     }
 
@@ -409,6 +411,7 @@ final class WorldController: ObservableObject {
         let covering = engine.tileIDsCoveringRoute(result.samples)
         processTileIDs(covering, at: result.endedAt, activity: recorder.activityType)
 
+        store.setDeferPersistence(false, flush: true)
         store.applySessionProgress(sessionProgress, updatedTiles: sessionTiles)
 
         sessionFrontier.weeklyTotalAfter = store.frontierState.weeklyScore

@@ -4,10 +4,6 @@ import Foundation
 struct HexSectorEngine: Sendable {
     static let span = 36
 
-    private static let directionOffsets: [(Int, Int)] = [
-        (1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)
-    ]
-
     // MARK: - Sector identity
 
     func sectorCoordinate(for tile: TileCoordinate) -> SectorCoordinate {
@@ -62,7 +58,7 @@ struct HexSectorEngine: Sendable {
         let members = tiles(in: sector)
         var boundary: Set<TileCoordinate> = []
         for tile in members {
-            let neighbors = neighborTiles(of: tile)
+            let neighbors = TileEngine.neighbors(of: tile)
             if neighbors.contains(where: { sectorCoordinate(for: $0) != sector }) {
                 boundary.insert(tile)
             }
@@ -95,7 +91,7 @@ struct HexSectorEngine: Sendable {
     // MARK: - Sector navigation
 
     func neighborSector(_ sector: SectorCoordinate, directionIndex: Int) -> SectorCoordinate {
-        let offset = Self.directionOffsets[directionIndex % 6]
+        let offset = TileEngine.neighborOffsets[directionIndex % 6]
         return SectorCoordinate(q: sector.q + offset.0, r: sector.r + offset.1)
     }
 
@@ -164,7 +160,4 @@ struct HexSectorEngine: Sendable {
         return results
     }
 
-    private func neighborTiles(of tile: TileCoordinate) -> [TileCoordinate] {
-        Self.directionOffsets.map { TileCoordinate(q: tile.q + $0.0, r: tile.r + $0.1) }
-    }
 }

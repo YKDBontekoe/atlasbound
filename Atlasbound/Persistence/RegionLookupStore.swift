@@ -95,6 +95,7 @@ final class RegionLookupStore: ObservableObject {
     // MARK: - Disk
 
     private struct SaveFile: Codable {
+        var version: Int?
         var cells: [PersistedRegionCell]
     }
 
@@ -108,7 +109,10 @@ final class RegionLookupStore: ObservableObject {
     }
 
     private func persistToDisk() {
-        let save = SaveFile(cells: cells.values.sorted { $0.cellKey < $1.cellKey })
+        let save = SaveFile(
+            version: JSONFileStore.currentSchemaVersion,
+            cells: cells.values.sorted { $0.cellKey < $1.cellKey }
+        )
         JSONFileStore.save(save, to: fileURL)
     }
 }

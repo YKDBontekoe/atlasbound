@@ -4,25 +4,19 @@ import CoreLocation
 /// Pure scoring math for Pinpoint. Single responsibility: distance, area metrics, and score derivation.
 struct PinpointScoring: Sendable {
 
-    /// Haversine distance in meters between two coordinates.
-    static func haversine(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Double {
-        let R = 6_371_000.0
-        let dLat = (b.latitude - a.latitude) * .pi / 180
-        let dLon = (b.longitude - a.longitude) * .pi / 180
-        let lat1 = a.latitude * .pi / 180
-        let lat2 = b.latitude * .pi / 180
-        let h = sin(dLat / 2) * sin(dLat / 2) +
-                 cos(lat1) * cos(lat2) * sin(dLon / 2) * sin(dLon / 2)
-        return R * 2 * atan2(sqrt(h), sqrt(1 - h))
+    /// Geodesic distance in meters between two coordinates.
+    static func distanceMeters(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Double {
+        CLLocation(latitude: a.latitude, longitude: a.longitude)
+            .distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude))
     }
 
     /// Flat-top hex area from flat-to-flat width in meters.
     static func hexAreaSquareMeters(tileSizeMeters: Double) -> Double {
-        StatsEngine.areaSquareMeters(tileCount: 1, flatToFlatMeters: tileSizeMeters)
+        TileEngine.areaSquareMeters(flatToFlatMeters: tileSizeMeters)
     }
 
     static func unlockedAreaM2(discoveredCount: Int, tileSizeMeters: Double) -> Double {
-        StatsEngine.areaSquareMeters(tileCount: discoveredCount, flatToFlatMeters: tileSizeMeters)
+        TileEngine.areaSquareMeters(tileCount: discoveredCount, flatToFlatMeters: tileSizeMeters)
     }
 
     static func formatArea(_ squareMeters: Double) -> String {

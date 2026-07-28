@@ -87,7 +87,24 @@ struct TileEngine: Sendable {
 
     /// Six axial neighbors of a flat-top hex.
     func neighbors(of axial: TileCoordinate) -> [TileCoordinate] {
-        Self.neighborOffsets.map { TileCoordinate(q: axial.q + $0.0, r: axial.r + $0.1) }
+        Self.neighbors(of: axial)
+    }
+
+    /// Flat-top hex area from flat-to-flat width in meters (single tile).
+    static func areaSquareMeters(flatToFlatMeters: Double) -> Double {
+        guard flatToFlatMeters > 0 else { return 0 }
+        return (sqrt(3.0) / 2.0) * flatToFlatMeters * flatToFlatMeters
+    }
+
+    /// Total unlocked area for `tileCount` flat-top hexes.
+    static func areaSquareMeters(tileCount: Int, flatToFlatMeters: Double) -> Double {
+        guard tileCount > 0 else { return 0 }
+        return Double(tileCount) * areaSquareMeters(flatToFlatMeters: flatToFlatMeters)
+    }
+
+    /// Six axial neighbors of a flat-top hex (static; no tile-size context required).
+    static func neighbors(of axial: TileCoordinate) -> [TileCoordinate] {
+        neighborOffsets.map { TileCoordinate(q: axial.q + $0.0, r: axial.r + $0.1) }
     }
 
     /// True when any neighbor is outside the discovered set — the outer rim of claimed territory.
@@ -124,7 +141,7 @@ struct TileEngine: Sendable {
         return results
     }
 
-    private static let neighborOffsets: [(Int, Int)] = [
+    static let neighborOffsets: [(Int, Int)] = [
         (1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)
     ]
 

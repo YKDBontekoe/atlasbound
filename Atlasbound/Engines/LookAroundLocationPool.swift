@@ -173,7 +173,7 @@ struct LookAroundLocationPool: Sendable {
         from existing: [CLLocationCoordinate2D],
         minMeters: CLLocationDistance
     ) -> Bool {
-        existing.allSatisfy { PinpointScoring.haversine(from: candidate, to: $0) >= minMeters }
+        existing.allSatisfy { PinpointScoring.distanceMeters(from: candidate, to: $0) >= minMeters }
     }
 
     // MARK: - Private

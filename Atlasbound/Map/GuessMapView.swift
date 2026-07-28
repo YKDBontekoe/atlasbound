@@ -1,84 +1,67 @@
 import SwiftUI
 import MapKit
 
-/// Tappable world map for placing a Pinpoint guess. UIViewRepresentable for tap gesture support.
-struct GuessMapView: UIViewRepresentable {
+/// Tappable world map for placing a Pinpoint guess.
+struct GuessMapView: View {
     @Binding var guessCoordinate: CLLocationCoordinate2D?
     var regionConstraint: MKCoordinateRegion?
 
-    func makeUIView(context: Context) -> MKMapView {
-        let map = MKMapView()
-        map.mapType = .standard
-        map.isZoomEnabled = true
-        map.isScrollEnabled = true
-        map.isRotateEnabled = false
-        map.isPitchEnabled = false
-        map.showsUserLocation = false
-        map.delegate = context.coordinator
+    @State private var position: MapCameraPosition = .automatic
 
-        if let region = regionConstraint {
-            map.setRegion(region, animated: false)
-        }
-
-        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
-        map.addGestureRecognizer(tap)
-
-        return map
-    }
-
-    func updateUIView(_ mapView: MKMapView, context: Context) {
-        context.coordinator.regionConstraint = regionConstraint
-        mapView.removeAnnotations(mapView.annotations)
-        if let coord = guessCoordinate {
-            let pin = MKPointAnnotation()
-            pin.coordinate = coord
-            pin.title = "Your Guess"
-            mapView.addAnnotation(pin)
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    class Coordinator: NSObject, MKMapViewDelegate {
-        var parent: GuessMapView
-        var regionConstraint: MKCoordinateRegion?
-
-        init(_ parent: GuessMapView) {
-            self.parent = parent
-            self.regionConstraint = parent.regionConstraint
-        }
-
-        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
-            guard let mapView = gesture.view as? MKMapView else { return }
-            let point = gesture.location(in: mapView)
-            var coordinate = mapView.convert(point, toCoordinateFrom: mapView)
-            coordinate = clamp(coordinate)
-            parent.guessCoordinate = coordinate
-        }
-
-        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-            guard let constraint = regionConstraint else { return }
-            let center = clamp(mapView.centerCoordinate, to: constraint)
-            if center.latitude != mapView.centerCoordinate.latitude
-                || center.longitude != mapView.centerCoordinate.longitude {
-                mapView.setCenter(center, animated: false)
+    var body: some View {
+        MapReader { proxy in
+            Map(position: $position) {
+                if let coord = guessCoordinate {
+                    Annotation("Your Guess", coordinate: coord) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.title)
+                            .foregroundStyle(AtlasTheme.blue)
+                    }
+                }
+            }
+            .mapStyle(.standard)
+            .onTapGesture { point in
+                if let coordinate = proxy.convert(point, from: .local) {
+                    guessCoordinate = clamp(coordinate)
+                }
+            }
+            .onMapCameraChange(frequency: .onEnd) { context in
+                guard let constraint = regionConstraint else { return }
+                let clampedCenter = clamp(context.region.center, to: constraint)
+                if clampedCenter.latitude != context.region.center.latitude
+                    || clampedCenter.longitude != context.region.center.longitude {
+                    position = .region(
+                        MKCoordinateRegion(center: clampedCenter, span: context.region.span)
+                    )
+                }
             }
         }
-
-        private func clamp(_ coordinate: CLLocationCoordinate2D, to region: MKCoordinateRegion? = nil) -> CLLocationCoordinate2D {
-            guard let region = region ?? regionConstraint else { return coordinate }
-            let halfLat = region.span.latitudeDelta / 2
-            let halfLon = region.span.longitudeDelta / 2
-            let minLat = region.center.latitude - halfLat
-            let maxLat = region.center.latitude + halfLat
-            let minLon = region.center.longitude - halfLon
-            let maxLon = region.center.longitude + halfLon
-            return CLLocationCoordinate2D(
-                latitude: min(max(coordinate.latitude, minLat), maxLat),
-                longitude: min(max(coordinate.longitude, minLon), maxLon)
-            )
+        .onAppear {
+            if let region = regionConstraint {
+                position = .region(region)
+            }
         }
+        .onChange(of: regionConstraint?.center.latitude) { _, _ in
+            if let region = regionConstraint {
+                position = .region(region)
+            }
+        }
+    }
+
+    private func clamp(
+        _ coordinate: CLLocationCoordinate2D,
+        to region: MKCoordinateRegion? = nil
+    ) -> CLLocationCoordinate2D {
+        guard let region = region ?? regionConstraint else { return coordinate }
+        let halfLat = region.span.latitudeDelta / 2
+        let halfLon = region.span.longitudeDelta / 2
+        let minLat = region.center.latitude - halfLat
+        let maxLat = region.center.latitude + halfLat
+        let minLon = region.center.longitude - halfLon
+        let maxLon = region.center.longitude + halfLon
+        return CLLocationCoordinate2D(
+            latitude: min(max(coordinate.latitude, minLat), maxLat),
+            longitude: min(max(coordinate.longitude, minLon), maxLon)
+        )
     }
 }
