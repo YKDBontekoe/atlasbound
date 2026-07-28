@@ -809,6 +809,7 @@ extension WorldController {
             Self.debugLocation(coordinate: coordinate, course: course, speed: speed)
         )
         refreshFrontierPresentation()
+        refreshWorldEventPresentation()
     }
 
     func debugNudge(northMeters: Double, eastMeters: Double, speed: CLLocationSpeed = 1.4) {

@@ -164,6 +164,13 @@ struct MainMapScreen: View {
             }
             #endif
         }
+        .task {
+            // Pick up UTC event window open/close while the map stays foregrounded.
+            while !Task.isCancelled {
+                controller.refreshWorldEventPresentation()
+                try? await Task.sleep(for: .seconds(60))
+            }
+        }
         .task(id: recorder.lastErrorMessage) {
             guard recorder.lastErrorMessage != nil else { return }
             try? await Task.sleep(for: .seconds(5))
