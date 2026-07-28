@@ -48,6 +48,39 @@ final class FrontierSnapshotTests: XCTestCase {
         try SnapshotSupport.assertSnapshot(of: view, named: "FrontierMissionBannerActive")
     }
 
+    func testMapMissionsStripIdleSnapshot() throws {
+        let controller = makeController()
+        let store = controller.store
+
+        let view = MapMissionsStrip(
+            controller: controller,
+            store: store,
+            onHotspotsTap: {},
+            onExpeditionsTap: {}
+        )
+        .frame(width: 390)
+        .padding()
+        try SnapshotSupport.assertSnapshot(of: view, named: "MapMissionsStripIdle")
+    }
+
+    func testMapMissionsStripActiveExpeditionSnapshot() throws {
+        let controller = makeController()
+        let store = controller.store
+        if let offer = controller.availableExpeditions.first {
+            controller.selectExpedition(offer)
+        }
+
+        let view = MapMissionsStrip(
+            controller: controller,
+            store: store,
+            onHotspotsTap: {},
+            onExpeditionsTap: {}
+        )
+        .frame(width: 390)
+        .padding()
+        try SnapshotSupport.assertSnapshot(of: view, named: "MapMissionsStripActiveExpedition")
+    }
+
     func testActiveFrontierTrackerSnapshot() throws {
         let controller = makeController()
         if let offer = controller.availableExpeditions.first {
