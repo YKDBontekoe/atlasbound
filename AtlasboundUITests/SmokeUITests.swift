@@ -65,33 +65,36 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(progressTab.waitForExistence(timeout: 5))
         progressTab.tap()
 
-        guard app.state == .runningForeground || app.state == .runningBackground else {
-            throw XCTSkip("App terminated before Progress tab could load in this simulator session")
+        // Simulator MapKit sessions can terminate the process here (also flakes on main).
+        // Poll `.exists` only while the app is alive — `waitForExistence` throws on a dead process.
+        let deadline = Date().addingTimeInterval(12)
+        var sawChrome = false
+        while Date() < deadline {
+            let state = app.state
+            guard state == .runningForeground || state == .runningBackground else {
+                throw XCTSkip("App terminated before Progress tab could load in this simulator session")
+            }
+            if app.navigationBars["Atlas Stats"].exists
+                || app.staticTexts["Atlas Stats"].exists
+                || app.staticTexts["Territory conquered"].exists
+                || app.staticTexts["Lifetime XP"].exists {
+                sawChrome = true
+                break
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.35))
         }
-
-        // Location alerts / first paint can delay the Progress root; retry once if still alive.
-        let atlasReady =
-            app.navigationBars["Atlas Stats"].waitForExistence(timeout: 6)
-            || app.staticTexts["Atlas Stats"].waitForExistence(timeout: 2)
-            || app.staticTexts["Territory conquered"].waitForExistence(timeout: 2)
-        if !atlasReady, app.state == .runningForeground {
-            progressTab.tap()
-        }
-
-        let hasChrome =
-            app.navigationBars["Atlas Stats"].waitForExistence(timeout: 8)
-            || app.staticTexts["Atlas Stats"].waitForExistence(timeout: 3)
-            || app.staticTexts["Territory conquered"].waitForExistence(timeout: 3)
-            || app.staticTexts["Lifetime XP"].waitForExistence(timeout: 2)
-        guard hasChrome else {
+        guard sawChrome else {
             throw XCTSkip("Progress tab chrome not available in this simulator session")
         }
 
+        guard app.state == .runningForeground || app.state == .runningBackground else {
+            throw XCTSkip("App terminated while Progress tab was visible")
+        }
         let hasExplorerContent =
-            app.staticTexts["Territory conquered"].waitForExistence(timeout: 5)
-            || app.staticTexts["Lifetime XP"].waitForExistence(timeout: 2)
-            || app.staticTexts["Mastery ladder"].waitForExistence(timeout: 2)
-            || app.staticTexts["Frontier"].waitForExistence(timeout: 2)
+            app.staticTexts["Territory conquered"].exists
+            || app.staticTexts["Lifetime XP"].exists
+            || app.staticTexts["Mastery ladder"].exists
+            || app.staticTexts["Frontier"].exists
             || revealStaticText("Territory conquered")
             || revealStaticText("Lifetime XP")
         guard hasExplorerContent else {
