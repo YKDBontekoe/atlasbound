@@ -11,7 +11,7 @@ Guidance for AI agents and contributors working in this repo.
 | Platform | iOS 17+, Xcode 16+ |
 | Bundle ID | `com.atlasbound.app` |
 | Scheme | `Atlasbound` |
-| Persistence | `Documents/atlasbound-world.json` + `atlasbound-pinpoint.json` + `atlasbound-activities.json` + `atlasbound-regions.json` + UserDefaults tile size |
+| Persistence | `Documents/atlasbound-world.json` + `atlasbound-pinpoint.json` + `atlasbound-activities.json` + `atlasbound-regions.json` + `atlasbound-treasures.json` + `atlasbound-inventory.json` + UserDefaults tile size |
 | Distribution | Unsigned IPA → GitHub Releases + Pages AltStore source |
 
 ## Read first
@@ -49,6 +49,7 @@ Atlasbound/
     GeocodeLimiter.swift       # Shared throttled CLGeocoder
     FrontierEngine.swift       # Weekly expeditions + frontier scoring
     TreasureEventEngine.swift  # Daily trails, weekly vaults, and relic rewards
+    FieldFindEngine.swift      # Field-find rolls, loot tables, craft/salvage
     PinpointController.swift   # Pinpoint game orchestration
     PinpointScoring.swift      # Distance + score math (Sendable)
     LookAroundLocationPool.swift # Coverage-region + Home Turf targets (Sendable)
@@ -58,9 +59,11 @@ Atlasbound/
     RegionLookupStore.swift    # Reverse-geocode place cache (JSON)
     PinpointStore.swift        # Pinpoint game history (JSON)
     ActivityHistoryStore.swift # Activity session history + per-type records
-  Models/                      # WorldTile, activity types, FrontierModels, TreasureModels, PinpointModels
+    TreasureStore.swift        # Trail, vault, relic persistence
+    InventoryStore.swift       # Field finds + stackable inventory (JSON)
+  Models/                      # WorldTile, activity types, FrontierModels, TreasureModels, ItemModels, PinpointModels
   Map/                         # DiscoveryMapView, AtlasStatsMapView, GuessMapView (MapKit)
-  Views/                       # MainMapScreen, summary, tabs, Pinpoint + preparing views
+  Views/                       # MainMapScreen, summary, tabs, Pinpoint + inventory views
   Theme/                       # AtlasTheme
 AtlasboundTests/               # Unit + chrome snapshot tests
 AtlasboundUITests/             # UI smoke tests

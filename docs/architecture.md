@@ -10,11 +10,14 @@ AtlasboundApp
   │    persistence + canonical 20 m atlas
   ├─ TreasureStore (@MainActor ObservableObject)
   │    daily trail + weekly vault + relic persistence
+  ├─ InventoryStore (@MainActor ObservableObject)
+  │    field finds + stackable inventory + active effects
   └─ WorldController (@MainActor ObservableObject)
        ├─ ActivityRecorder     — shared explicit/passive GPS samples
        ├─ TileEngine           — via store.tileEngine
        ├─ LandmarkResolver     — MapKit public-landmark targets
        ├─ TreasureEventEngine — pure trail/choice/reward rules
+       ├─ FieldFindEngine     — pure find rolls + craft/salvage
        └─ ProgressionEngine    — discovery / familiarity
             └─ Views (RootTabView → MainMapScreen → DiscoveryMapView)
 ```
@@ -40,7 +43,7 @@ AtlasboundApp
 
 - **Persisted:** 20 m tile IDs, axial `q`/`r`, mastery fields, activity stamps, dates, and totals.
 - **Derived at render:** hex polygons, map overlays, fog rings.
-- Save files: `Documents/atlasbound-world.json` and `atlasbound-treasures.json`.
+- Save files: `Documents/atlasbound-world.json`, `atlasbound-treasures.json`, and `atlasbound-inventory.json`.
 
 ## UI notes
 
@@ -84,6 +87,19 @@ Serverless daily exploration loop using nearby MapKit landmarks.
 | `JournalTabView` | Trail, relics, discoveries, optional activity history | SwiftUI |
 
 Each local day produces a three-stage trail. Three daily keys unlock the ISO-week vault.
+
+## Field finds & inventory
+
+Deterministic pickups while exploring tiles; stackable pack separate from Treasure relics.
+
+| Type | Role | Threading |
+|------|------|-----------|
+| `FieldFindEngine` | Spawn rolls, loot tables, assemble/salvage, XP effect math | `Sendable` |
+| `InventoryStore` | Stacks, claimed find IDs, active effects, cartographer pins | `@MainActor` |
+| `DiscoveryMapView` | Nearby unclaimed find preview markers | SwiftUI |
+| `JournalTabView` | Inventory use / activate / assemble / salvage | SwiftUI |
+
+Find IDs are `find:{dayKey}:{tileID}` — claim once per local day. Atlas Tokens remain non-consumable; field items grant temporary modifiers and charges only.
 
 ## Extension points
 

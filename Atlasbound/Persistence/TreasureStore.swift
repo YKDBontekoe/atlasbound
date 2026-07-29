@@ -55,6 +55,15 @@ final class TreasureStore: ObservableObject {
         persist()
     }
 
+    /// Grants an extra free trail reroll (e.g. Trail Reroll Token / Ribboned Cache Key).
+    func grantFreeReroll(date: Date = .now) {
+        refreshCalendarState(date: date)
+        guard var trail = dailyTrail, !trail.isCompleted else { return }
+        trail.freeRerollsRemaining += 1
+        dailyTrail = trail
+        persist()
+    }
+
     func reroll(anchor: TileCoordinate, tileEngine: TileEngine, date: Date = .now) {
         guard var trail = dailyTrail, trail.freeRerollsRemaining > 0, !trail.isCompleted else { return }
         let dayKey = TreasureEventEngine.localDayKey(for: date)

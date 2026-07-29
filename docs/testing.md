@@ -75,6 +75,11 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | Daily treasure trail | Reach marker with Sim GPS and choose routes | Each target advances once; final target grants relic + key |
 | Weekly vault | Complete three daily trails | Vault target appears and awards rare-or-better relic once |
 | Landmark fallback | Disable network before generating trail | Procedural cache remains playable and can be rerolled once |
+| Field find pickup | Explore new tiles via Sim GPS | Occasional pickup sheet; item appears in Journal → Inventory |
+| Inventory use / activate | Journal → long-press item | Boosts start effects; charges apply trail reroll / fog lantern / survey pulse |
+| Assemble | Journal → Assemble | Recipes craft when materials are sufficient |
+| Salvage | Journal → long-press uncommon+ item | Breaks into 1–2 materials |
+| Clear atlas finds | Settings → Clear discovered tiles | Claimed find IDs reset so tiles can yield again; owned stacks kept |
 
 ## Agent checklist after behavioral changes
 

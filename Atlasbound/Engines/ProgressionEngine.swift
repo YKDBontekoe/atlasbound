@@ -124,6 +124,13 @@ struct ProgressionEngine: Sendable {
         }
     }
 
+    /// Survey Beacon / tools: add mastery XP and advance state without counting a visit.
+    func applyMasteryPulse(tile: inout WorldTile, amount: Int) {
+        guard amount > 0, tile.isDiscovered else { return }
+        tile.masteryXP += amount
+        advanceStateIfNeeded(&tile)
+    }
+
 }
 
 enum VisitKind: Sendable {

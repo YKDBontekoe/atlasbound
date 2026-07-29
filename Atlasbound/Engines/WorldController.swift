@@ -23,6 +23,7 @@ final class WorldController: ObservableObject {
     let regionLookup: RegionLookupStore
     let gameCenterManager: GameCenterManager
     let treasureStore: TreasureStore
+    let inventoryStore: InventoryStore
     private let progression = ProgressionEngine()
     private let frontierEngine = FrontierEngine()
     private let sectorEngine = HexSectorEngine()
@@ -46,6 +47,7 @@ final class WorldController: ObservableObject {
         regionLookup: RegionLookupStore? = nil,
         gameCenterManager: GameCenterManager? = nil,
         treasureStore: TreasureStore? = nil,
+        inventoryStore: InventoryStore? = nil,
         recorder: ActivityRecorder? = nil,
         landmarkResolver: any LandmarkResolving = LandmarkResolver()
     ) {
@@ -54,6 +56,7 @@ final class WorldController: ObservableObject {
         self.regionLookup = regionLookup ?? RegionLookupStore()
         self.gameCenterManager = gameCenterManager ?? GameCenterManager()
         self.treasureStore = treasureStore ?? TreasureStore()
+        self.inventoryStore = inventoryStore ?? InventoryStore()
         self.recorder = recorder ?? ActivityRecorder()
         self.landmarkResolver = landmarkResolver
         restoreSelectedActivityType()
@@ -234,10 +237,119 @@ final class WorldController: ObservableObject {
         guard let coordinate else { return [] }
         let engine = tileEngine
         let center = engine.axialCoordinate(for: coordinate)
-        return engine.ring(around: center, radius: radius).filter { axial in
+        let effectiveRadius = radius + (inventoryStore.hasFogLanternActive ? FieldFindConstants.fogLanternRadiusBonus : 0)
+        return engine.ring(around: center, radius: effectiveRadius).filter { axial in
             let id = TileEngine.makeTileID(q: axial.q, r: axial.r, sizeMeters: engine.tileSizeMeters)
             let tile = sessionTiles[id] ?? store.tiles[id]
             return tile == nil || tile?.state == .fogged
+        }
+    }
+
+    var fieldFindPreviews: [FieldFindPreview] {
+        inventoryStore.previewFinds(
+            around: playerTileCoordinate,
+            tileEngine: tileEngine,
+            discoveredTileIDs: store.discoveredTileIDs
+        )
+    }
+
+    /// Use / activate inventory items with world side effects.
+    @discardableResult
+    func performItemAction(itemID: String, action: ItemActionKind) -> ItemActionResult? {
+        guard let def = ItemCatalog.definition(for: itemID) else { return nil }
+        switch action {
+        case .use:
+            let result = inventoryStore.useItem(itemID: itemID)
+            if let result, result.grantedFamiliarityXP > 0 || result.grantedDiscoveryXP > 0 {
+                store.addXP(discovery: result.grantedDiscoveryXP, familiarity: result.grantedFamiliarityXP)
+            }
+            if def.effectKind == .streakOil, result != nil {
+                frontierCombo = inventoryStore.consumeStreakOil(combo: frontierCombo)
+            }
+            if result != nil { AtlasHaptics.success() }
+            return result
+        case .activate:
+            return activateInventoryItem(itemID: itemID, definition: def)
+        case .salvage:
+            let result = inventoryStore.salvage(itemID: itemID)
+            if result != nil { AtlasHaptics.select() }
+            return result
+        case .discard:
+            let result = inventoryStore.discard(itemID: itemID)
+            if result != nil { AtlasHaptics.select() }
+            return result
+        case .assemble, .collect:
+            return nil
+        }
+    }
+
+    @discardableResult
+    func assembleRecipe(recipeID: String) -> ItemActionResult? {
+        let result = inventoryStore.assemble(recipeID: recipeID)
+        if result != nil { AtlasHaptics.success() }
+        return result
+    }
+
+    private func activateInventoryItem(itemID: String, definition: ItemDefinition) -> ItemActionResult? {
+        let vaultHint: String = {
+            let keys = treasureStore.weeklyVault.keys
+            let need = TreasureConstants.keysRequiredForVault
+            if treasureStore.weeklyVault.isCompleted {
+                return "This week’s vault already rests open."
+            }
+            if treasureStore.weeklyVault.isUnlocked {
+                return "The vault is unlocked — follow the map marker."
+            }
+            return "Vault keys \(keys)/\(need). Keep finishing daily trails."
+        }()
+
+        let playerTileID = playerTileCoordinate.map {
+            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: tileEngine.tileSizeMeters)
+        }
+
+        guard let result = inventoryStore.activateItem(
+            itemID: itemID,
+            playerTileID: playerTileID,
+            vaultHint: vaultHint
+        ) else { return nil }
+
+        switch definition.effectKind {
+        case .trailReroll:
+            treasureStore.grantFreeReroll()
+        case .surveyBeacon:
+            applySurveyBeaconPulse()
+        default:
+            break
+        }
+        AtlasHaptics.success()
+        objectWillChange.send()
+        return result
+    }
+
+    private func applySurveyBeaconPulse() {
+        guard let center = playerTileCoordinate else { return }
+        let engine = tileEngine
+        var updated: [WorldTile] = []
+        let centerID = TileEngine.makeTileID(q: center.q, r: center.r, sizeMeters: engine.tileSizeMeters)
+        let neighbors = engine.ring(around: center, radius: 1)
+
+        func bump(_ id: String, amount: Int) {
+            guard var tile = sessionTiles[id] ?? store.tiles[id], tile.isDiscovered else { return }
+            progression.applyMasteryPulse(tile: &tile, amount: amount)
+            if explorationMode.isExplicitSession {
+                sessionTiles[id] = tile
+            }
+            updated.append(tile)
+        }
+
+        bump(centerID, amount: FieldFindConstants.surveyBeaconMasteryXP)
+        for axial in neighbors {
+            let id = TileEngine.makeTileID(q: axial.q, r: axial.r, sizeMeters: engine.tileSizeMeters)
+            guard id != centerID else { continue }
+            bump(id, amount: FieldFindConstants.surveyBeaconNeighborXP)
+        }
+        if !updated.isEmpty {
+            store.applyLiveVisitProgress(updatedTiles: updated, discoveryXP: 0, familiarityXP: 0)
         }
     }
 
@@ -524,12 +636,18 @@ final class WorldController: ObservableObject {
             at: date,
             activity: .unknown
         )
+        let modified = inventoryStore.applyXPModifiers(
+            discovery: progress.discoveryXP,
+            familiarity: progress.familiarityXP
+        )
         store.applyLiveVisitProgress(
             updatedTiles: newIDs.compactMap { updated[$0] },
-            discoveryXP: progress.discoveryXP,
-            familiarityXP: progress.familiarityXP
+            discoveryXP: modified.discovery,
+            familiarityXP: modified.familiarity
         )
         treasureStore.processVisitedTileIDs(newIDs)
+        inventoryStore.processVisitedTileIDs(newIDs, discoveryTileIDs: discoveryCandidates, date: date)
+        objectWillChange.send()
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
         if progress.tilesDiscovered > 0 {
             regionLookup.resolve(tiles: store.discoveredTiles)
@@ -567,6 +685,11 @@ final class WorldController: ObservableObject {
             activity: activity
         )
 
+        let modified = inventoryStore.applyXPModifiers(
+            discovery: progress.discoveryXP,
+            familiarity: progress.familiarityXP
+        )
+
         var discovered = sessionDiscoveredIDs
         for id in discoveryCandidates {
             if let tile = sessionTiles[id], tile.isDiscovered {
@@ -578,8 +701,8 @@ final class WorldController: ObservableObject {
         sessionProgress.tilesVisited = sessionVisitedTileIDs.count
         sessionProgress.tilesDiscovered += progress.tilesDiscovered
         sessionProgress.tilesRevisited += progress.tilesRevisited
-        sessionProgress.discoveryXP += progress.discoveryXP
-        sessionProgress.familiarityXP += progress.familiarityXP
+        sessionProgress.discoveryXP += modified.discovery
+        sessionProgress.familiarityXP += modified.familiarity
         sessionDiscoveredCount = sessionProgress.tilesDiscovered
 
         emitSessionFeedback(
@@ -590,6 +713,8 @@ final class WorldController: ObservableObject {
         )
 
         treasureStore.processVisitedTileIDs(newIDs)
+        inventoryStore.processVisitedTileIDs(newIDs, discoveryTileIDs: discoveryCandidates, date: date)
+        objectWillChange.send()
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
 
         let discoveredUpdates = newIDs.compactMap { id -> WorldTile? in
@@ -598,8 +723,8 @@ final class WorldController: ObservableObject {
         }
         store.applyLiveVisitProgress(
             updatedTiles: discoveredUpdates,
-            discoveryXP: progress.discoveryXP,
-            familiarityXP: progress.familiarityXP
+            discoveryXP: modified.discovery,
+            familiarityXP: modified.familiarity
         )
     }
 
