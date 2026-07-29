@@ -1,14 +1,19 @@
 # Testing
 
-CI discovers the XCTest suite on every run, balances unit/visual test classes
-across four macOS runners, and balances UI test methods across five more.
-Static validation and the unsigned IPA build run alongside those shards.
+CI discovers the XCTest suite on every run, runs unit/visual tests on one
+macOS runner, and balances UI test methods across three more. Together with the
+unsigned IPA job, this fills the five available macOS runner slots without
+creating a second queued wave. Static validation runs alongside them.
 Releases gate publishing on the complete matrix plus validation and packaging.
 
 Shared macOS test steps live in [`scripts/ci-run-tests.sh`](../scripts/ci-run-tests.sh) and [`.github/actions/ios-test`](../.github/actions/ios-test) (simulator boot, snapshot bootstrap, `xcodebuild test`).
 The shared action restores a versioned Xcode DerivedData cache so later commits
 can compile incrementally; unit/visual and UI targets use separate runners but
 the same cache lineage.
+
+The simulator starts before `xcodebuild build-for-testing`, so its cold boot
+overlaps compilation. Tests then use `test-without-building` after the simulator
+is ready.
 
 ## Automated suite
 

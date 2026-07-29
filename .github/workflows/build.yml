@@ -34,13 +34,13 @@ jobs:
           UNIT_MATRIX="$(python3 scripts/ci_test_matrix.py \
             --path AtlasboundTests \
             --target AtlasboundTests \
-            --shards 4 \
+            --shards 1 \
             --granularity class \
             --label unit)"
           UI_MATRIX="$(python3 scripts/ci_test_matrix.py \
             --path AtlasboundUITests \
             --target AtlasboundUITests \
-            --shards 5 \
+            --shards 3 \
             --granularity method \
             --label ui)"
           echo "unit=$UNIT_MATRIX" >> "$GITHUB_OUTPUT"

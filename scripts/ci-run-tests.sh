@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Boot iOS Simulator, optionally bootstrap snapshot goldens, and run xcodebuild test.
+# Start an iOS Simulator, compile while it boots, then run the selected tests.
 # Used by GitHub Actions and local CI parity runs.
 set -euo pipefail
 
@@ -52,12 +52,26 @@ bootstrap_snapshots_if_needed() {
   fi
 }
 
-boot_simulator() {
+start_simulator() {
   local name="$1"
   xcrun simctl boot "$name" 2>/dev/null || true
+}
+
+prepare_simulator() {
+  local name="$1"
   xcrun simctl bootstatus "$name" -b
   xcrun simctl privacy "$name" grant location-always com.atlasbound.app || true
   xcrun simctl privacy "$name" grant location com.atlasbound.app || true
+}
+
+build_tests() {
+  local name="$1"
+  local dest="platform=iOS Simulator,name=${name}"
+  xcodebuild build-for-testing \
+    -project "$PROJECT" \
+    -scheme "$SCHEME" \
+    -destination "$dest" \
+    COMPILER_INDEX_STORE_ENABLE=NO
 }
 
 run_tests() {
@@ -65,7 +79,7 @@ run_tests() {
   shift
   local dest="platform=iOS Simulator,name=${name}"
   rm -rf "$RESULT_BUNDLE"
-  xcodebuild test \
+  xcodebuild test-without-building \
     -project "$PROJECT" \
     -scheme "$SCHEME" \
     -destination "$dest" \
@@ -79,7 +93,9 @@ main() {
   echo "Using simulator: ${SIMULATOR_NAME}"
 
   bootstrap_snapshots_if_needed
-  boot_simulator "$SIMULATOR_NAME"
+  start_simulator "$SIMULATOR_NAME"
+  build_tests "$SIMULATOR_NAME"
+  prepare_simulator "$SIMULATOR_NAME"
   run_tests "$SIMULATOR_NAME" "$@"
 }
 
