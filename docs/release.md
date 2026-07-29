@@ -8,6 +8,10 @@ Unsigned IPA distribution. AltStore/SideStore re-signs with the user’s Apple I
 https://ykdbontekoe.github.io/atlasbound/apps.json
 ```
 
+The Pages root at `https://ykdbontekoe.github.io/atlasbound/` serves the
+documentation landing page from `altstore/index.html`. Both the landing page
+and AltStore source are deployed together by the release workflow.
+
 ## What ships on `main`
 
 Workflow: `.github/workflows/release.yml`

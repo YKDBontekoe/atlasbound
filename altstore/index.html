@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101c19">
+  <meta
+    name="description"
+    content="Atlasbound is a location-based exploration RPG for iPhone. Discover the world one hex at a time."
+  >
+  <title>Atlasbound — Explore the world, one hex at a time</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f3f7f4;
+      --muted: #aabbb4;
+      --accent: #65d5a4;
+      --accent-strong: #8aebc0;
+      --panel: rgba(20, 39, 33, 0.82);
+      --line: rgba(184, 233, 211, 0.16);
+      --shadow: rgba(0, 0, 0, 0.34);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 18% -10%, rgba(54, 156, 113, 0.31), transparent 35rem),
+        radial-gradient(circle at 95% 22%, rgba(57, 111, 92, 0.23), transparent 31rem),
+        #09110f;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .shell {
+      width: min(1120px, calc(100% - 2rem));
+      margin-inline: auto;
+    }
+
+    .site-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-block: 1.3rem;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      font-weight: 760;
+      letter-spacing: -0.02em;
+    }
+
+    .brand img {
+      width: 42px;
+      height: 42px;
+      border-radius: 11px;
+      box-shadow: 0 8px 24px var(--shadow);
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .nav a {
+      text-decoration: none;
+    }
+
+    .nav a:hover,
+    .nav a:focus-visible {
+      color: var(--ink);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(290px, 0.75fr);
+      gap: clamp(2rem, 7vw, 6rem);
+      align-items: center;
+      min-height: 72vh;
+      padding-block: clamp(4rem, 10vw, 8rem);
+    }
+
+    .eyebrow {
+      margin: 0 0 1rem;
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(3.2rem, 8.6vw, 7.2rem);
+      font-weight: 790;
+      letter-spacing: -0.075em;
+      line-height: 0.92;
+    }
+
+    .lede {
+      max-width: 650px;
+      margin: 1.7rem 0 0;
+      color: var(--muted);
+      font-size: clamp(1.05rem, 2vw, 1.3rem);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin-top: 2rem;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0.7rem 1.15rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.035);
+      text-decoration: none;
+      font-size: 0.92rem;
+      font-weight: 720;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .button:hover,
+    .button:focus-visible {
+      transform: translateY(-2px);
+      border-color: rgba(138, 235, 192, 0.55);
+    }
+
+    .button.primary {
+      border-color: transparent;
+      color: #07130e;
+      background: var(--accent);
+    }
+
+    .button.primary:hover,
+    .button.primary:focus-visible {
+      background: var(--accent-strong);
+    }
+
+    .atlas-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 390px;
+      border: 1px solid var(--line);
+      border-radius: 32px;
+      background:
+        linear-gradient(145deg, rgba(53, 137, 99, 0.28), rgba(10, 23, 19, 0.75)),
+        var(--panel);
+      box-shadow: 0 32px 70px var(--shadow);
+    }
+
+    .atlas-card::before,
+    .atlas-card::after {
+      position: absolute;
+      width: 150px;
+      height: 130px;
+      border: 1px solid rgba(138, 235, 192, 0.28);
+      background: rgba(101, 213, 164, 0.08);
+      content: "";
+      clip-path: polygon(25% 6.7%, 75% 6.7%, 100% 50%, 75% 93.3%, 25% 93.3%, 0% 50%);
+    }
+
+    .atlas-card::before {
+      top: 35px;
+      right: 24px;
+      transform: rotate(8deg);
+    }
+
+    .atlas-card::after {
+      right: 117px;
+      bottom: 34px;
+      transform: rotate(-7deg);
+    }
+
+    .card-copy {
+      position: absolute;
+      right: 1.7rem;
+      bottom: 1.7rem;
+      left: 1.7rem;
+      z-index: 1;
+    }
+
+    .card-copy strong {
+      display: block;
+      font-size: 1.35rem;
+      letter-spacing: -0.025em;
+    }
+
+    .card-copy span {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .section {
+      padding-block: 5rem;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-heading {
+      max-width: 650px;
+      margin-bottom: 2.2rem;
+    }
+
+    h2 {
+      margin: 0 0 0.7rem;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      letter-spacing: -0.045em;
+      line-height: 1.05;
+    }
+
+    .section-heading p,
+    .step p,
+    .doc-card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .feature,
+    .doc-card {
+      padding: 1.45rem;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--panel);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.13);
+    }
+
+    .feature h3,
+    .doc-card h3,
+    .step h3 {
+      margin: 0 0 0.55rem;
+      font-size: 1.05rem;
+    }
+
+    .feature p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .install {
+      display: grid;
+      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+      gap: clamp(2rem, 7vw, 6rem);
+      align-items: start;
+    }
+
+    .steps {
+      display: grid;
+      gap: 1.6rem;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 0.9rem;
+    }
+
+    .step-number {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border: 1px solid rgba(101, 213, 164, 0.4);
+      border-radius: 50%;
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .source-url {
+      display: block;
+      overflow-x: auto;
+      margin-top: 1rem;
+      padding: 1rem 1.15rem;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      color: var(--accent-strong);
+      background: rgba(0, 0, 0, 0.23);
+      font: 0.87rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: nowrap;
+    }
+
+    .docs-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .doc-card {
+      display: block;
+      text-decoration: none;
+      transition: border-color 160ms ease, transform 160ms ease;
+    }
+
+    .doc-card:hover,
+    .doc-card:focus-visible {
+      transform: translateY(-2px);
+      border-color: rgba(138, 235, 192, 0.45);
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-block: 2rem 3rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    footer p {
+      margin: 0;
+    }
+
+    @media (max-width: 760px) {
+      .nav a:not(:last-child) {
+        display: none;
+      }
+
+      .hero,
+      .install {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        min-height: auto;
+        padding-block: 4.5rem;
+      }
+
+      .atlas-card {
+        min-height: 300px;
+      }
+
+      .feature-grid,
+      .docs-grid {
+        grid-template-columns: 1fr;
+      }
+
+      footer {
+        flex-direction: column;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      .button,
+      .doc-card {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header shell">
+    <a class="brand" href="./" aria-label="Atlasbound home">
+      <img src="icon.png" alt="">
+      <span>Atlasbound</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#docs">Docs</a>
+      <a href="https://github.com/YKDBontekoe/atlasbound">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero shell">
+      <div>
+        <p class="eyebrow">Location RPG for iPhone</p>
+        <h1>Your world is the map.</h1>
+        <p class="lede">
+          Move through the real world to reveal a personal atlas, master familiar
+          territory, follow treasure trails, and discover what waits beyond the fog.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#install">Install with AltStore</a>
+          <a class="button" href="https://github.com/YKDBontekoe/atlasbound/releases/latest">
+            Latest release
+          </a>
+        </div>
+      </div>
+      <div class="atlas-card" aria-hidden="true">
+        <div class="card-copy">
+          <strong>Every journey leaves a mark.</strong>
+          <span>Discovery, familiarity, expeditions, and field finds—all stored on your device.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="shell">
+        <div class="section-heading">
+          <p class="eyebrow">Explore differently</p>
+          <h2>A game built around where you go.</h2>
+          <p>Atlasbound turns everyday movement into a persistent exploration game.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature">
+            <h3>Reveal your atlas</h3>
+            <p>Discover a 20-metre hex grid on foot, by bike, in transit, or wherever the day takes you.</p>
+          </article>
+          <article class="feature">
+            <h3>Master familiar ground</h3>
+            <p>Revisit tiles to earn familiarity XP, progress mastery, and build your explorer profile.</p>
+          </article>
+          <article class="feature">
+            <h3>Follow the frontier</h3>
+            <p>Take on weekly expeditions, daily landmark trails, vaults, relics, and field finds.</p>
+          </article>
+          <article class="feature">
+            <h3>Test your instincts</h3>
+            <p>Play five-round Pinpoint challenges using spoiler-free Look Around scenes.</p>
+          </article>
+          <article class="feature">
+            <h3>Track your story</h3>
+            <p>Review territory, records, routes, places visited, and progress in your journal.</p>
+          </article>
+          <article class="feature">
+            <h3>Keep it yours</h3>
+            <p>Your atlas and game progress are persisted locally on your iPhone.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="install">
+      <div class="shell install">
+        <div class="section-heading">
+          <p class="eyebrow">Sideload on iPhone</p>
+          <h2>Install through AltStore or SideStore.</h2>
+          <p>
+            Atlasbound ships as an unsigned IPA. Your sideloading app signs it
+            locally with your Apple ID.
+          </p>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <span class="step-number">1</span>
+            <div>
+              <h3>Open your source manager</h3>
+              <p>In AltStore or SideStore, open Sources and add a new source.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-number">2</span>
+            <div>
+              <h3>Add the Atlasbound source</h3>
+              <p>Paste this URL when prompted:</p>
+              <code class="source-url">https://ykdbontekoe.github.io/atlasbound/apps.json</code>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-number">3</span>
+            <div>
+              <h3>Install Atlasbound</h3>
+              <p>Select Atlasbound from the source. Future releases appear there as updates.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="docs">
+      <div class="shell">
+        <div class="section-heading">
+          <p class="eyebrow">Documentation</p>
+          <h2>Build, understand, and contribute.</h2>
+          <p>The complete technical documentation lives beside the source on GitHub.</p>
+        </div>
+        <div class="docs-grid">
+          <a class="doc-card" href="https://github.com/YKDBontekoe/atlasbound/blob/main/docs/architecture.md">
+            <h3>Architecture</h3>
+            <p>Ownership, layering, state flow, engines, stores, controllers, and views.</p>
+          </a>
+          <a class="doc-card" href="https://github.com/YKDBontekoe/atlasbound/blob/main/docs/domain.md">
+            <h3>Domain model</h3>
+            <p>Hex identifiers, route coverage, discovery XP, familiarity, and mastery.</p>
+          </a>
+          <a class="doc-card" href="https://github.com/YKDBontekoe/atlasbound/blob/main/docs/development.md">
+            <h3>Development</h3>
+            <p>Local setup, project conventions, file layout, and validation commands.</p>
+          </a>
+          <a class="doc-card" href="https://github.com/YKDBontekoe/atlasbound/blob/main/docs/release.md">
+            <h3>Release</h3>
+            <p>Automatic versioning, unsigned IPA builds, releases, and the AltStore source.</p>
+          </a>
+          <a class="doc-card" href="https://github.com/YKDBontekoe/atlasbound/blob/main/docs/testing.md">
+            <h3>Testing</h3>
+            <p>Automated suites, simulator guidance, and the manual test matrix.</p>
+          </a>
+          <a class="doc-card" href="https://github.com/YKDBontekoe/atlasbound">
+            <h3>Source repository</h3>
+            <p>Browse the app, report an issue, or follow the latest development.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="shell">
+    <p>Atlasbound · Explore the world, one hex at a time.</p>
+    <p><a href="https://github.com/YKDBontekoe/atlasbound">View on GitHub</a></p>
+  </footer>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily landmark treasure trails, collect relics, and unlock a weekly vault. Fitness activity tracking is optional.
 
-**Docs:** [docs/](docs/) · **Agents:** [AGENTS.md](AGENTS.md)
+**Website:** [ykdbontekoe.github.io/atlasbound](https://ykdbontekoe.github.io/atlasbound/) · **Docs:** [docs/](docs/) · **Agents:** [AGENTS.md](AGENTS.md)
 
 ## Current capabilities
 
