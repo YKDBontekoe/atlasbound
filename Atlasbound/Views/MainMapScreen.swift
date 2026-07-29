@@ -14,11 +14,18 @@ struct MainMapScreen: View {
     @State private var showSettings = false
     @State private var showActivityPicker = false
     @State private var showExpeditionSheet = false
-    @State private var showLayers = false
+    @State private var showMapOptions = false
     @State private var showTreasureSheet = false
     @State private var presentedSummary: ActivitySummary?
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
     @AppStorage(OnboardingPreference.storageKey) private var onboardingVersion = 0
+    @AppStorage("map.style") private var mapStyleRaw = LiveMapStyle.explorer.rawValue
+    @AppStorage("map.dataLayer") private var mapDataLayerRaw = LiveMapDataLayer.mastery.rawValue
+    @AppStorage("map.uses3D") private var prefers3DMap = false
+    @AppStorage("map.layer.mastery") private var showsMasteryLayer = true
+    @AppStorage("map.layer.places") private var showsPlacesLayer = true
+    @AppStorage("map.layer.fog") private var showsFogLayer = true
+    @AppStorage("map.layer.frontier") private var showsFrontierLayer = true
     @State private var onboardingStep = 0
 
     init(controller: WorldController, store: TileStore) {
@@ -44,7 +51,13 @@ struct MainMapScreen: View {
                 recorder: recorder,
                 position: $position,
                 followsUser: $followsUser,
-                showLayers: showLayers,
+                mapStyle: availableMapStyle,
+                dataLayer: availableMapDataLayer,
+                is3DEnabled: uses3DMap,
+                showsMasteryLayer: showsMasteryLayer,
+                showsPlacesLayer: showsPlacesLayer,
+                showsFogLayer: showsFogLayer,
+                showsFrontierLayer: showsFrontierLayer,
                 onTreasureTap: { showTreasureSheet = true }
             )
             .ignoresSafeArea()
@@ -144,6 +157,21 @@ struct MainMapScreen: View {
         .sheet(isPresented: $showActivityPicker) {
             ActivityPickerSheet(controller: controller, startsTrackingOnSelection: true)
                 .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showMapOptions) {
+            LiveMapOptionsSheet(
+                selectedStyleRaw: $mapStyleRaw,
+                selectedDataLayerRaw: $mapDataLayerRaw,
+                uses3DMap: $prefers3DMap,
+                showsMastery: $showsMasteryLayer,
+                showsPlaces: $showsPlacesLayer,
+                showsFog: $showsFogLayer,
+                showsFrontier: $showsFrontierLayer,
+                explorerLevel: ExplorerProgressionEngine().level(
+                    forTotalXP: store.discoveryXPTotal + store.familiarityXPTotal
+                )
+            )
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showTreasureSheet) {
             TreasureDetailSheet(controller: controller, store: treasureStore)
@@ -385,21 +413,70 @@ struct MainMapScreen: View {
                 .buttonStyle(GlassButtonStyle(shape: .circle))
                 .opacity(controller.isRecording ? 0 : 1)
 
+                if explorerLevel >= ExplorerProgressionEngine.threeDMapRequiredLevel {
+                    Button {
+                        prefers3DMap.toggle()
+                        AtlasHaptics.select()
+                    } label: {
+                        Image(systemName: "cube.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(uses3DMap ? AtlasTheme.blue : .secondary)
+                            .frame(width: 42, height: 42)
+                            .rotation3DEffect(
+                                .degrees(uses3DMap ? 18 : 0),
+                                axis: (x: 1, y: 1, z: 0)
+                            )
+                            .animation(AtlasMotion.camera, value: uses3DMap)
+                    }
+                    .buttonStyle(GlassButtonStyle(shape: .circle))
+                    .accessibilityLabel(uses3DMap ? "Disable 3D map" : "Enable 3D map")
+                }
+
                 Button {
-                    showLayers.toggle()
+                    showMapOptions = true
                     AtlasHaptics.select()
                 } label: {
                     Image(systemName: "square.3.layers.3d.top.filled")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(showLayers ? AtlasTheme.blue : .secondary)
+                        .foregroundStyle(hasCustomMapPresentation ? AtlasTheme.blue : .secondary)
                         .frame(width: 42, height: 42)
-                        .scaleEffect(showLayers ? 1.05 : 1)
-                        .animation(AtlasMotion.fade, value: showLayers)
+                        .animation(AtlasMotion.fade, value: hasCustomMapPresentation)
                 }
                 .buttonStyle(GlassButtonStyle(shape: .circle))
+                .accessibilityLabel("Map styles and layers")
             }
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    private var hasCustomMapPresentation: Bool {
+        mapStyleRaw != LiveMapStyle.explorer.rawValue ||
+            mapDataLayerRaw != LiveMapDataLayer.mastery.rawValue ||
+            uses3DMap ||
+            !showsMasteryLayer ||
+            !showsPlacesLayer ||
+            !showsFogLayer ||
+            !showsFrontierLayer
+    }
+
+    private var explorerLevel: Int {
+        ExplorerProgressionEngine().level(
+            forTotalXP: store.discoveryXPTotal + store.familiarityXPTotal
+        )
+    }
+
+    private var availableMapStyle: LiveMapStyle {
+        let selected = LiveMapStyle(rawValue: mapStyleRaw) ?? .explorer
+        return selected.requiredLevel <= explorerLevel ? selected : .explorer
+    }
+
+    private var availableMapDataLayer: LiveMapDataLayer {
+        let selected = LiveMapDataLayer(rawValue: mapDataLayerRaw) ?? .mastery
+        return selected.requiredLevel <= explorerLevel ? selected : .mastery
+    }
+
+    private var uses3DMap: Bool {
+        prefers3DMap && explorerLevel >= ExplorerProgressionEngine.threeDMapRequiredLevel
     }
 
     // MARK: - Helpers
@@ -454,13 +531,24 @@ struct MainMapScreen: View {
             ? AtlasTheme.mapSpanRecordingMeters
             : AtlasTheme.mapSpanIdleMeters
         withAnimation(AtlasMotion.camera) {
-            position = .region(
-                MKCoordinateRegion(
-                    center: location.coordinate,
-                    latitudinalMeters: span,
-                    longitudinalMeters: span
+            if uses3DMap {
+                position = .camera(
+                    MapCamera(
+                        centerCoordinate: location.coordinate,
+                        distance: span,
+                        heading: 0,
+                        pitch: 58
+                    )
                 )
-            )
+            } else {
+                position = .region(
+                    MKCoordinateRegion(
+                        center: location.coordinate,
+                        latitudinalMeters: span,
+                        longitudinalMeters: span
+                    )
+                )
+            }
         }
     }
 

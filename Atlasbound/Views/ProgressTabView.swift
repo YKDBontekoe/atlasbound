@@ -38,18 +38,37 @@ struct ProgressTabView: View {
         StatsEngine.discoveryDateRange(tiles: allTiles)
     }
 
+    private var explorerProgression: ExplorerProgressionSnapshot {
+        let stampedTypes = Set(allTiles.flatMap(\.activityStamps))
+            .filter { $0 != .unknown }
+        let metrics = ExplorerProgressionMetrics(
+            totalXP: store.discoveryXPTotal + store.familiarityXPTotal,
+            discoveredTiles: store.discoveredTileCount,
+            masteredTiles: allTiles.filter { $0.state.rawValue >= TileState.mastered.rawValue }.count,
+            legendaryTiles: allTiles.filter { $0.state == .legendary }.count,
+            totalVisits: allTiles.reduce(0) { $0 + $1.visitCount },
+            activeDays: StatsEngine.activeExplorationDays(tiles: allTiles),
+            activitiesCompleted: store.activitiesCompleted,
+            stampedActivityTypes: stampedTypes.count,
+            expeditionsCompleted: store.frontierState.lifetimeCompletedExpeditions
+        )
+        return ExplorerProgressionEngine().snapshot(metrics: metrics)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
-                    territoryCard
+                    ExplorerProgressionView(snapshot: explorerProgression)
                         .staggeredAppear(index: 0)
+                    territoryCard
+                        .staggeredAppear(index: 1)
                     if !placesVisited.isEmpty || regionLookup.isResolving {
                         placesVisitedCard
-                            .staggeredAppear(index: 1)
+                            .staggeredAppear(index: 2)
                     }
                     frontierStatsCard
-                        .staggeredAppear(index: 2)
+                        .staggeredAppear(index: 3)
                     personalRecordsCard
                         .staggeredAppear(index: 3)
                     if !activityFootprint.isEmpty {

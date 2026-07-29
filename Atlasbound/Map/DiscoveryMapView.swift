@@ -10,8 +10,13 @@ struct DiscoveryMapView: View {
     @Binding var position: MapCameraPosition
     @Binding var followsUser: Bool
 
-    /// When true (layers toggle), show mastery markers on top of fills.
-    var showLayers: Bool = false
+    var mapStyle: LiveMapStyle = .explorer
+    var dataLayer: LiveMapDataLayer = .mastery
+    var is3DEnabled: Bool = false
+    var showsMasteryLayer: Bool = true
+    var showsPlacesLayer: Bool = true
+    var showsFogLayer: Bool = true
+    var showsFrontierLayer: Bool = true
     var onTreasureTap: () -> Void = {}
 
     @State private var visibleRegion: MKCoordinateRegion?
@@ -22,11 +27,16 @@ struct DiscoveryMapView: View {
     @State private var cachedTargetBoundary: [TileCoordinate] = []
     @State private var cachedPlacePins: [PlaceMapPin] = []
     @State private var cachedPerimeterIDs: Set<String> = []
+    @State private var cachedMaximumVisitCount = 1
+    @State private var lastCamera: MapCamera?
 
     private var engine: TileEngine { store.tileEngine }
 
     var body: some View {
-        Map(position: $position) {
+        Map(
+            position: $position,
+            interactionModes: is3DEnabled ? .all : [.pan, .zoom, .rotate]
+        ) {
             if recorder.isSimulationActive, let coordinate = recorder.lastLocation?.coordinate {
                 Annotation("", coordinate: coordinate, anchor: .center) {
                     SimulatedUserDot()
@@ -36,7 +46,7 @@ struct DiscoveryMapView: View {
             }
 
             // Fill-only fog (no stroke) — cheaper for MapKit.
-            ForEach(cachedFog, id: \.self) { axial in
+            ForEach(showsFogLayer ? cachedFog : [], id: \.self) { axial in
                 let vertices = engine.polygon(for: axial)
                 if vertices.count >= 3 {
                     MapPolygon(coordinates: vertices)
@@ -51,16 +61,16 @@ struct DiscoveryMapView: View {
                     let charge = tile.weeklyCharge
                     let perimeter = cachedPerimeterIDs.contains(tile.id)
                     MapPolygon(coordinates: vertices)
-                        .foregroundStyle(tile.state.mapFill(isFreshDiscovery: fresh, weeklyCharge: charge))
+                        .foregroundStyle(discoveredFill(for: tile, isFresh: fresh, weeklyCharge: charge))
                         .stroke(
-                            tile.state.mapStroke(isFreshDiscovery: fresh, isPerimeter: perimeter),
-                            lineWidth: tile.state.mapStrokeWidth(isFreshDiscovery: fresh, isPerimeter: perimeter)
+                            discoveredStroke(for: tile, isFresh: fresh, isPerimeter: perimeter),
+                            lineWidth: discoveredStrokeWidth(for: tile, isFresh: fresh, isPerimeter: perimeter)
                         )
                 }
             }
 
             // Soft gold wash on undiscovered frontier neighbors — fill only to avoid double edges.
-            ForEach(cachedFrontierEdge, id: \.self) { axial in
+            ForEach(showsFrontierLayer ? cachedFrontierEdge : [], id: \.self) { axial in
                 let vertices = engine.polygon(for: axial)
                 if vertices.count >= 3 {
                     MapPolygon(coordinates: vertices)
@@ -68,7 +78,7 @@ struct DiscoveryMapView: View {
                 }
             }
 
-            ForEach(cachedTargetBoundary, id: \.self) { axial in
+            ForEach(showsFrontierLayer ? cachedTargetBoundary : [], id: \.self) { axial in
                 let vertices = engine.polygon(for: axial)
                 if vertices.count >= 3 {
                     MapPolygon(coordinates: vertices)
@@ -77,7 +87,7 @@ struct DiscoveryMapView: View {
                 }
             }
 
-            if let beacon = controller.expeditionBeaconCoordinate {
+            if showsFrontierLayer, let beacon = controller.expeditionBeaconCoordinate {
                 Annotation("", coordinate: beacon, anchor: .center) {
                     ExpeditionBeaconView()
                 }
@@ -122,12 +132,14 @@ struct DiscoveryMapView: View {
                     .stroke(AtlasTheme.blue, lineWidth: AtlasTheme.routeLineWidth)
             }
         }
-        .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll, showsTraffic: false))
+        .modifier(LiveMapStyleModifier(style: mapStyle))
         .mapControls {
             MapCompass()
+            MapScaleView()
         }
         .onMapCameraChange(frequency: .onEnd) { context in
             visibleRegion = context.region
+            lastCamera = context.camera
             refreshOverlays()
         }
         .onAppear {
@@ -149,8 +161,23 @@ struct DiscoveryMapView: View {
         .onChange(of: controller.regionLookup.resolvedCellCount) { _, _ in
             refreshOverlays()
         }
-        .onChange(of: showLayers) { _, _ in
+        .onChange(of: showsMasteryLayer) { _, _ in
             refreshOverlays()
+        }
+        .onChange(of: dataLayer) { _, _ in
+            refreshOverlays()
+        }
+        .onChange(of: showsPlacesLayer) { _, _ in
+            refreshOverlays()
+        }
+        .onChange(of: showsFogLayer) { _, _ in
+            refreshOverlays()
+        }
+        .onChange(of: showsFrontierLayer) { _, _ in
+            refreshOverlays()
+        }
+        .onChange(of: is3DEnabled) { _, _ in
+            applyCameraPitch()
         }
         .onChange(of: controller.isRecording) { _, _ in
             refreshOverlays()
@@ -163,13 +190,24 @@ struct DiscoveryMapView: View {
                 ? AtlasTheme.mapSpanRecordingMeters
                 : AtlasTheme.mapSpanIdleMeters
             withAnimation(AtlasMotion.camera) {
-                position = .region(
-                    MKCoordinateRegion(
-                        center: location.coordinate,
-                        latitudinalMeters: span,
-                        longitudinalMeters: span
+                if is3DEnabled {
+                    position = .camera(
+                        MapCamera(
+                            centerCoordinate: location.coordinate,
+                            distance: span,
+                            heading: lastCamera?.heading ?? 0,
+                            pitch: 58
+                        )
                     )
-                )
+                } else {
+                    position = .region(
+                        MKCoordinateRegion(
+                            center: location.coordinate,
+                            latitudinalMeters: span,
+                            longitudinalMeters: span
+                        )
+                    )
+                }
             }
         }
     }
@@ -179,14 +217,15 @@ struct DiscoveryMapView: View {
         let discovered = cullDiscovered(engine: engine)
         let discoveredIDs = store.discoveredTileIDs
         cachedDiscovered = discovered
+        cachedMaximumVisitCount = max(discovered.map(\.visitCount).max() ?? 1, 1)
         cachedPerimeterIDs = engine.territoryPerimeterIDs(among: discovered, discoveredIDs: discoveredIDs)
         cachedFog = buildFog(engine: engine)
         cachedFrontierEdge = controller.frontierEdgeTileIDs.compactMap { engine.parseTileID($0) }
         cachedTargetBoundary = controller.targetSectorBoundaryTileIDs.compactMap { engine.parseTileID($0) }
-        cachedPlacePins = showLayers
+        cachedPlacePins = showsPlacesLayer
             ? Array(controller.placeMapPins.prefix(AtlasTheme.maxVisiblePlacePins))
             : []
-        cachedMarkers = showLayers
+        cachedMarkers = showsMasteryLayer
             ? Array(
                 discovered
                     .filter { $0.state.markerSymbol != nil }
@@ -194,6 +233,26 @@ struct DiscoveryMapView: View {
                     .prefix(AtlasTheme.maxVisibleMarkers)
               )
             : []
+    }
+
+    private func applyCameraPitch() {
+        let center = lastCamera?.centerCoordinate
+            ?? recorder.lastLocation?.coordinate
+            ?? visibleRegion?.center
+        guard let center else { return }
+        let distance = lastCamera?.distance
+            ?? (controller.isRecording ? AtlasTheme.mapSpanRecordingMeters : AtlasTheme.mapSpanIdleMeters)
+        let heading = lastCamera?.heading ?? 0
+        withAnimation(AtlasMotion.camera) {
+            position = .camera(
+                MapCamera(
+                    centerCoordinate: center,
+                    distance: distance,
+                    heading: heading,
+                    pitch: is3DEnabled ? 58 : 0
+                )
+            )
+        }
     }
 
     private func cullDiscovered(engine: TileEngine) -> [WorldTile] {
@@ -215,6 +274,50 @@ struct DiscoveryMapView: View {
         return Array(tiles.prefix(AtlasTheme.maxFogPolygons))
     }
 
+    private func discoveredFill(for tile: WorldTile, isFresh: Bool, weeklyCharge: Int) -> Color {
+        guard dataLayer == .visitHeat else {
+            return tile.state.mapFill(isFreshDiscovery: isFresh, weeklyCharge: weeklyCharge)
+        }
+        let intensity = min(1, Double(tile.visitCount) / Double(cachedMaximumVisitCount))
+        return AtlasTheme.teal.opacity((isFresh ? 0.42 : 0.12) + intensity * 0.52)
+    }
+
+    private func discoveredStroke(for tile: WorldTile, isFresh: Bool, isPerimeter: Bool) -> Color {
+        guard dataLayer == .visitHeat else {
+            return tile.state.mapStroke(isFreshDiscovery: isFresh, isPerimeter: isPerimeter)
+        }
+        guard isPerimeter else { return .clear }
+        let intensity = min(1, Double(tile.visitCount) / Double(cachedMaximumVisitCount))
+        return AtlasTheme.gold.opacity(0.35 + intensity * 0.65)
+    }
+
+    private func discoveredStrokeWidth(for tile: WorldTile, isFresh: Bool, isPerimeter: Bool) -> CGFloat {
+        guard dataLayer == .visitHeat else {
+            return tile.state.mapStrokeWidth(isFreshDiscovery: isFresh, isPerimeter: isPerimeter)
+        }
+        return isPerimeter ? 1.5 : 0
+    }
+
+}
+
+private struct LiveMapStyleModifier: ViewModifier {
+    let style: LiveMapStyle
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        switch style {
+        case .explorer:
+            content.mapStyle(
+                .standard(elevation: .realistic, pointsOfInterest: .excludingAll, showsTraffic: false)
+            )
+        case .satellite:
+            content.mapStyle(.imagery(elevation: .realistic))
+        case .hybrid:
+            content.mapStyle(
+                .hybrid(elevation: .realistic, pointsOfInterest: .excludingAll, showsTraffic: false)
+            )
+        }
+    }
 }
 
 struct TreasureMapMarkerView: View {

@@ -104,3 +104,64 @@ final class ProgressionEngineTests: XCTestCase {
         XCTAssertEqual(progress.discoveryXP, 0)
     }
 }
+
+final class ExplorerProgressionEngineTests: XCTestCase {
+    private let engine = ExplorerProgressionEngine()
+
+    func testLevelCurveUsesCumulativeThresholds() {
+        XCTAssertEqual(engine.xpRequired(forLevel: 1), 0)
+        XCTAssertEqual(engine.xpRequired(forLevel: 2), 1_000)
+        XCTAssertEqual(engine.xpRequired(forLevel: 3), 2_500)
+        XCTAssertEqual(engine.level(forTotalXP: 999), 1)
+        XCTAssertEqual(engine.level(forTotalXP: 1_000), 2)
+        XCTAssertEqual(engine.level(forTotalXP: 2_500), 3)
+    }
+
+    func testSnapshotCombinesLevelAndAchievementRewards() {
+        let snapshot = engine.snapshot(
+            metrics: ExplorerProgressionMetrics(
+                totalXP: 2_500,
+                discoveredTiles: 100,
+                masteredTiles: 25,
+                legendaryTiles: 5,
+                totalVisits: 500,
+                activeDays: 30,
+                activitiesCompleted: 4,
+                stampedActivityTypes: 4,
+                expeditionsCompleted: 10
+            )
+        )
+
+        XCTAssertEqual(snapshot.level, 3)
+        XCTAssertEqual(snapshot.title, "Scout")
+        XCTAssertTrue(snapshot.achievements.allSatisfy(\.isUnlocked))
+        XCTAssertGreaterThan(snapshot.atlasTokens, 0)
+        XCTAssertTrue(snapshot.rewards.contains { $0.level == 3 && $0.kind == .mapStyle })
+    }
+
+    func testMapRewardsUnlockAtTheirRequiredLevels() {
+        XCTAssertFalse(engine.isMapStyleUnlocked(.satellite, atLevel: 2))
+        XCTAssertTrue(engine.isMapStyleUnlocked(.satellite, atLevel: 3))
+        XCTAssertFalse(engine.isMapStyleUnlocked(.hybrid, atLevel: 4))
+        XCTAssertTrue(engine.isMapStyleUnlocked(.hybrid, atLevel: 5))
+        XCTAssertFalse(engine.is3DMapUnlocked(atLevel: 3))
+        XCTAssertTrue(engine.is3DMapUnlocked(atLevel: 4))
+        XCTAssertTrue(
+            engine.snapshot(
+                metrics: ExplorerProgressionMetrics(
+                    totalXP: engine.xpRequired(forLevel: 4),
+                    discoveredTiles: 0,
+                    masteredTiles: 0,
+                    legendaryTiles: 0,
+                    totalVisits: 0,
+                    activeDays: 0,
+                    activitiesCompleted: 0,
+                    stampedActivityTypes: 0,
+                    expeditionsCompleted: 0
+                )
+            )
+            .rewards
+            .contains { $0.level == 4 && $0.name == "3D Terrain" }
+        )
+    }
+}

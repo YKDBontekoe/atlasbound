@@ -37,6 +37,18 @@ Thresholds live in `ProgressionEngine.advanceStateIfNeeded`. These are intention
 
 Session totals: `SessionProgress` (discovered / revisited / XP splits). Lifetime totals live in `TileStore`.
 
+## Explorer levels and rewards
+
+Lifetime discovery + familiarity XP also feeds `ExplorerProgressionEngine`. This account-wide layer is derived from canonical progress, so existing saves gain the correct level and rewards without a migration.
+
+- 50 levels use the cumulative curve `250 × (level - 1)² + 750 × (level - 1)`.
+- Rank titles advance from Wanderer through Atlas Legend.
+- Each level grants Atlas Tokens; milestone levels unlock live-map presentation features, including visit heat, satellite imagery, 3D terrain, and hybrid imagery.
+- Achievements measure discovery, deep mastery, repeat visits, activity variety, active days, and Frontier expeditions.
+- Atlas Tokens and unlocks are deterministic lifetime rewards, not consumable currency.
+
+This system does not change per-tile mastery XP or discovery/revisit awards.
+
 ## Exploration and activity types
 
 `walk` | `run` | `cycle` | `hike` | `drive` | `publicTransport` | `unknown` — stamped on tiles (`activityStamps`).

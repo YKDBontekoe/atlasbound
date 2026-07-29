@@ -26,6 +26,7 @@ AtlasboundApp
 | `ActivityRecorder` | `CLLocationManager` wrapper | `@MainActor` |
 | `TileEngine` | Projection + axial hex + polygons | `Sendable` value type |
 | `ProgressionEngine` | Visit → XP + state | `Sendable` value type |
+| `ExplorerProgressionEngine` | Lifetime XP → level, title, reward track, achievements | `Sendable` value type |
 | `WorldTile` / models | Domain records | `Sendable` where pure |
 
 ## Session flow
@@ -45,6 +46,7 @@ AtlasboundApp
 
 - Primary chrome: `MainMapScreen` + settings sheet.
 - Map: `DiscoveryMapView` (MapKit polygons / polyline / user annotation).
+- Live-map presentation preferences use `AppStorage`: basemap style, mastery/visit-heat data lens, places, fog, and Frontier visibility.
 - Discovered markers are capped (~80 highest-ranked) for performance.
 - Map header uses procedural hex **sectors** (`HexSectorEngine`), not political geography.
 - Atlas Stats **Places visited** uses reverse-geocoded country / province / city labels from a coarse-cell cache (`RegionLookupStore`).
