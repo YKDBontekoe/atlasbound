@@ -3,114 +3,250 @@ import SwiftUI
 struct ExplorerProgressionView: View {
     let snapshot: ExplorerProgressionSnapshot
 
-    private var nearbyRewards: [ExplorerLevelReward] {
-        let lowerBound = max(2, snapshot.level)
-        let upperBound = min(ExplorerProgressionEngine.maximumLevel, snapshot.level + 3)
-        return snapshot.rewards.filter { ($0.level >= lowerBound && $0.level <= upperBound) || $0.level == snapshot.level }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var showsAllAchievements = false
+
+    private var isMaximumLevel: Bool {
+        snapshot.level == ExplorerProgressionEngine.maximumLevel
+    }
+
+    private var nextLevelRewards: [ExplorerLevelReward] {
+        let level = isMaximumLevel ? snapshot.level : snapshot.level + 1
+        return snapshot.rewards.filter { $0.level == level }
+    }
+
+    private var unlockedAchievementCount: Int {
+        snapshot.achievements.filter(\.isUnlocked).count
+    }
+
+    private var priorityAchievements: [ExplorerAchievement] {
+        let locked = snapshot.achievements
+            .filter { !$0.isUnlocked }
+            .sorted {
+                if $0.progressFraction == $1.progressFraction {
+                    return $0.targetValue < $1.targetValue
+                }
+                return $0.progressFraction > $1.progressFraction
+            }
+
+        if locked.isEmpty {
+            return Array(snapshot.achievements.prefix(3))
+        }
+        return Array(locked.prefix(3))
+    }
+
+    private var visibleAchievements: [ExplorerAchievement] {
+        showsAllAchievements ? snapshot.achievements : priorityAchievements
     }
 
     var body: some View {
         VStack(spacing: 14) {
-            levelCard
-            rewardTrackCard
+            explorerHero
+            nextLevelCard
             achievementsCard
         }
     }
 
-    private var levelCard: some View {
-        StatSectionCard {
-            VStack(spacing: 14) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [AtlasTheme.blue, AtlasTheme.teal],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 72, height: 72)
-                        VStack(spacing: 0) {
-                            Text("\(snapshot.level)")
-                                .font(.system(size: 28, weight: .heavy, design: .rounded))
-                            Text("LEVEL")
-                                .font(.system(size: 8, weight: .bold))
-                        }
-                        .foregroundStyle(.white)
-                    }
+    private var explorerHero: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center, spacing: 14) {
+                levelMedallion
 
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(snapshot.title)
-                            .font(.title2.weight(.bold))
-                        Text("\(snapshot.totalXP.formatted()) lifetime XP")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                        Label("\(snapshot.atlasTokens.formatted()) Atlas Tokens", systemImage: "seal.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AtlasTheme.gold)
-                    }
-                    Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("EXPLORER RANK")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.2)
+                        .foregroundStyle(.white.opacity(0.7))
+                    Text(snapshot.title)
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.white)
+                    Text("Level \(snapshot.level) of \(ExplorerProgressionEngine.maximumLevel)")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.76))
                 }
 
-                VStack(spacing: 6) {
-                    ProgressView(value: snapshot.progressFraction)
-                        .tint(AtlasTheme.blue)
-                        .scaleEffect(y: 1.7)
-                    HStack {
+                Spacer(minLength: 0)
+            }
+
+            VStack(spacing: 8) {
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(.white.opacity(0.18))
+                        Capsule()
+                            .fill(.white)
+                            .frame(width: proxy.size.width * snapshot.progressFraction)
+                    }
+                }
+                .frame(height: 8)
+                .animation(
+                    AtlasMotion.optional(AtlasMotion.panel, reduceMotion: reduceMotion),
+                    value: snapshot.progressFraction
+                )
+
+                HStack {
+                    if isMaximumLevel {
+                        Text("Maximum rank reached")
+                    } else {
                         Text("\(snapshot.xpIntoLevel.formatted()) / \(snapshot.xpNeededForLevel.formatted()) XP")
                         Spacer()
-                        if snapshot.level < ExplorerProgressionEngine.maximumLevel {
-                            Text("\(snapshot.xpToNextLevel.formatted()) to level \(snapshot.level + 1)")
-                        } else {
-                            Text("Maximum rank")
-                        }
+                        Text("\(snapshot.xpToNextLevel.formatted()) XP to level \(snapshot.level + 1)")
                     }
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
                 }
+                .font(.caption2.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.8))
+            }
+
+            HStack(spacing: 8) {
+                heroMetric(
+                    value: snapshot.totalXP.formatted(),
+                    label: "Lifetime XP",
+                    symbol: "sparkles"
+                )
+                heroMetric(
+                    value: snapshot.atlasTokens.formatted(),
+                    label: "Tokens",
+                    symbol: "seal.fill"
+                )
+                heroMetric(
+                    value: "\(unlockedAchievementCount)/\(snapshot.achievements.count)",
+                    label: "Badges",
+                    symbol: "medal.fill"
+                )
             }
         }
+        .padding(18)
+        .background {
+            ZStack(alignment: .topTrailing) {
+                RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.10, green: 0.24, blue: 0.52),
+                                AtlasTheme.blue,
+                                AtlasTheme.teal.opacity(0.88),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                Circle()
+                    .stroke(.white.opacity(0.09), lineWidth: 24)
+                    .frame(width: 150, height: 150)
+                    .offset(x: 48, y: -70)
+                    .accessibilityHidden(true)
+            }
+            .shadow(color: AtlasTheme.blue.opacity(0.25), radius: 16, y: 7)
+        }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("explorerLevelCard")
     }
 
-    private var rewardTrackCard: some View {
+    private var levelMedallion: some View {
+        ZStack {
+            Circle()
+                .fill(.white.opacity(0.16))
+            Circle()
+                .stroke(.white.opacity(0.32), lineWidth: 1)
+            VStack(spacing: -2) {
+                Text("\(snapshot.level)")
+                    .font(.system(size: 29, weight: .heavy, design: .rounded))
+                Text("LEVEL")
+                    .font(.system(size: 8, weight: .heavy))
+                    .tracking(0.8)
+            }
+            .foregroundStyle(.white)
+        }
+        .frame(width: 70, height: 70)
+        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+        .accessibilityHidden(true)
+    }
+
+    private func heroMetric(value: String, label: String, symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Image(systemName: symbol)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.white.opacity(0.72))
+            Text(value)
+                .font(.system(.subheadline, design: .rounded, weight: .bold))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.white.opacity(0.7))
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(.white.opacity(0.11), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var nextLevelCard: some View {
         StatSectionCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Level rewards")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Text("Automatic unlocks")
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    sectionIcon(
+                        symbol: isMaximumLevel ? "crown.fill" : "flag.checkered",
+                        color: isMaximumLevel ? AtlasTheme.gold : AtlasTheme.blue
+                    )
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isMaximumLevel ? "Reward track complete" : "Next level")
+                            .font(.subheadline.weight(.semibold))
+                        Text(
+                            isMaximumLevel
+                                ? "You’ve reached the summit"
+                                : "\(snapshot.xpToNextLevel.formatted()) XP remaining"
+                        )
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    if !isMaximumLevel {
+                        Text("LVL \(snapshot.level + 1)")
+                            .font(.caption2.weight(.heavy))
+                            .foregroundStyle(AtlasTheme.blue)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .background(AtlasTheme.blue.opacity(0.1), in: Capsule())
+                    }
                 }
 
-                ForEach(nearbyRewards) { reward in
-                    let unlocked = snapshot.level >= reward.level
-                    HStack(spacing: 10) {
-                        ZStack {
-                            Circle()
-                                .fill(unlocked ? AtlasTheme.teal.opacity(0.18) : Color.secondary.opacity(0.10))
-                                .frame(width: 38, height: 38)
-                            Image(systemName: unlocked ? "checkmark" : reward.symbolName)
+                if nextLevelRewards.isEmpty {
+                    Text("Every road from here adds to your legend.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(nextLevelRewards) { reward in
+                        HStack(spacing: 10) {
+                            Image(systemName: reward.symbolName)
                                 .font(.caption.weight(.bold))
-                                .foregroundStyle(unlocked ? AtlasTheme.teal : .secondary)
-                        }
+                                .foregroundStyle(
+                                    reward.kind == .atlasTokens ? AtlasTheme.gold : AtlasTheme.teal
+                                )
+                                .frame(width: 28, height: 28)
+                                .background(
+                                    (reward.kind == .atlasTokens ? AtlasTheme.gold : AtlasTheme.teal)
+                                        .opacity(0.12),
+                                    in: Circle()
+                                )
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Text("Level \(reward.level)")
-                                    .font(.caption2.weight(.bold))
-                                    .foregroundStyle(unlocked ? AtlasTheme.teal : .secondary)
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text(reward.name)
                                     .font(.caption.weight(.semibold))
+                                Text(reward.detail)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
                             }
-                            Text(reward.detail)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                            Spacer(minLength: 0)
                         }
-                        Spacer()
+                        .accessibilityElement(children: .combine)
                     }
                 }
             }
@@ -119,41 +255,110 @@ struct ExplorerProgressionView: View {
 
     private var achievementsCard: some View {
         StatSectionCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Achievements")
-                        .font(.subheadline.weight(.semibold))
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    sectionIcon(symbol: "medal.fill", color: AtlasTheme.gold)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Achievements")
+                            .font(.subheadline.weight(.semibold))
+                        Text("\(unlockedAchievementCount) of \(snapshot.achievements.count) earned")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     Spacer()
-                    Text("\(snapshot.achievements.filter(\.isUnlocked).count)/\(snapshot.achievements.count)")
-                        .font(.caption.weight(.bold).monospacedDigit())
-                        .foregroundStyle(AtlasTheme.gold)
+
+                    if !snapshot.achievements.isEmpty {
+                        Text("\(unlockedAchievementCount)/\(snapshot.achievements.count)")
+                            .font(.caption.weight(.bold).monospacedDigit())
+                            .foregroundStyle(AtlasTheme.gold)
+                    }
                 }
 
-                ForEach(snapshot.achievements) { achievement in
-                    HStack(spacing: 10) {
-                        Image(systemName: achievement.symbolName)
-                            .foregroundStyle(achievement.isUnlocked ? AtlasTheme.gold : .secondary)
-                            .frame(width: 28)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(achievement.name)
-                                    .font(.caption.weight(.semibold))
-                                Spacer()
-                                Text(achievement.isUnlocked ? "+\(achievement.tokenReward)" : "\(min(achievement.currentValue, achievement.targetValue))/\(achievement.targetValue)")
-                                    .font(.caption2.weight(.bold).monospacedDigit())
-                                    .foregroundStyle(achievement.isUnlocked ? AtlasTheme.gold : .secondary)
-                            }
-                            Text(achievement.detail)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            ProgressView(value: achievement.progressFraction)
-                                .tint(achievement.isUnlocked ? AtlasTheme.gold : AtlasTheme.blue)
-                        }
+                ForEach(Array(visibleAchievements.enumerated()), id: \.element.id) { index, achievement in
+                    if index > 0 {
+                        Divider()
                     }
-                    .accessibilityElement(children: .combine)
+                    achievementRow(achievement)
+                }
+
+                if snapshot.achievements.count > priorityAchievements.count {
+                    Button {
+                        AtlasMotion.withOptionalAnimation(AtlasMotion.panel, reduceMotion: reduceMotion) {
+                            showsAllAchievements.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Text(showsAllAchievements ? "Show priority goals" : "View all achievements")
+                            Spacer()
+                            Image(systemName: showsAllAchievements ? "chevron.up" : "chevron.down")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AtlasTheme.blue)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("toggleAllAchievements")
                 }
             }
         }
+    }
+
+    private func achievementRow(_ achievement: ExplorerAchievement) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            ZStack {
+                Circle()
+                    .fill(
+                        (achievement.isUnlocked ? AtlasTheme.gold : AtlasTheme.blue)
+                            .opacity(0.12)
+                    )
+                Image(systemName: achievement.isUnlocked ? "checkmark" : achievement.symbolName)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(achievement.isUnlocked ? AtlasTheme.gold : AtlasTheme.blue)
+            }
+            .frame(width: 34, height: 34)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(achievement.name)
+                            .font(.caption.weight(.semibold))
+                        Text(achievement.detail)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Text(
+                        achievement.isUnlocked
+                            ? "+\(achievement.tokenReward)"
+                            : "\(min(achievement.currentValue, achievement.targetValue))/\(achievement.targetValue)"
+                    )
+                    .font(.caption2.weight(.bold).monospacedDigit())
+                    .foregroundStyle(achievement.isUnlocked ? AtlasTheme.gold : .secondary)
+                }
+
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.secondary.opacity(0.12))
+                        Capsule()
+                            .fill(achievement.isUnlocked ? AtlasTheme.gold : AtlasTheme.blue)
+                            .frame(width: proxy.size.width * achievement.progressFraction)
+                    }
+                }
+                .frame(height: 5)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func sectionIcon(symbol: String, color: Color) -> some View {
+        Image(systemName: symbol)
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(color)
+            .frame(width: 36, height: 36)
+            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
 }

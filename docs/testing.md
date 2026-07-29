@@ -76,6 +76,7 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | Live map options | Map → layers button | Style picker, mastery/heat lens, fog, places, and Frontier toggles update independently |
 | 3D live map | Reach level 4 → Map → cube button | Camera pitches smoothly, preserves center/heading, and returns flat without moving the atlas |
 | Level rewards | Progress after earning XP | Level progress, nearby rewards, tokens, and achievement progress reflect lifetime atlas stats |
+| Scout Circuit | Discover 5 new tiles, return to 3 older tiles, visit 12 unique tiles in one local day | Map mission, active tracker, and Progress card stay in sync; circuit reaches 3/3 without changing XP |
 | Automatic foreground | Open Map and move with app open | Tiles reveal without an explicit session or fitness record |
 | Automatic background | Enable screen-locked exploration and grant Always | Discovery continues with the iOS location indicator |
 | Daily treasure trail | Reach marker with Sim GPS and choose routes | Each target advances once; final target grants relic + key |

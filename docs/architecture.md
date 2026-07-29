@@ -30,6 +30,7 @@ AtlasboundApp
 | `TileEngine` | Projection + axial hex + polygons | `Sendable` value type |
 | `ProgressionEngine` | Visit → XP + state | `Sendable` value type |
 | `ExplorerProgressionEngine` | Lifetime XP → level, title, reward track, achievements | `Sendable` value type |
+| `DailyChallengeEngine` | Today’s tile timestamps → Scout Circuit goals | `Sendable` value type |
 | `WorldTile` / models | Domain records | `Sendable` where pure |
 
 ## Session flow

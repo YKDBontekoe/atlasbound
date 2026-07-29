@@ -57,6 +57,7 @@ Automatic Explore discovers without fitness history while the app is open. Scree
 
 ## Session extras
 
+- **Scout Circuit:** a local-day, derived challenge for discovering 5 new tiles, revisiting 3 known tiles, and visiting 12 unique tiles. It reads canonical visit timestamps, resets automatically with the local day, and does not modify XP.
 - **Frontier combo:** during an active expedition, consecutive qualifying frontier tiles within **20 minutes** build a combo multiplier on frontier scoring (see `FrontierEngine`).
 - **Treasure trails:** three local-day landmark targets with direct/detour choices. Completion grants a relic and weekly key.
 - **Weekly vault:** three keys reveal a once-per-ISO-week destination with rare-or-better loot.

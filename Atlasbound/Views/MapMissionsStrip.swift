@@ -4,6 +4,8 @@ import SwiftUI
 struct MapMissionsStrip: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
+    var dailyChallenge: DailyChallengeSnapshot?
+    var onDailyTap: () -> Void = {}
     let onExpeditionsTap: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -13,7 +15,30 @@ struct MapMissionsStrip: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 10) {
+            if let dailyChallenge {
+                missionSegment(
+                    icon: dailyChallenge.isComplete ? "checkmark.seal.fill" : "safari.fill",
+                    tint: dailyChallenge.isComplete ? AtlasTheme.teal : AtlasTheme.blue,
+                    title: "Daily",
+                    label: dailyChallenge.isComplete
+                        ? "Circuit complete"
+                        : "\(dailyChallenge.completedGoalCount)/\(dailyChallenge.goals.count) goals",
+                    badge: "\(Int((dailyChallenge.progressFraction * 100).rounded()))%",
+                    badgeTint: dailyChallenge.isComplete ? AtlasTheme.teal : AtlasTheme.blue,
+                    action: onDailyTap
+                )
+                .accessibilityIdentifier("mapMissionsDailyChallenge")
+                .accessibilityLabel(
+                    "Daily Scout Circuit, \(dailyChallenge.completedGoalCount) of \(dailyChallenge.goals.count) goals"
+                )
+                .accessibilityHint("Opens today’s exploration challenge")
+
+                Rectangle()
+                    .fill(AtlasTheme.divider(for: colorScheme))
+                    .frame(width: 1, height: 36)
+            }
+
             missionSegment(
                 icon: frontierLabels.iconName,
                 tint: frontierLabels.tint,

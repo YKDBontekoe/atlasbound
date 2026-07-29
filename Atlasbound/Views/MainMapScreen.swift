@@ -17,6 +17,7 @@ struct MainMapScreen: View {
     @State private var showExpeditionSheet = false
     @State private var showMapOptions = false
     @State private var showTreasureSheet = false
+    @State private var showDailyChallenge = false
     @State private var presentedSummary: ActivitySummary?
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
     @AppStorage(OnboardingPreference.storageKey) private var onboardingVersion = 0
@@ -43,6 +44,10 @@ struct MainMapScreen: View {
         #else
         false
         #endif
+    }
+
+    private var dailyChallenge: DailyChallengeSnapshot {
+        DailyChallengeEngine().snapshot(tiles: store.discoveredTiles)
     }
 
     var body: some View {
@@ -125,6 +130,8 @@ struct MainMapScreen: View {
                     MapMissionsStrip(
                         controller: controller,
                         store: store,
+                        dailyChallenge: dailyChallenge,
+                        onDailyTap: { showDailyChallenge = true },
                         onExpeditionsTap: { showExpeditionSheet = true }
                     )
                     idleBottomSheet
@@ -183,6 +190,10 @@ struct MainMapScreen: View {
         }
         .sheet(isPresented: $showTreasureSheet) {
             TreasureDetailSheet(controller: controller, store: treasureStore)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showDailyChallenge) {
+            DailyChallengeSheet(snapshot: dailyChallenge)
                 .presentationDetents([.medium, .large])
         }
         .sheet(item: $treasureStore.pendingEncounter) { encounter in
@@ -382,6 +393,13 @@ struct MainMapScreen: View {
                 .padding(.horizontal, 12)
             }
             ActiveFrontierTracker(controller: controller, compact: true)
+            Button {
+                showDailyChallenge = true
+            } label: {
+                DailyChallengeCompactTracker(snapshot: dailyChallenge)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("activeDailyChallenge")
 
             HStack(spacing: 14) {
                 Button {

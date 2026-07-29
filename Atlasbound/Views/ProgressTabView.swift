@@ -55,38 +55,42 @@ struct ProgressTabView: View {
         return ExplorerProgressionEngine().snapshot(metrics: metrics)
     }
 
+    private var dailyChallenge: DailyChallengeSnapshot {
+        DailyChallengeEngine().snapshot(tiles: allTiles)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
                     ExplorerProgressionView(snapshot: explorerProgression)
                         .staggeredAppear(index: 0)
-                    territoryCard
+                    DailyChallengeProgressCard(snapshot: dailyChallenge)
                         .staggeredAppear(index: 1)
+                    territoryCard
+                        .staggeredAppear(index: 2)
+                    atlasMapCard
+                        .staggeredAppear(index: 3)
+                    masteryLadderCard
+                        .staggeredAppear(index: 4)
                     if !placesVisited.isEmpty || regionLookup.isResolving {
                         placesVisitedCard
-                            .staggeredAppear(index: 2)
+                            .staggeredAppear(index: 5)
                     }
                     frontierStatsCard
-                        .staggeredAppear(index: 3)
+                        .staggeredAppear(index: 6)
                     personalRecordsCard
-                        .staggeredAppear(index: 3)
+                        .staggeredAppear(index: 7)
                     if !activityFootprint.isEmpty {
                         activityFootprintCard
-                            .staggeredAppear(index: 4)
+                            .staggeredAppear(index: 8)
                     }
-                    atlasMapCard
-                        .staggeredAppear(index: 5)
                     explorerVitalsCard
-                        .staggeredAppear(index: 6)
-                    explorerHero
-                        .staggeredAppear(index: 7)
-                    xpTotalsCard
-                        .staggeredAppear(index: 8)
-                    pinpointStatsCard
                         .staggeredAppear(index: 9)
-                    masteryLadderCard
+                    xpTotalsCard
                         .staggeredAppear(index: 10)
+                    pinpointStatsCard
+                        .staggeredAppear(index: 11)
                 }
                 .padding(20)
             }
@@ -466,33 +470,6 @@ struct ProgressTabView: View {
                     value: "\(deepMastery)",
                     icon: "star.fill"
                 )
-            }
-        }
-    }
-
-    // MARK: - Explorer hero
-
-    private var explorerHero: some View {
-        StatSectionCard {
-            VStack(spacing: 14) {
-                Text("\(store.discoveryXPTotal + store.familiarityXPTotal)")
-                    .font(.system(size: 36, weight: .heavy, design: .rounded))
-                    .foregroundStyle(AtlasTheme.teal)
-                    .contentTransition(.numericText())
-                    .animation(AtlasMotion.number, value: store.discoveryXPTotal + store.familiarityXPTotal)
-                Text("Lifetime XP")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-
-                HStack(spacing: 0) {
-                    StatKPI(value: "\(store.discoveredTileCount)", caption: "Tiles")
-                    StatKPI(value: "\(store.activitiesCompleted)", caption: "Activities")
-                    StatKPI(
-                        value: StatsFormat.percent(store.discoveryXPTotal, of: store.discoveryXPTotal + store.familiarityXPTotal),
-                        caption: "Discovery"
-                    )
-                }
             }
         }
     }
