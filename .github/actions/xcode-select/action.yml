@@ -15,3 +15,5 @@ runs:
         echo "Using $CANDIDATE"
         sudo xcode-select -s "$CANDIDATE"
         xcodebuild -version
+        XCODE_CACHE_VERSION="$(xcodebuild -version | tr '\n' '-' | tr -cd '[:alnum:]._-')"
+        echo "ATLASBOUND_XCODE_CACHE_VERSION=$XCODE_CACHE_VERSION" >> "$GITHUB_ENV"

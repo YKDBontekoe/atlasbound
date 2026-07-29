@@ -70,6 +70,7 @@ run_tests() {
     -scheme "$SCHEME" \
     -destination "$dest" \
     -resultBundlePath "$RESULT_BUNDLE" \
+    COMPILER_INDEX_STORE_ENABLE=NO \
     "$@"
 }
 

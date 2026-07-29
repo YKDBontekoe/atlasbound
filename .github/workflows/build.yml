@@ -1,6 +1,7 @@
 name: Build IPA
 
-# PR validation: static checks, unit/snapshot/UI tests, unsigned IPA artifact.
+# PR validation: static checks, unit/snapshot tests, UI tests, and the unsigned
+# IPA artifact all run independently so the slowest shard defines elapsed time.
 # Releases (with automatic versioning) are handled by "Build IPA & AltStore Source"
 # on pushes to main.
 
@@ -17,6 +18,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test-plan:
+    name: Plan test shards
+    runs-on: ubuntu-latest
+    outputs:
+      unit: ${{ steps.matrix.outputs.unit }}
+      ui: ${{ steps.matrix.outputs.ui }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate balanced test matrices
+        id: matrix
+        run: |
+          UNIT_MATRIX="$(python3 scripts/ci_test_matrix.py \
+            --path AtlasboundTests \
+            --target AtlasboundTests \
+            --shards 4 \
+            --granularity class \
+            --label unit)"
+          UI_MATRIX="$(python3 scripts/ci_test_matrix.py \
+            --path AtlasboundUITests \
+            --target AtlasboundUITests \
+            --shards 5 \
+            --granularity method \
+            --label ui)"
+          echo "unit=$UNIT_MATRIX" >> "$GITHUB_OUTPUT"
+          echo "ui=$UI_MATRIX" >> "$GITHUB_OUTPUT"
+
   validate:
     name: Static validation
     runs-on: ubuntu-latest
@@ -29,8 +58,12 @@ jobs:
           chmod +x scripts/validate-pr.sh scripts/check-privacy-alignment.py
           ./scripts/validate-pr.sh
 
-  test:
-    name: Unit + visual + UI tests
+  test-unit:
+    name: Unit + visual (${{ matrix.name }})
+    needs: test-plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.test-plan.outputs.unit) }}
     runs-on: macos-15
     steps:
       - name: Checkout
@@ -42,7 +75,31 @@ jobs:
       - name: Run iOS tests
         uses: ./.github/actions/ios-test
         with:
-          upload-artifact-name: atlasbound-test-results
+          result-bundle: UnitTestResults-${{ matrix.name }}.xcresult
+          only-testing: ${{ matrix.only_testing }}
+          upload-artifact-name: atlasbound-unit-test-results-${{ matrix.name }}
+          artifact-retention-days: "7"
+
+  test-ui:
+    name: UI smoke (${{ matrix.name }})
+    needs: test-plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.test-plan.outputs.ui) }}
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: ./.github/actions/xcode-select
+
+      - name: Run UI tests
+        uses: ./.github/actions/ios-test
+        with:
+          result-bundle: UITestResults-${{ matrix.name }}.xcresult
+          only-testing: ${{ matrix.only_testing }}
+          upload-artifact-name: atlasbound-ui-test-results-${{ matrix.name }}
           artifact-retention-days: "7"
 
   build:

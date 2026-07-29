@@ -5,7 +5,8 @@ name: Build IPA & AltStore Source
 #   (conventional commits: feat→minor, BREAKING→major, else patch)
 # - Build number (CFBundleVersion): GitHub run number (always unique for AltStore updates)
 # Every push to main publishes a release + refreshes the AltStore source.
-# validate + test must pass before IPA / publish.
+# Validation, both test shards, and the IPA archive start together. Publishing
+# is the only join point, so failed checks can never ship an already-built IPA.
 
 on:
   push:
@@ -38,6 +39,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  test-plan:
+    name: Plan test shards
+    runs-on: ubuntu-latest
+    outputs:
+      unit: ${{ steps.matrix.outputs.unit }}
+      ui: ${{ steps.matrix.outputs.ui }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate balanced test matrices
+        id: matrix
+        run: |
+          UNIT_MATRIX="$(python3 scripts/ci_test_matrix.py \
+            --path AtlasboundTests \
+            --target AtlasboundTests \
+            --shards 4 \
+            --granularity class \
+            --label unit)"
+          UI_MATRIX="$(python3 scripts/ci_test_matrix.py \
+            --path AtlasboundUITests \
+            --target AtlasboundUITests \
+            --shards 5 \
+            --granularity method \
+            --label ui)"
+          echo "unit=$UNIT_MATRIX" >> "$GITHUB_OUTPUT"
+          echo "ui=$UI_MATRIX" >> "$GITHUB_OUTPUT"
+
   validate:
     name: Static validation
     runs-on: ubuntu-latest
@@ -50,8 +79,12 @@ jobs:
           chmod +x scripts/validate-pr.sh scripts/check-privacy-alignment.py
           ./scripts/validate-pr.sh
 
-  test:
-    name: Unit + visual + UI tests
+  test-unit:
+    name: Unit + visual (${{ matrix.name }})
+    needs: test-plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.test-plan.outputs.unit) }}
     runs-on: macos-15
     steps:
       - name: Checkout
@@ -63,12 +96,35 @@ jobs:
       - name: Run iOS tests
         uses: ./.github/actions/ios-test
         with:
-          upload-artifact-name: atlasbound-release-test-results
+          result-bundle: UnitTestResults-${{ matrix.name }}.xcresult
+          only-testing: ${{ matrix.only_testing }}
+          upload-artifact-name: atlasbound-release-unit-test-results-${{ matrix.name }}
+          artifact-retention-days: "14"
+
+  test-ui:
+    name: UI smoke (${{ matrix.name }})
+    needs: test-plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.test-plan.outputs.ui) }}
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: ./.github/actions/xcode-select
+
+      - name: Run UI tests
+        uses: ./.github/actions/ios-test
+        with:
+          result-bundle: UITestResults-${{ matrix.name }}.xcresult
+          only-testing: ${{ matrix.only_testing }}
+          upload-artifact-name: atlasbound-release-ui-test-results-${{ matrix.name }}
           artifact-retention-days: "14"
 
   build:
     name: Build unsigned IPA
-    needs: [validate, test]
     runs-on: macos-15
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -139,7 +195,13 @@ jobs:
         run: |
           chmod +x scripts/build-ipa.sh
           ./scripts/build-ipa.sh
-          SOURCE="$(ls dist/Atlasbound-*.ipa | head -1)"
+          shopt -s nullglob
+          IPA_CANDIDATES=(dist/Atlasbound-*.ipa)
+          if [[ "${#IPA_CANDIDATES[@]}" -ne 1 ]]; then
+            echo "Expected exactly one IPA, found ${#IPA_CANDIDATES[@]}" >&2
+            exit 1
+          fi
+          SOURCE="${IPA_CANDIDATES[0]}"
           if [[ "$(basename "$SOURCE")" != "$IPA_NAME" ]]; then
             mv "$SOURCE" "dist/$IPA_NAME"
           fi
@@ -165,8 +227,13 @@ jobs:
 
   publish:
     name: Release + AltStore source
-    needs: build
-    if: needs.build.outputs.publish == 'true'
+    needs: [validate, test-unit, test-ui, build]
+    if: >-
+      needs.validate.result == 'success' &&
+      needs.test-unit.result == 'success' &&
+      needs.test-ui.result == 'success' &&
+      needs.build.result == 'success' &&
+      needs.build.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

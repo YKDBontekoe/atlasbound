@@ -19,7 +19,15 @@ Workflow: `.github/workflows/release.yml`
 5. `scripts/generate-altstore-source.py` prepends version to `altstore/apps.json`
 6. Deploy `apps.json` + `icon.png` to GitHub Pages
 
-PR workflow (`.github/workflows/build.yml`) runs `validate`, `test`, and unsigned IPA in parallel — no publish. Test steps are shared via [`.github/actions/ios-test`](../.github/actions/ios-test) and [`scripts/ci-run-tests.sh`](../scripts/ci-run-tests.sh).
+PR workflow (`.github/workflows/build.yml`) automatically shards unit/visual
+test classes across four runners and UI methods across five runners. Static
+validation and the unsigned IPA build run alongside the test matrix — no
+publish. Test steps are shared via [`.github/actions/ios-test`](../.github/actions/ios-test)
+and [`scripts/ci-run-tests.sh`](../scripts/ci-run-tests.sh).
+
+The release workflow starts those same four jobs concurrently. The publish job
+waits for every check plus the IPA artifact, so validation remains a hard release
+gate without placing the archive behind the simulator suite.
 
 ## Semver bump rules
 

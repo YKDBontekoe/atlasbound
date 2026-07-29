@@ -14,6 +14,10 @@ inputs:
     description: Artifact retention in days
     required: false
     default: "7"
+  only-testing:
+    description: Whitespace-separated XCTest identifiers; empty runs the complete scheme
+    required: false
+    default: ""
   extra-xcodebuild-args:
     description: Extra arguments passed to xcodebuild test
     required: false
@@ -22,19 +26,35 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Restore Xcode build cache
+      uses: actions/cache@v4
+      with:
+        path: ~/Library/Developer/Xcode/DerivedData
+        key: atlasbound-xcode-${{ runner.os }}-${{ runner.arch }}-${{ env.ATLASBOUND_XCODE_CACHE_VERSION }}-${{ hashFiles('Atlasbound.xcodeproj/project.pbxproj', 'Atlasbound.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Atlasbound/**/*.swift', 'AtlasboundTests/**/*.swift', 'AtlasboundUITests/**/*.swift') }}
+        restore-keys: |
+          atlasbound-xcode-${{ runner.os }}-${{ runner.arch }}-${{ env.ATLASBOUND_XCODE_CACHE_VERSION }}-
+
     - name: Run tests
       shell: bash
       env:
         RESULT_BUNDLE: ${{ inputs.result-bundle }}
+        ONLY_TESTING: ${{ inputs.only-testing }}
+        EXTRA_XCODEBUILD_ARGS: ${{ inputs.extra-xcodebuild-args }}
       run: |
         set -euo pipefail
         chmod +x scripts/ci-run-tests.sh
-        if [[ -n "${{ inputs.extra-xcodebuild-args }}" ]]; then
-          # shellcheck disable=SC2086
-          ./scripts/ci-run-tests.sh ${{ inputs.extra-xcodebuild-args }}
-        else
-          ./scripts/ci-run-tests.sh
+        args=()
+        if [[ -n "$ONLY_TESTING" ]]; then
+          read -r -a test_identifiers <<< "$ONLY_TESTING"
+          for identifier in "${test_identifiers[@]}"; do
+            args+=("-only-testing:${identifier}")
+          done
         fi
+        if [[ -n "$EXTRA_XCODEBUILD_ARGS" ]]; then
+          # shellcheck disable=SC2086
+          args+=($EXTRA_XCODEBUILD_ARGS)
+        fi
+        ./scripts/ci-run-tests.sh "${args[@]}"
 
     - name: Upload test results
       if: inputs.upload-artifact-name != '' && always()
