@@ -134,16 +134,16 @@ struct DiscoveryMapView: View {
             controller.prepareLocation()
             refreshOverlays()
         }
-        .onChange(of: store.discoveredTiles.count) { _, _ in
+        .onReceive(store.$tiles) { _ in
             refreshOverlays()
         }
         .onChange(of: controller.sessionDiscoveredIDs.count) { _, _ in
             refreshOverlays()
         }
-        .onChange(of: controller.frontierEdgeTileIDs.count) { _, _ in
+        .onChange(of: controller.frontierEdgeTileIDs) { _, _ in
             refreshOverlays()
         }
-        .onChange(of: controller.targetSectorBoundaryTileIDs.count) { _, _ in
+        .onChange(of: controller.targetSectorBoundaryTileIDs) { _, _ in
             refreshOverlays()
         }
         .onChange(of: controller.regionLookup.resolvedCellCount) { _, _ in
@@ -155,7 +155,7 @@ struct DiscoveryMapView: View {
         .onChange(of: controller.isRecording) { _, _ in
             refreshOverlays()
         }
-        .onChange(of: recorder.lastLocation?.coordinate.latitude) { _, _ in
+        .onChange(of: recorder.lastLocation?.timestamp) { _, _ in
             controller.prepareTreasureTrail()
             refreshOverlays()
             guard followsUser, let location = recorder.lastLocation else { return }

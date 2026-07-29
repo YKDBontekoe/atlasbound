@@ -11,6 +11,7 @@ final class RegionLookupStore: ObservableObject {
 
     private let fileURL: URL
     private var resolveTask: Task<Void, Never>?
+    private var pendingCellKeys: Set<String> = []
     private let failureBackoff: TimeInterval = 6 * 60 * 60
 
     private static let fileName = "atlasbound-regions.json"
@@ -41,12 +42,11 @@ final class RegionLookupStore: ObservableObject {
     /// Resolve uncached / retryable cells for discovered tiles. Safe to call repeatedly.
     func resolve(tiles: [WorldTile]) {
         let counts = RegionLookupEngine.tileCountsByCell(tiles: tiles)
-        let pendingKeys = counts.keys.filter { needsResolve(cellKey: $0) }.sorted()
-        guard !pendingKeys.isEmpty else { return }
+        pendingCellKeys.formUnion(counts.keys.filter { needsResolve(cellKey: $0) })
+        guard !pendingCellKeys.isEmpty, resolveTask == nil else { return }
 
-        resolveTask?.cancel()
         resolveTask = Task { [weak self] in
-            await self?.resolveCells(pendingKeys)
+            await self?.drainResolveQueue()
         }
     }
 
@@ -59,36 +59,52 @@ final class RegionLookupStore: ObservableObject {
         return Date().timeIntervalSince(failedAt) >= failureBackoff
     }
 
-    private func resolveCells(_ keys: [String]) async {
+    private func drainResolveQueue() async {
         isResolving = true
-        defer { isResolving = false }
+        defer {
+            isResolving = false
+            resolveTask = nil
+        }
 
         var dirty = false
-        for key in keys {
-            if Task.isCancelled { break }
-            guard let coordinate = RegionLookupEngine.representativeCoordinate(forCellKey: key) else {
-                continue
-            }
-
-            let placemark = await GeocodeLimiter.shared.reverseGeocode(at: coordinate)
-            if Task.isCancelled { break }
-
-            if let placemark {
-                let labels = RegionLookupEngine.labels(from: placemark)
-                if labels.isEmpty {
-                    cells[key] = PersistedRegionCell.failed(cellKey: key, at: Date())
-                } else {
-                    cells[key] = PersistedRegionCell(cellKey: key, labels: labels, resolvedAt: Date())
+        while !pendingCellKeys.isEmpty {
+            let keys = pendingCellKeys.sorted()
+            pendingCellKeys.removeAll()
+            for key in keys {
+                if Task.isCancelled { break }
+                guard needsResolve(cellKey: key),
+                      let coordinate = RegionLookupEngine.representativeCoordinate(forCellKey: key) else {
+                    continue
                 }
-            } else {
-                cells[key] = PersistedRegionCell.failed(cellKey: key, at: Date())
+
+                let placemark = await GeocodeLimiter.shared.reverseGeocode(at: coordinate)
+                if Task.isCancelled { break }
+
+                if let placemark {
+                    let labels = RegionLookupEngine.labels(from: placemark)
+                    if labels.isEmpty {
+                        setCell(.failed(cellKey: key, at: Date()), forKey: key)
+                    } else {
+                        setCell(PersistedRegionCell(cellKey: key, labels: labels, resolvedAt: Date()), forKey: key)
+                    }
+                } else {
+                    setCell(.failed(cellKey: key, at: Date()), forKey: key)
+                }
+                dirty = true
             }
-            dirty = true
-            resolvedCellCount = cells.values.filter(\.didSucceed).count
+            if Task.isCancelled { break }
         }
 
         if dirty {
             persistToDisk()
+        }
+    }
+
+    private func setCell(_ cell: PersistedRegionCell, forKey key: String) {
+        let wasSuccessful = cells[key]?.didSucceed == true
+        cells[key] = cell
+        if wasSuccessful != cell.didSucceed {
+            resolvedCellCount += cell.didSucceed ? 1 : -1
         }
     }
 
@@ -106,7 +122,12 @@ final class RegionLookupStore: ObservableObject {
             cells = [:]
             return
         }
-        cells = Dictionary(uniqueKeysWithValues: save.cells.map { ($0.cellKey, $0) })
+        cells = save.cells.reduce(into: [:]) { result, cell in
+            guard RegionLookupEngine.representativeCoordinate(forCellKey: cell.cellKey) != nil else {
+                return
+            }
+            result[cell.cellKey] = cell
+        }
     }
 
     private func persistToDisk() {

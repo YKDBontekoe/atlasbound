@@ -1,11 +1,15 @@
 import Foundation
 
 /// Axial hex coordinate (flat-top). Stable across sessions for a given tile size.
-struct TileCoordinate: Hashable, Codable, Sendable {
+struct TileCoordinate: Hashable, Codable, Sendable, Comparable {
     let q: Int
     let r: Int
 
     var s: Int { -q - r }
+
+    static func < (lhs: TileCoordinate, rhs: TileCoordinate) -> Bool {
+        lhs.q == rhs.q ? lhs.r < rhs.r : lhs.q < rhs.q
+    }
 }
 
 enum TileState: Int, Codable, Sendable, CaseIterable {

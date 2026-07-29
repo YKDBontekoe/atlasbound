@@ -49,6 +49,35 @@ final class FrontierEngineTests: XCTestCase {
         XCTAssertEqual(Set(first.map(\.targetSectorID)).count, first.count)
     }
 
+    func testStableHashMatchesKnownFNV1aVector() {
+        XCTAssertEqual(StableHash.fnv1a64("hello"), 0xa430_d846_80aa_bd0b)
+    }
+
+    func testHistoricalScoringUsesEventTimeForCombo() {
+        let eventDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let origin = TileCoordinate(q: 0, r: 0)
+        let discoveredTile = TileCoordinate(q: 1, r: 0)
+        let result = engine.scoreDiscovery(
+            tileID: TileEngine.makeTileID(q: 1, r: 0, sizeMeters: 20),
+            tile: discoveredTile,
+            isNewDiscovery: true,
+            activeOffer: nil,
+            territory: [origin],
+            discovered: [origin],
+            targetSectorDiscoveredCount: 0,
+            connectionBonusesAwarded: [],
+            combo: FrontierComboState(
+                count: 1,
+                expiresAt: eventDate.addingTimeInterval(60)
+            ),
+            tileEngine: tileEngine,
+            at: eventDate
+        )
+
+        XCTAssertEqual(result.award?.comboMultiplier, 1.2)
+        XCTAssertEqual(result.award?.totalPoints, 12)
+    }
+
     func testRejectsHighlyDiscoveredSector() {
         let sector = engine.sectorEngine.sectorCoordinate(for: TileCoordinate(q: 18, r: 0))
         let members = engine.sectorEngine.tiles(in: sector)

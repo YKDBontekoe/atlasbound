@@ -13,6 +13,7 @@ final class PinpointStore: ObservableObject {
     private let fileURL: URL
 
     private static let fileName = "atlasbound-pinpoint.json"
+    private static let maxRetainedGames = 100
 
     init(fileURL: URL? = nil) {
         self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: Self.fileName)
@@ -28,7 +29,10 @@ final class PinpointStore: ObservableObject {
 
     func record(_ game: PinpointGame) {
         gameHistory.append(game)
-        gamesPlayed = gameHistory.count
+        if gameHistory.count > Self.maxRetainedGames {
+            gameHistory.removeFirst(gameHistory.count - Self.maxRetainedGames)
+        }
+        gamesPlayed += 1
         exactTileHits += game.rounds.filter(\.hitExactTile).count
 
         switch game.mode {
@@ -61,6 +65,7 @@ final class PinpointStore: ObservableObject {
         let highScoreWorldwide: Int
         let highScoreHomeTurf: Int
         let exactTileHits: Int
+        let gamesPlayed: Int?
     }
 
     private func loadFromDisk() {
@@ -70,11 +75,11 @@ final class PinpointStore: ObservableObject {
             gameHistory = []
             return
         }
-        gameHistory = save.games
-        gamesPlayed = save.games.count
-        highScoreWorldwide = save.highScoreWorldwide
-        highScoreHomeTurf = save.highScoreHomeTurf
-        exactTileHits = save.exactTileHits
+        gameHistory = Array(save.games.suffix(Self.maxRetainedGames))
+        gamesPlayed = max(save.gamesPlayed ?? save.games.count, gameHistory.count)
+        highScoreWorldwide = max(0, save.highScoreWorldwide)
+        highScoreHomeTurf = max(0, save.highScoreHomeTurf)
+        exactTileHits = max(0, save.exactTileHits)
     }
 
     private func persistToDisk() {
@@ -83,7 +88,8 @@ final class PinpointStore: ObservableObject {
             games: gameHistory,
             highScoreWorldwide: highScoreWorldwide,
             highScoreHomeTurf: highScoreHomeTurf,
-            exactTileHits: exactTileHits
+            exactTileHits: exactTileHits,
+            gamesPlayed: gamesPlayed
         )
         JSONFileStore.save(save, to: fileURL)
     }

@@ -75,7 +75,8 @@ struct RegionLookupEngine: Sendable {
         guard parts.count == 2,
               let lat = Double(parts[0]),
               let lon = Double(parts[1]) else { return nil }
-        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        return CLLocationCoordinate2DIsValid(coordinate) ? coordinate : nil
     }
 
     static func labels(

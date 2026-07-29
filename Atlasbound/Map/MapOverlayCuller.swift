@@ -50,8 +50,13 @@ enum MapOverlayCuller {
     ) -> Double {
         let c = engine.centerCoordinate(for: axial)
         let dLat = c.latitude - center.latitude
-        let dLon = c.longitude - center.longitude
+        let dLon = wrappedLongitudeDelta(c.longitude, center.longitude)
         return dLat * dLat + dLon * dLon
+    }
+
+    static func wrappedLongitudeDelta(_ lhs: Double, _ rhs: Double) -> Double {
+        let raw = abs(lhs - rhs).truncatingRemainder(dividingBy: 360)
+        return min(raw, 360 - raw)
     }
 }
 
@@ -69,7 +74,9 @@ extension MKCoordinateRegion {
     func contains(_ coordinate: CLLocationCoordinate2D) -> Bool {
         let halfLat = span.latitudeDelta / 2
         let halfLon = span.longitudeDelta / 2
+        let longitudeIsVisible = span.longitudeDelta >= 360
+            || MapOverlayCuller.wrappedLongitudeDelta(coordinate.longitude, center.longitude) <= halfLon
         return abs(coordinate.latitude - center.latitude) <= halfLat
-            && abs(coordinate.longitude - center.longitude) <= halfLon
+            && longitudeIsVisible
     }
 }

@@ -38,8 +38,12 @@ struct ActivitySummary: Identifiable, Sendable {
     let familiarityXP: Int
     let activityType: ActivityType
     var frontierContribution: FrontierSessionContribution?
+    /// Active recording time, excluding pauses. Older callers and records fall back to wall time.
+    var activeDuration: TimeInterval? = nil
 
-    var duration: TimeInterval { endedAt.timeIntervalSince(startedAt) }
+    var duration: TimeInterval {
+        max(0, activeDuration ?? endedAt.timeIntervalSince(startedAt))
+    }
 
     var totalXP: Int { discoveryXP + familiarityXP }
 }

@@ -29,7 +29,11 @@ final class TileStore: ObservableObject {
     }
 
     var discoveredTileIDs: Set<String> {
-        Set(discoveredTiles.map(\.id))
+        Set(tiles.values.lazy.filter(\.isDiscovered).map(\.id))
+    }
+
+    var discoveredTileCount: Int {
+        tiles.values.lazy.filter(\.isDiscovered).count
     }
 
     init(fileURL: URL? = nil, installationID: String? = nil) {
@@ -55,9 +59,10 @@ final class TileStore: ObservableObject {
     func upsertMany(_ newTiles: [WorldTile]) {
         guard !newTiles.isEmpty else { return }
         var next = tiles
-        for tile in newTiles {
+        for tile in newTiles where isCanonical(tile) {
             next[tile.id] = tile
         }
+        guard next != tiles else { return }
         tiles = next
         persistToDisk()
     }
@@ -69,7 +74,7 @@ final class TileStore: ObservableObject {
     ) {
         if !updatedTiles.isEmpty {
             var next = tiles
-            for (_, tile) in updatedTiles {
+            for (_, tile) in updatedTiles where isCanonical(tile) {
                 next[tile.id] = tile
             }
             tiles = next
@@ -91,7 +96,7 @@ final class TileStore: ObservableObject {
         guard !updatedTiles.isEmpty || discoveryXP != 0 || familiarityXP != 0 else { return }
         if !updatedTiles.isEmpty {
             var next = tiles
-            for tile in updatedTiles {
+            for tile in updatedTiles where isCanonical(tile) {
                 next[tile.id] = tile
             }
             tiles = next
@@ -101,7 +106,18 @@ final class TileStore: ObservableObject {
         persistToDisk()
     }
 
-    func updateFrontierState(_ transform: (FrontierState) -> FrontierState, playerTile: TileCoordinate?) {
+    func updateFrontierState(
+        _ transform: (FrontierState) -> FrontierState,
+        playerTile: TileCoordinate?,
+        updatedTiles: [WorldTile] = []
+    ) {
+        if !updatedTiles.isEmpty {
+            var next = tiles
+            for tile in updatedTiles where isCanonical(tile) {
+                next[tile.id] = tile
+            }
+            tiles = next
+        }
         let engine = FrontierEngine()
         var state = engine.ensureWeeklyState(
             state: frontierState,
@@ -177,9 +193,11 @@ final class TileStore: ObservableObject {
             return
         }
 
-        tiles = Dictionary(
-            uniqueKeysWithValues: save.tiles.map { ($0.id, $0.asWorldTile()) }
-        )
+        tiles = save.tiles.reduce(into: [:]) { result, record in
+            let tile = record.asWorldTile()
+            guard isCanonical(tile) else { return }
+            result[tile.id] = tile
+        }
         discoveryXPTotal = save.progress.discoveryXPTotal
         familiarityXPTotal = save.progress.familiarityXPTotal
         activitiesCompleted = save.progress.activitiesCompleted
@@ -206,5 +224,14 @@ final class TileStore: ObservableObject {
             frontier: PersistedFrontierRecord(from: frontierState)
         )
         JSONFileStore.save(save, to: fileURL)
+    }
+
+    private func isCanonical(_ tile: WorldTile) -> Bool {
+        guard tileEngine.parseTileID(tile.id) == tile.coordinate else { return false }
+        return tile.id == TileEngine.makeTileID(
+            q: tile.coordinate.q,
+            r: tile.coordinate.r,
+            sizeMeters: tileSize.meters
+        )
     }
 }

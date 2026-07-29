@@ -73,7 +73,7 @@ struct ProgressTabView: View {
             }
             .background(AtlasTheme.canvas(for: colorScheme).ignoresSafeArea())
             .navigationTitle("Atlas Stats")
-            .task(id: store.discoveredTiles.count) {
+            .task(id: store.discoveredTileCount) {
                 regionLookup.resolve(tiles: allTiles)
             }
             .sheet(isPresented: $showExplorerMap) {
@@ -467,7 +467,7 @@ struct ProgressTabView: View {
                     .textCase(.uppercase)
 
                 HStack(spacing: 0) {
-                    StatKPI(value: "\(store.discoveredTiles.count)", caption: "Tiles")
+                    StatKPI(value: "\(store.discoveredTileCount)", caption: "Tiles")
                     StatKPI(value: "\(store.activitiesCompleted)", caption: "Activities")
                     StatKPI(
                         value: StatsFormat.percent(store.discoveryXPTotal, of: store.discoveryXPTotal + store.familiarityXPTotal),

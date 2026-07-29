@@ -35,6 +35,34 @@ final class TileStoreTests: XCTestCase {
         XCTAssertEqual(store.discoveredTiles.first?.id, tile.id)
     }
 
+    func testRejectsNonCanonicalOrMismatchedTiles() {
+        let store = TileStore(fileURL: tempURL)
+        let date = Date()
+        store.upsertMany([
+            WorldTile(
+                id: "hex:50:0:0",
+                coordinate: TileCoordinate(q: 0, r: 0),
+                state: .discovered,
+                masteryXP: 100,
+                visitCount: 1,
+                firstVisitedAt: date,
+                lastVisitedAt: date
+            ),
+            WorldTile(
+                id: "hex:20:1:0",
+                coordinate: TileCoordinate(q: 2, r: 0),
+                state: .discovered,
+                masteryXP: 100,
+                visitCount: 1,
+                firstVisitedAt: date,
+                lastVisitedAt: date
+            ),
+        ])
+
+        XCTAssertTrue(store.tiles.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempURL.path))
+    }
+
     func testClearAtlasWipesAllProgress() {
         let store = TileStore(fileURL: tempURL)
         store.upsert(

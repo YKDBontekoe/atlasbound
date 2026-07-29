@@ -121,13 +121,21 @@ struct FrontierComboState: Sendable, Equatable {
     static let empty = FrontierComboState(count: 0, expiresAt: nil)
 
     var multiplier: Double {
-        guard count > 0, let expiresAt, expiresAt > .now else { return 1.0 }
+        multiplier(at: .now)
+    }
+
+    func multiplier(at date: Date) -> Double {
+        guard count > 0, let expiresAt, expiresAt > date else { return 1.0 }
         return min(2.0, 1.0 + Double(count) * 0.1)
     }
 
     var isActive: Bool {
+        isActive(at: .now)
+    }
+
+    func isActive(at date: Date) -> Bool {
         guard count > 0, let expiresAt else { return false }
-        return expiresAt > .now
+        return expiresAt > date
     }
 }
 

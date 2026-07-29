@@ -6,8 +6,12 @@ struct TreasureEventEngine: Sendable {
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 
-    static func isoWeekKey(for date: Date = .now, calendar: Calendar = .current) -> String {
-        let parts = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+    static func isoWeekKey(for date: Date = .now, calendar: Calendar? = nil) -> String {
+        var resolvedCalendar = calendar ?? Calendar(identifier: .iso8601)
+        if calendar == nil {
+            resolvedCalendar.timeZone = .current
+        }
+        let parts = resolvedCalendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
         return String(format: "%04d-W%02d", parts.yearForWeekOfYear ?? 0, parts.weekOfYear ?? 0)
     }
 
@@ -16,7 +20,7 @@ struct TreasureEventEngine: Sendable {
         tileEngine: TileEngine,
         dayKey: String
     ) -> TreasureTrail {
-        let seed = stableSeed(dayKey)
+        let seed = StableHash.fnv1a64(dayKey)
         let candidates = (0..<(TreasureConstants.stagesPerTrail * 2)).map { index -> LandmarkTarget in
             let radius = 5 + index * 3
             let direction = Int((seed + UInt64(index * 5)) % 6)
@@ -67,7 +71,7 @@ struct TreasureEventEngine: Sendable {
         weekKey: String
     ) -> LandmarkTarget {
         let ring = tileEngine.ring(around: anchor, radius: 12)
-        let index = ring.isEmpty ? 0 : Int(stableSeed(weekKey) % UInt64(ring.count))
+        let index = ring.isEmpty ? 0 : Int(StableHash.fnv1a64(weekKey) % UInt64(ring.count))
         let coordinate = ring.isEmpty ? anchor : ring[index]
         return LandmarkTarget(
             id: "vault:\(weekKey)",
@@ -86,7 +90,7 @@ struct TreasureEventEngine: Sendable {
         isVault: Bool,
         date: Date = .now
     ) -> RelicRecord {
-        let value = stableSeed(seed)
+        let value = StableHash.fnv1a64(seed)
         let theme = RelicTheme.allCases[Int(value % UInt64(RelicTheme.allCases.count))]
         let rarity: RelicRarity
         let roll = Int((value / 7) % 100)
@@ -108,11 +112,5 @@ struct TreasureEventEngine: Sendable {
             discoveredAt: date,
             source: isVault ? "Weekly Vault" : "Daily Trail"
         )
-    }
-
-    private func stableSeed(_ string: String) -> UInt64 {
-        string.utf8.reduce(UInt64(14_695_981_039_346_656_037)) { value, byte in
-            (value ^ UInt64(byte)) &* 1_099_511_628_211
-        }
     }
 }

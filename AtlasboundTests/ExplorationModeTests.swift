@@ -17,6 +17,8 @@ final class ExplorationModeTests: XCTestCase {
         XCTAssertTrue(fixture.history.sessions.isEmpty)
         XCTAssertEqual(fixture.store.activitiesCompleted, 0)
         XCTAssertEqual(fixture.controller.explorationMode, .automatic)
+        XCTAssertGreaterThan(fixture.store.frontierState.weeklyScore, 0)
+        XCTAssertTrue(fixture.store.discoveredTiles.contains { $0.weeklyCharge > 0 })
     }
 
     @MainActor

@@ -88,4 +88,19 @@ final class ProgressionEngineTests: XCTestCase {
         XCTAssertEqual(secondPass.tilesRevisited, 1)
         XCTAssertEqual(secondPass.familiarityXP, 25)
     }
+
+    func testProcessVisitsSkipsInvalidGridIDs() {
+        var tiles: [String: WorldTile] = [:]
+        let progress = progression.processVisits(
+            tileIDs: ["hex:50:0:0", "malformed"],
+            tiles: &tiles,
+            tileEngine: engine,
+            at: dayOne,
+            activity: .walk
+        )
+
+        XCTAssertTrue(tiles.isEmpty)
+        XCTAssertEqual(progress.tilesVisited, 0)
+        XCTAssertEqual(progress.discoveryXP, 0)
+    }
 }

@@ -27,6 +27,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
     @Published private(set) var automaticBackgroundEnabled = false
 
     private let manager = CLLocationManager()
+    private let now: () -> Date
     private var settings: ActivitySettings
     private var lastAcceptedLocation: CLLocation?
     private var pausedAt: Date?
@@ -37,8 +38,12 @@ final class ActivityRecorder: NSObject, ObservableObject {
     var onSample: ((LocationSample) -> Void)?
     var onPassiveSample: ((LocationSample) -> Void)?
 
-    init(settings: ActivitySettings = .default) {
+    init(
+        settings: ActivitySettings = .default,
+        now: @escaping () -> Date = Date.init
+    ) {
         self.settings = settings
+        self.now = now
         self.authorizationStatus = manager.authorizationStatus
         super.init()
         manager.delegate = self
@@ -146,7 +151,8 @@ final class ActivityRecorder: NSObject, ObservableObject {
         manager.allowsBackgroundLocationUpdates = canEnable
     }
 
-    func start() {
+    @discardableResult
+    func start() -> Bool {
         clearError()
         requestAuthorization()
 
@@ -154,13 +160,13 @@ final class ActivityRecorder: NSObject, ObservableObject {
         let authorized = status == .authorizedWhenInUse || status == .authorizedAlways
         guard authorized || isSimulationActive else {
             lastErrorMessage = "Location permission is required to record an activity."
-            return
+            return false
         }
 
         samples = []
         distanceMeters = 0
         lastAcceptedLocation = nil
-        startedAt = Date()
+        startedAt = now()
         isRecording = true
         isPaused = false
         pausedAt = nil
@@ -169,18 +175,19 @@ final class ActivityRecorder: NSObject, ObservableObject {
         if isSimulationActive {
             manager.stopUpdatingLocation()
             manager.allowsBackgroundLocationUpdates = false
-            return
+            return true
         }
 
         applyBackgroundRecordingPreference()
 
         manager.startUpdatingLocation()
+        return true
     }
 
     func pause() {
         guard isRecording, !isPaused else { return }
         isPaused = true
-        pausedAt = Date()
+        pausedAt = now()
         if !isSimulationActive {
             manager.stopUpdatingLocation()
         }
@@ -189,7 +196,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
     func resume() {
         guard isRecording, isPaused else { return }
         if let pausedAt {
-            accumulatedPause += Date().timeIntervalSince(pausedAt)
+            accumulatedPause += now().timeIntervalSince(pausedAt)
         }
         pausedAt = nil
         isPaused = false
@@ -205,13 +212,14 @@ final class ActivityRecorder: NSObject, ObservableObject {
     /// Elapsed active time, excluding pauses.
     var elapsedActive: TimeInterval {
         guard let startedAt else { return 0 }
+        let current = now()
         let pauseExtra: TimeInterval
         if isPaused, let pausedAt {
-            pauseExtra = accumulatedPause + Date().timeIntervalSince(pausedAt)
+            pauseExtra = accumulatedPause + current.timeIntervalSince(pausedAt)
         } else {
             pauseExtra = accumulatedPause
         }
-        return max(0, Date().timeIntervalSince(startedAt) - pauseExtra)
+        return max(0, current.timeIntervalSince(startedAt) - pauseExtra)
     }
 
     /// Instantaneous speed in km/h from the latest sample, or average if unavailable.
@@ -225,21 +233,28 @@ final class ActivityRecorder: NSObject, ObservableObject {
     }
 
     @discardableResult
-    func stop() -> (samples: [LocationSample], distance: Double, startedAt: Date, endedAt: Date)? {
+    func stop() -> (
+        samples: [LocationSample],
+        distance: Double,
+        startedAt: Date,
+        endedAt: Date,
+        activeDuration: TimeInterval
+    )? {
         guard isRecording else { return nil }
+        let ended = now()
         if isPaused, let pausedAt {
-            accumulatedPause += Date().timeIntervalSince(pausedAt)
+            accumulatedPause += ended.timeIntervalSince(pausedAt)
         }
         manager.stopUpdatingLocation()
         manager.allowsBackgroundLocationUpdates = false
         isRecording = false
         isPaused = false
         pausedAt = nil
-        let ended = Date()
         let started = startedAt ?? ended
+        let activeDuration = max(0, ended.timeIntervalSince(started) - accumulatedPause)
         startedAt = nil
         accumulatedPause = 0
-        return (samples, distanceMeters, started, ended)
+        return (samples, distanceMeters, started, ended, activeDuration)
     }
 
     // MARK: - Simulation (DEBUG / tests)
@@ -273,11 +288,13 @@ final class ActivityRecorder: NSObject, ObservableObject {
 
     private func accept(_ location: CLLocation) {
         guard location.horizontalAccuracy >= 0,
-              location.horizontalAccuracy <= settings.maxHorizontalAccuracy else {
+              location.horizontalAccuracy <= settings.maxHorizontalAccuracy,
+              startedAt.map({ location.timestamp >= $0 }) ?? true else {
             return
         }
 
         if let previous = lastAcceptedLocation {
+            guard location.timestamp > previous.timestamp else { return }
             let delta = location.distance(from: previous)
             guard delta >= settings.minSampleDistance else { return }
             distanceMeters += delta
@@ -300,9 +317,11 @@ final class ActivityRecorder: NSObject, ObservableObject {
     private func acceptPassive(_ location: CLLocation) {
         guard location.horizontalAccuracy >= 0,
               location.horizontalAccuracy <= settings.maxHorizontalAccuracy else { return }
-        if let previous = lastPassiveLocation,
-           location.distance(from: previous) < settings.minSampleDistance {
-            return
+        if let previous = lastPassiveLocation {
+            guard location.timestamp > previous.timestamp,
+                  location.distance(from: previous) >= settings.minSampleDistance else {
+                return
+            }
         }
         lastPassiveLocation = location
         lastLocation = location

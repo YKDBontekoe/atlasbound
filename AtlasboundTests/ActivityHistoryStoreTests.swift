@@ -79,6 +79,28 @@ final class ActivityHistoryStoreTests: XCTestCase {
         XCTAssertEqual(store.sessions.first?.frontierSessionTotal, 45)
     }
 
+    func testPersistsActiveDurationInsteadOfPausedWallTime() {
+        let summary = ActivitySummary(
+            id: UUID(),
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            endedAt: Date(timeIntervalSince1970: 1_700_000_600),
+            distanceMeters: 1_000,
+            sampleCount: 10,
+            tilesVisited: 5,
+            tilesDiscovered: 3,
+            discoveryXP: 300,
+            familiarityXP: 0,
+            activityType: .walk,
+            activeDuration: 420
+        )
+        let store = ActivityHistoryStore(fileURL: tempURL)
+
+        store.record(summary)
+
+        XCTAssertEqual(store.sessions.first?.duration, 420)
+        XCTAssertEqual(store.totalDurationByActivity[.walk], 420)
+    }
+
     private func makeSummary(activity: ActivityType, distance: Double) -> ActivitySummary {
         ActivitySummary(
             id: UUID(),

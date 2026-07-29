@@ -187,10 +187,16 @@ struct TileEngine: Sendable {
         // Format: "hex:{size}:{q}:{r}"
         let parts = id.split(separator: ":")
         guard parts.count == 4, parts[0] == "hex",
+              let sizeMeters = Int(parts[1]),
+              sizeMeters == Int(tileSizeMeters.rounded()),
               let q = Int(parts[2]), let r = Int(parts[3]) else {
             return nil
         }
-        return TileCoordinate(q: q, r: r)
+        let coordinate = TileCoordinate(q: q, r: r)
+        guard id == Self.makeTileID(q: q, r: r, sizeMeters: tileSizeMeters) else {
+            return nil
+        }
+        return coordinate
     }
 
     static func makeTileID(q: Int, r: Int, sizeMeters: Double) -> String {

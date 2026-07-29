@@ -41,10 +41,14 @@ struct ProgressionEngine: Sendable {
         var discovered = 0
         var revisited = 0
 
+        var processed = 0
         for id in tileIDs {
-            var tile = tiles[id] ?? makeTile(id: id, engine: tileEngine)
+            guard let coordinate = tileEngine.parseTileID(id) else { continue }
+            var tile = tiles[id] ?? WorldTile(id: id, coordinate: coordinate)
+            guard tile.id == id, tile.coordinate == coordinate else { continue }
             let result = processVisit(tile: &tile, at: date, activity: activity)
             tiles[id] = tile
+            processed += 1
 
             switch result.kind {
             case .discovery:
@@ -57,7 +61,7 @@ struct ProgressionEngine: Sendable {
         }
 
         return SessionProgress(
-            tilesVisited: tileIDs.count,
+            tilesVisited: processed,
             tilesDiscovered: discovered,
             tilesRevisited: revisited,
             discoveryXP: discoveryXP,
@@ -120,10 +124,6 @@ struct ProgressionEngine: Sendable {
         }
     }
 
-    private func makeTile(id: String, engine: TileEngine) -> WorldTile {
-        let coordinate = engine.parseTileID(id) ?? TileCoordinate(q: 0, r: 0)
-        return WorldTile(id: id, coordinate: coordinate)
-    }
 }
 
 enum VisitKind: Sendable {

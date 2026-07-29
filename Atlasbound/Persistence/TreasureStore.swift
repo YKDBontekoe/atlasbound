@@ -170,15 +170,20 @@ final class TreasureStore: ObservableObject {
     }
 
     private func refreshCalendarState(date: Date = .now) {
+        var didChange = false
         let weekKey = TreasureEventEngine.isoWeekKey(for: date)
         if weeklyVault.weekKey != weekKey {
             weeklyVault = WeeklyVaultState(weekKey: weekKey, keys: 0, target: nil, isCompleted: false)
+            didChange = true
         }
         if let trail = dailyTrail, trail.dayKey != TreasureEventEngine.localDayKey(for: date) {
             dailyTrail = nil
             pendingEncounter = nil
+            didChange = true
         }
-        persist()
+        if didChange {
+            persist()
+        }
     }
 
     private func load() {

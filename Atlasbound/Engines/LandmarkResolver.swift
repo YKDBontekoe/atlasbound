@@ -1,7 +1,28 @@
 import Foundation
 import MapKit
 
-struct LandmarkResolver {
+protocol LandmarkResolving: Sendable {
+    func targets(
+        near coordinate: CLLocationCoordinate2D,
+        tileEngine: TileEngine,
+        count: Int
+    ) async -> [LandmarkTarget]
+}
+
+extension LandmarkResolving {
+    func targets(
+        near coordinate: CLLocationCoordinate2D,
+        tileEngine: TileEngine
+    ) async -> [LandmarkTarget] {
+        await targets(
+            near: coordinate,
+            tileEngine: tileEngine,
+            count: TreasureConstants.stagesPerTrail * 2
+        )
+    }
+}
+
+struct LandmarkResolver: LandmarkResolving, Sendable {
     private let searchTerms = ["park", "library", "monument", "museum", "public art", "historic site"]
 
     func targets(

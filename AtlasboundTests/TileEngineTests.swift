@@ -17,6 +17,8 @@ final class TileEngineTests: XCTestCase {
     func testParseTileIDRejectsMalformed() {
         XCTAssertNil(engine.parseTileID("hex:20:onlytwo"))
         XCTAssertNil(engine.parseTileID("tile:80:1:2"))
+        XCTAssertNil(engine.parseTileID("hex:50:1:2"))
+        XCTAssertNil(engine.parseTileID("hex:20:01:2"))
         XCTAssertNil(engine.parseTileID(""))
     }
 

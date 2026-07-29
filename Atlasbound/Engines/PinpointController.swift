@@ -46,17 +46,17 @@ final class PinpointController: ObservableObject {
 
     var unlockedAreaM2: Double {
         PinpointScoring.unlockedAreaM2(
-            discoveredCount: tileStore.discoveredTiles.count,
+            discoveredCount: tileStore.discoveredTileCount,
             tileSizeMeters: tileStore.tileEngine.tileSizeMeters
         )
     }
 
     var homeTurfUnlocked: Bool {
-        tileStore.discoveredTiles.count >= PinpointConstants.homeTurfMinTiles
+        tileStore.discoveredTileCount >= PinpointConstants.homeTurfMinTiles
     }
 
     var homeTurfTilesNeeded: Int {
-        max(0, PinpointConstants.homeTurfMinTiles - tileStore.discoveredTiles.count)
+        max(0, PinpointConstants.homeTurfMinTiles - tileStore.discoveredTileCount)
     }
 
     init(store: PinpointStore, tileStore: TileStore, gameCenterManager: GameCenterManager) {
@@ -121,7 +121,7 @@ final class PinpointController: ObservableObject {
     }
 
     func submitGuess(_ guess: CLLocationCoordinate2D) {
-        guard currentRound < targets.count else { return }
+        guard phase == .playing, currentRound < targets.count else { return }
 
         let target = targets[currentRound]
         let engine = tileStore.tileEngine
@@ -149,6 +149,7 @@ final class PinpointController: ObservableObject {
     }
 
     func advanceRound() {
+        guard phase == .roundResult else { return }
         currentRound += 1
         if currentRound >= PinpointConstants.roundsPerGame {
             let game = PinpointGame(
@@ -172,6 +173,9 @@ final class PinpointController: ObservableObject {
     }
 
     func returnToLobby() {
+        preparationTask?.cancel()
+        preparationTask = nil
+        preparationID = nil
         phase = .lobby
         preparationError = nil
         preparationFoundCount = 0

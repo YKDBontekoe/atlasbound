@@ -33,6 +33,12 @@ final class RegionLookupEngineTests: XCTestCase {
         XCTAssertEqual(restored.longitude, parts[1], accuracy: 0.0001)
     }
 
+    func testRepresentativeCoordinateRejectsInvalidCoordinates() {
+        XCTAssertNil(RegionLookupEngine.representativeCoordinate(forCellKey: "91.00:0.00"))
+        XCTAssertNil(RegionLookupEngine.representativeCoordinate(forCellKey: "0.00:181.00"))
+        XCTAssertNil(RegionLookupEngine.representativeCoordinate(forCellKey: "nan:0.00"))
+    }
+
     func testLabelsFromPlacemarkFields() {
         let labels = RegionLookupEngine.labels(
             countryCode: " nl ",
@@ -190,6 +196,31 @@ final class RegionLookupStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.resolvedCellCount, 1)
         XCTAssertEqual(reloaded.successfulLabels["51.80:4.66"]?.countryDisplayName, "Netherlands")
         XCTAssertEqual(reloaded.successfulLabels["51.80:4.66"]?.locality, "Dordrecht")
+    }
+
+    func testDuplicateAndInvalidCacheCellsLoadSafely() throws {
+        let first = PersistedRegionCell(
+            cellKey: "51.80:4.66",
+            labels: RegionLookupEngine.labels(countryCode: "NL", countryName: "Old", administrativeArea: nil, locality: nil),
+            resolvedAt: Date()
+        )
+        let replacement = PersistedRegionCell(
+            cellKey: "51.80:4.66",
+            labels: RegionLookupEngine.labels(countryCode: "NL", countryName: "Netherlands", administrativeArea: nil, locality: nil),
+            resolvedAt: Date()
+        )
+        let invalid = PersistedRegionCell(
+            cellKey: "999.00:4.66",
+            labels: RegionLookupEngine.labels(countryCode: "XX", countryName: "Invalid", administrativeArea: nil, locality: nil),
+            resolvedAt: Date()
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(RegionSaveFileStub(cells: [first, replacement, invalid])).write(to: tempURL)
+
+        let store = RegionLookupStore(fileURL: tempURL)
+        XCTAssertEqual(store.cells.count, 1)
+        XCTAssertEqual(store.successfulLabels["51.80:4.66"]?.countryDisplayName, "Netherlands")
     }
 
     func testPlacesVisitedUsesCachedLabelsForMatchingCells() {

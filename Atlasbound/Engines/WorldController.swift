@@ -26,7 +26,7 @@ final class WorldController: ObservableObject {
     private let progression = ProgressionEngine()
     private let frontierEngine = FrontierEngine()
     private let sectorEngine = HexSectorEngine()
-    private let landmarkResolver = LandmarkResolver()
+    private let landmarkResolver: any LandmarkResolving
 
     /// Tiles mutated during the active session (merged into store on stop).
     private var sessionTiles: [String: WorldTile] = [:]
@@ -35,6 +35,8 @@ final class WorldController: ObservableObject {
     private var scoredFrontierTiles: Set<String> = []
     private var automaticPreviousSample: LocationSample?
     private var automaticVisitedTileIDs: Set<String> = []
+    private var treasurePreparationTask: Task<Void, Never>?
+    private var treasurePreparationDayKey: String?
 
     private static let selectedActivityKey = "atlasbound.selectedActivityType"
 
@@ -44,7 +46,8 @@ final class WorldController: ObservableObject {
         regionLookup: RegionLookupStore? = nil,
         gameCenterManager: GameCenterManager? = nil,
         treasureStore: TreasureStore? = nil,
-        recorder: ActivityRecorder? = nil
+        recorder: ActivityRecorder? = nil,
+        landmarkResolver: any LandmarkResolving = LandmarkResolver()
     ) {
         self.store = store
         self.activityHistory = activityHistory
@@ -52,6 +55,7 @@ final class WorldController: ObservableObject {
         self.gameCenterManager = gameCenterManager ?? GameCenterManager()
         self.treasureStore = treasureStore ?? TreasureStore()
         self.recorder = recorder ?? ActivityRecorder()
+        self.landmarkResolver = landmarkResolver
         restoreSelectedActivityType()
         syncRecorderSettings()
 
@@ -109,7 +113,7 @@ final class WorldController: ObservableObject {
         return tileEngine.centerCoordinate(for: axial)
     }
 
-    var discoveredTileCount: Int { store.discoveredTiles.count }
+    var discoveredTileCount: Int { store.discoveredTileCount }
 
     var frontierComboMultiplier: Double {
         frontierCombo.multiplier
@@ -184,22 +188,23 @@ final class WorldController: ObservableObject {
     }
 
     var placeMapPins: [PlaceMapPin] {
-        let labels = regionLookup.successfulLabels
-        var pins: [PlaceMapPin] = []
-        for (cellKey, place) in labels {
-            guard let name = place.locality ?? place.administrativeArea else { continue }
-            guard let coordinate = RegionLookupEngine.representativeCoordinate(forCellKey: cellKey) else { continue }
-            pins.append(
-                PlaceMapPin(
-                    id: cellKey,
-                    name: name,
-                    latitude: coordinate.latitude,
-                    longitude: coordinate.longitude
-                )
+        let pins = regionLookup.successfulLabels.compactMap { cellKey, place -> PlaceMapPin? in
+            guard let name = place.locality ?? place.administrativeArea else { return nil }
+            guard let coordinate = RegionLookupEngine.representativeCoordinate(forCellKey: cellKey) else { return nil }
+            return PlaceMapPin(
+                id: cellKey,
+                name: name,
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude
             )
-            if pins.count >= AtlasTheme.maxVisiblePlacePins { break }
         }
-        return pins.sorted { $0.name < $1.name }
+        return Array(
+            pins.sorted {
+                let comparison = $0.name.localizedCaseInsensitiveCompare($1.name)
+                return comparison == .orderedSame ? $0.id < $1.id : comparison == .orderedAscending
+            }
+            .prefix(AtlasTheme.maxVisiblePlacePins)
+        )
     }
 
     private var playerTileCoordinate: TileCoordinate? {
@@ -231,7 +236,7 @@ final class WorldController: ObservableObject {
         let center = engine.axialCoordinate(for: coordinate)
         return engine.ring(around: center, radius: radius).filter { axial in
             let id = TileEngine.makeTileID(q: axial.q, r: axial.r, sizeMeters: engine.tileSizeMeters)
-            let tile = store.tiles[id] ?? sessionTiles[id]
+            let tile = sessionTiles[id] ?? store.tiles[id]
             return tile == nil || tile?.state == .fogged
         }
     }
@@ -308,6 +313,7 @@ final class WorldController: ObservableObject {
 
     private func beginSession(mode: ExplorationMode) {
         guard mode == .quickExplore || mode == .trackedActivity else { return }
+        guard !recorder.isRecording, recorder.start() else { return }
         store.applyWeeklyChargeResetIfNeeded()
         refreshFrontierPresentation()
         liveRoute = []
@@ -322,15 +328,15 @@ final class WorldController: ObservableObject {
         sessionProgress = .empty
         sessionFrontier = .empty
         scoredFrontierTiles = []
+        automaticPreviousSample = nil
         if let offer = activeExpedition {
             sessionFrontier.targetTilesRequired = offer.tilesRequired
             sessionFrontier.targetTilesDiscovered = targetSectorDiscoveredCount
         }
         lastSummary = nil
-        explorationMode = mode
         AtlasHaptics.prepare()
+        explorationMode = mode
         store.setDeferPersistence(true)
-        recorder.start()
     }
 
     func pauseActivity() {
@@ -376,7 +382,8 @@ final class WorldController: ObservableObject {
                 discoveryXP: sessionProgress.discoveryXP,
                 familiarityXP: sessionProgress.familiarityXP,
                 activityType: recorder.activityType,
-                frontierContribution: sessionFrontier
+                frontierContribution: sessionFrontier,
+                activeDuration: result.activeDuration
             )
             activityHistory.record(summary)
             lastSummary = summary
@@ -384,6 +391,7 @@ final class WorldController: ObservableObject {
         frontierCombo = .empty
         frontierScoreCallouts = []
         regionLookup.resolve(tiles: store.discoveredTiles)
+        automaticPreviousSample = nil
         if recorder.automaticExplorationEnabled {
             explorationMode = .automatic
             recorder.startMonitoringIfNeeded()
@@ -419,6 +427,8 @@ final class WorldController: ObservableObject {
 
     func rerollTreasureTrail() {
         guard let playerTileCoordinate else { return }
+        treasurePreparationTask?.cancel()
+        treasurePreparationTask = nil
         treasureStore.reroll(anchor: playerTileCoordinate, tileEngine: tileEngine)
     }
 
@@ -426,15 +436,22 @@ final class WorldController: ObservableObject {
         guard let playerTileCoordinate, let location = recorder.lastLocation else { return }
         treasureStore.ensureTrail(anchor: playerTileCoordinate, tileEngine: tileEngine)
         treasureStore.ensureVaultTarget(anchor: playerTileCoordinate, tileEngine: tileEngine)
-        guard treasureStore.dailyTrail?.currentStageIndex == 0 else { return }
+        guard let dayKey = treasureStore.dailyTrail?.dayKey,
+              treasureStore.dailyTrail?.currentStageIndex == 0 else { return }
+        guard treasurePreparationTask == nil else { return }
+        guard treasurePreparationDayKey != dayKey else { return }
+        treasurePreparationDayKey = dayKey
         let engine = tileEngine
-        Task { [weak self] in
-            let targets = await self?.landmarkResolver.targets(
+        let resolver = landmarkResolver
+        treasurePreparationTask = Task { [weak self] in
+            let targets = await resolver.targets(
                 near: location.coordinate,
                 tileEngine: engine
-            ) ?? []
-            guard !targets.isEmpty else { return }
-            self?.treasureStore.replaceTrailTargets(targets)
+            )
+            guard let self else { return }
+            self.treasurePreparationTask = nil
+            guard !Task.isCancelled, !targets.isEmpty else { return }
+            self.treasureStore.replaceTrailTargets(targets)
         }
     }
 
@@ -476,6 +493,7 @@ final class WorldController: ObservableObject {
     private func handleAutomaticSample(_ sample: LocationSample) {
         guard recorder.automaticExplorationEnabled, !recorder.isRecording else { return }
         explorationMode = .automatic
+        store.applyWeeklyChargeResetIfNeeded()
         let engine = tileEngine
         let ids: [String]
         if let previous = automaticPreviousSample {
@@ -513,7 +531,9 @@ final class WorldController: ObservableObject {
         )
         treasureStore.processVisitedTileIDs(newIDs)
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
-        regionLookup.resolve(tiles: store.discoveredTiles)
+        if progress.tilesDiscovered > 0 {
+            regionLookup.resolve(tiles: store.discoveredTiles)
+        }
     }
 
     private func processTileIDs(_ ids: [String], at date: Date, activity: ActivityType) {
@@ -602,10 +622,11 @@ final class WorldController: ObservableObject {
         var batchCompletionBonus = 0
         var completedOffer: ExpeditionOffer?
         var newCalloutIDs: [UUID] = []
+        var chargedTiles: [WorldTile] = []
 
         for id in newDiscoveryIDs {
             guard let coordinate = tileEngine.parseTileID(id) else { continue }
-            guard let tile = sessionTiles[id], tile.isDiscovered else { continue }
+            guard let tile = sessionTiles[id] ?? store.tiles[id], tile.isDiscovered else { continue }
             guard !scoredFrontierTiles.contains(id) else { continue }
 
             let isNew = tile.visitCount <= 1
@@ -652,7 +673,10 @@ final class WorldController: ObservableObject {
 
             var updatedTile = tile
             updatedTile.weeklyCharge = min(FrontierConstants.maxWeeklyCharge, updatedTile.weeklyCharge + 1)
-            sessionTiles[id] = updatedTile
+            if explorationMode.isExplicitSession {
+                sessionTiles[id] = updatedTile
+            }
+            chargedTiles.append(updatedTile)
 
             let calloutID = UUID()
             newCalloutIDs.append(calloutID)
@@ -677,9 +701,9 @@ final class WorldController: ObservableObject {
             var next = state
             next.weeklyScore += batchTilePoints + batchConnectionBonus + batchCompletionBonus
             next.connectionBonusesAwarded = Array(Set(next.connectionBonusesAwarded).union(connectionBonuses))
-            for id in sessionTiles.keys {
-                if let tile = sessionTiles[id], tile.weeklyCharge > 0, !next.chargedTileIDs.contains(id) {
-                    next.chargedTileIDs.append(id)
+            for tile in chargedTiles where tile.weeklyCharge > 0 {
+                if !next.chargedTileIDs.contains(tile.id) {
+                    next.chargedTileIDs.append(tile.id)
                 }
             }
             if let completedOffer {
@@ -690,7 +714,7 @@ final class WorldController: ObservableObject {
                 next.activeOfferID = nil
             }
             return next
-        }, playerTile: playerTileCoordinate)
+        }, playerTile: playerTileCoordinate, updatedTiles: chargedTiles)
 
         sessionFrontier.weeklyTotalAfter = store.frontierState.weeklyScore
     }

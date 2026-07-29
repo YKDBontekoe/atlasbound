@@ -12,14 +12,15 @@ struct FrontierEngine: Sendable {
 
     // MARK: - ISO week
 
-    static func isoWeekKey(for date: Date = .now, calendar: Calendar = .current) -> String {
-        let week = calendar.component(.weekOfYear, from: date)
-        let year = calendar.component(.yearForWeekOfYear, from: date)
+    static func isoWeekKey(for date: Date = .now, calendar: Calendar? = nil) -> String {
+        let resolvedCalendar = calendar ?? localISOCalendar()
+        let week = resolvedCalendar.component(.weekOfYear, from: date)
+        let year = resolvedCalendar.component(.yearForWeekOfYear, from: date)
         return String(format: "%d-W%02d", year, week)
     }
 
     /// Human-readable range for an ISO week key such as `2026-W31`.
-    static func friendlyWeekLabel(for weekKey: String, calendar: Calendar = .current) -> String {
+    static func friendlyWeekLabel(for weekKey: String, calendar: Calendar? = nil) -> String {
         guard !weekKey.isEmpty else { return "This week" }
         guard let dashRange = weekKey.range(of: "-W"),
               let year = Int(weekKey[..<dashRange.lowerBound]),
@@ -30,8 +31,9 @@ struct FrontierEngine: Sendable {
         var components = DateComponents()
         components.weekOfYear = week
         components.yearForWeekOfYear = year
-        guard let start = calendar.date(from: components) else { return weekKey }
-        let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
+        let resolvedCalendar = calendar ?? localISOCalendar()
+        guard let start = resolvedCalendar.date(from: components) else { return weekKey }
+        let end = resolvedCalendar.date(byAdding: .day, value: 6, to: start) ?? start
 
         return "\(weekRangeFormatter.string(from: start)) – \(weekRangeFormatter.string(from: end))"
     }
@@ -41,6 +43,12 @@ struct FrontierEngine: Sendable {
         formatter.setLocalizedDateFormatFromTemplate("MMM d")
         return formatter
     }()
+
+    private static func localISOCalendar() -> Calendar {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = .current
+        return calendar
+    }
 
     // MARK: - Territory
 
@@ -53,7 +61,7 @@ struct FrontierEngine: Sendable {
         var remaining = discovered
         var components: [[TileCoordinate]] = []
 
-        while let seed = remaining.first {
+        while let seed = remaining.min() {
             var queue = [seed]
             var component: [TileCoordinate] = []
             remaining.remove(seed)
@@ -82,7 +90,11 @@ struct FrontierEngine: Sendable {
             return []
         }
         guard let playerTile else {
-            return Set(components.max(by: { $0.count < $1.count }) ?? [])
+            let largest = components.max { lhs, rhs in
+                if lhs.count != rhs.count { return lhs.count < rhs.count }
+                return (lhs.min() ?? .init(q: 0, r: 0)) > (rhs.min() ?? .init(q: 0, r: 0))
+            }
+            return Set(largest ?? [])
         }
         let nearest = components.min { lhs, rhs in
             let lDist = lhs.map { TileEngine.hexDistance($0, playerTile) }.min() ?? .max
@@ -186,7 +198,7 @@ struct FrontierEngine: Sendable {
         weekKey: String
     ) -> [ExpeditionOffer] {
         let discovered = discoveredTileCoordinates(from: tiles)
-        let anchorTile = playerTile ?? discovered.first ?? TileCoordinate(q: 0, r: 0)
+        let anchorTile = playerTile ?? discovered.min() ?? TileCoordinate(q: 0, r: 0)
         let anchorSector = sectorEngine.sectorCoordinate(for: anchorTile)
         let territory = territoryAnchor(playerTile: playerTile, discovered: discovered)
         let seed = weeklySeed(weekKey: weekKey, sizeMeters: tileEngine.tileSizeMeters, installationID: installationID)
@@ -259,10 +271,10 @@ struct FrontierEngine: Sendable {
             return (nil, combo, false, nil)
         }
 
-        var nextCombo = advanceCombo(current: combo, qualifyingTile: true, at: date)
-        let multiplier = nextCombo.multiplier
+        let nextCombo = advanceCombo(current: combo, qualifyingTile: true, at: date)
+        let multiplier = nextCombo.multiplier(at: date)
 
-        var base = Self.baseTilePoints
+        let base = Self.baseTilePoints
         var sectorBonus = 0
         if let offer = activeOffer,
            let parsed = sectorEngine.parseSectorID(offer.targetSectorID),
@@ -329,11 +341,9 @@ struct FrontierEngine: Sendable {
     // MARK: - Private
 
     private func weeklySeed(weekKey: String, sizeMeters: Double, installationID: String) -> UInt64 {
-        var hasher = Hasher()
-        hasher.combine(weekKey)
-        hasher.combine(Int(sizeMeters.rounded()))
-        hasher.combine(installationID)
-        return UInt64(bitPattern: Int64(hasher.finalize()))
+        StableHash.fnv1a64(
+            "frontier-week:\(weekKey):\(Int(sizeMeters.rounded())):\(installationID)"
+        )
     }
 
     private func pickDirection(
@@ -409,13 +419,15 @@ struct FrontierEngine: Sendable {
         directionIndex: Int,
         sectorID: String
     ) -> String {
-        var hasher = Hasher()
-        hasher.combine(weekKey)
-        hasher.combine(installationID)
-        hasher.combine(difficulty.rawValue)
-        hasher.combine(directionIndex)
-        hasher.combine(sectorID)
-        return "expedition:\(abs(hasher.finalize()))"
+        let source = [
+            "frontier-offer",
+            weekKey,
+            installationID,
+            difficulty.rawValue,
+            String(directionIndex),
+            sectorID
+        ].joined(separator: ":")
+        return "expedition:\(String(StableHash.fnv1a64(source), radix: 16))"
     }
 
 }
