@@ -7,6 +7,7 @@ struct MainMapScreen: View {
     @ObservedObject var store: TileStore
     @ObservedObject private var recorder: ActivityRecorder
     @ObservedObject private var treasureStore: TreasureStore
+    @ObservedObject private var inventoryStore: InventoryStore
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
@@ -33,6 +34,7 @@ struct MainMapScreen: View {
         self.store = store
         self._recorder = ObservedObject(wrappedValue: controller.recorder)
         self._treasureStore = ObservedObject(wrappedValue: controller.treasureStore)
+        self._inventoryStore = ObservedObject(wrappedValue: controller.inventoryStore)
     }
 
     private var showsSimGPSPad: Bool {
@@ -91,6 +93,11 @@ struct MainMapScreen: View {
             #endif
 
             VStack(spacing: 12) {
+                if let effect = inventoryStore.primaryActiveEffect {
+                    ActiveEffectChip(effect: effect)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+
                 if let error = recorder.lastErrorMessage {
                     Text(error)
                         .font(.caption.weight(.medium))
@@ -127,6 +134,7 @@ struct MainMapScreen: View {
             .padding(.bottom, 8)
             .animation(AtlasMotion.chrome, value: controller.isRecording)
             .animation(AtlasMotion.fade, value: controller.sessionFeedback.map(\.id))
+            .animation(AtlasMotion.fade, value: inventoryStore.primaryActiveEffect?.id)
         }
         .overlay {
             if onboardingVersion < OnboardingPreference.currentVersion {
@@ -187,6 +195,12 @@ struct MainMapScreen: View {
         .sheet(item: $treasureStore.latestReward) { reward in
             RelicRewardSheet(reward: reward) {
                 treasureStore.latestReward = nil
+            }
+            .presentationDetents([.medium])
+        }
+        .sheet(item: $inventoryStore.latestPickup) { pickup in
+            FieldFindPickupSheet(pickup: pickup) {
+                inventoryStore.dismissPickup()
             }
             .presentationDetents([.medium])
         }
@@ -640,6 +654,7 @@ struct SettingsSheet: View {
                 Section {
                     Button("Clear discovered tiles", role: .destructive) {
                         store.clearAtlas()
+                        controller.inventoryStore.clearClaimedFindIDs()
                     }
                     .disabled(controller.isRecording)
                 }

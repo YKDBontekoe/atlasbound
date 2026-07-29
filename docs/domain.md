@@ -60,6 +60,7 @@ Automatic Explore discovers without fitness history while the app is open. Scree
 - **Frontier combo:** during an active expedition, consecutive qualifying frontier tiles within **20 minutes** build a combo multiplier on frontier scoring (see `FrontierEngine`).
 - **Treasure trails:** three local-day landmark targets with direct/detour choices. Completion grants a relic and weekly key.
 - **Weekly vault:** three keys reveal a once-per-ISO-week destination with rare-or-better loot.
+- **Field finds:** deterministic tile pickups (`FieldFindEngine`) into `InventoryStore` — materials, boosts, charges; assemble / salvage / use / activate. Soft daily claim cap; claimed find IDs only (no geometry).
 - **Nearby fog / undiscovered counts:** rings around user via `TileEngine.ring`.
 
 ## Activity history & territory stats

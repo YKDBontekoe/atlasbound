@@ -5,9 +5,24 @@ struct JournalTabView: View {
     @ObservedObject var store: TileStore
     @ObservedObject var activityHistory: ActivityHistoryStore
     @ObservedObject var treasureStore: TreasureStore
+    @ObservedObject private var inventoryStore: InventoryStore
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedSession: PersistedActivityRecord?
+    @State private var showAssembleSheet = false
+
+    init(
+        controller: WorldController,
+        store: TileStore,
+        activityHistory: ActivityHistoryStore,
+        treasureStore: TreasureStore
+    ) {
+        self.controller = controller
+        self.store = store
+        self.activityHistory = activityHistory
+        self.treasureStore = treasureStore
+        self._inventoryStore = ObservedObject(wrappedValue: controller.inventoryStore)
+    }
 
     var body: some View {
         NavigationStack {
@@ -25,6 +40,62 @@ struct JournalTabView: View {
                             "Vault keys",
                             value: "\(treasureStore.weeklyVault.keys)/\(TreasureConstants.keysRequiredForVault)"
                         )
+                    }
+
+                    Section {
+                        if inventoryStore.sortedStacks.isEmpty {
+                            Text("Explore tiles to gather field finds — materials, boosts, and charges.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(inventoryStore.sortedStacks) { stack in
+                                InventoryItemRow(
+                                    stack: stack,
+                                    onUse: {
+                                        _ = controller.performItemAction(itemID: stack.itemID, action: .use)
+                                    },
+                                    onActivate: {
+                                        _ = controller.performItemAction(itemID: stack.itemID, action: .activate)
+                                    },
+                                    onSalvage: {
+                                        _ = controller.performItemAction(itemID: stack.itemID, action: .salvage)
+                                    },
+                                    onDiscard: {
+                                        _ = controller.performItemAction(itemID: stack.itemID, action: .discard)
+                                    }
+                                )
+                            }
+                        }
+
+                        Button {
+                            showAssembleSheet = true
+                        } label: {
+                            Label("Assemble…", systemImage: "hammer.fill")
+                        }
+
+                        LabeledContent("Finds today", value: "\(inventoryStore.findsClaimedToday)/\(FieldFindConstants.maxFindsPerDay)")
+                        LabeledContent("Lifetime finds", value: "\(inventoryStore.lifetimeFindsCollected)")
+
+                        if let message = inventoryStore.latestActionMessage {
+                            Text(message)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    } header: {
+                        Text("Inventory")
+                    } footer: {
+                        Text("Long-press an item to Use, Activate, Salvage, or Discard.")
+                    }
+
+                    if !inventoryStore.cartographerPins.isEmpty {
+                        Section("Pinned tiles") {
+                            ForEach(inventoryStore.cartographerPins.suffix(12).reversed()) { pin in
+                                LabeledContent(
+                                    pin.note,
+                                    value: pin.pinnedAt.formatted(date: .abbreviated, time: .shortened)
+                                )
+                            }
+                        }
                     }
 
                     Section("Optional Activity History") {
@@ -94,6 +165,10 @@ struct JournalTabView: View {
                 ActivitySessionDetailView(session: session) {
                     selectedSession = nil
                 }
+            }
+            .sheet(isPresented: $showAssembleSheet) {
+                AssembleSheet(controller: controller)
+                    .presentationDetents([.medium, .large])
             }
         }
     }

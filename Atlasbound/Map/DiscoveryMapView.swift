@@ -102,6 +102,14 @@ struct DiscoveryMapView: View {
                 }
             }
 
+            ForEach(controller.fieldFindPreviews) { preview in
+                if let coordinate = engine.parseTileID(preview.tileID).map({ engine.centerCoordinate(for: $0) }) {
+                    Annotation("Field find", coordinate: coordinate, anchor: .center) {
+                        FieldFindMapMarkerView(rarity: preview.rarity)
+                    }
+                }
+            }
+
             ForEach(controller.frontierScoreCallouts) { callout in
                 if let coordinate = engine.parseTileID(callout.tileID).map({ engine.centerCoordinate(for: $0) }) {
                     Annotation("", coordinate: coordinate, anchor: .bottom) {

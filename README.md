@@ -15,6 +15,7 @@ Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily l
 - **Explorer progression** — 50 account levels, rank titles, Atlas Tokens, map unlocks, and achievement milestones
 - **Frontier Expeditions** — weekly missions, combo scoring, Game Center leaderboards
 - **Treasure trails** — three daily landmark clues, route choices, collectible relics, and weekly vaults
+- **Field finds** — deterministic tile pickups into a stackable inventory (materials, boosts, charges); assemble, salvage, use, and activate
 - **Pinpoint** — 5-round Look Around location guessing (dynamic Worldwide streets + Home Turf)
 - **Atlas Stats** — territory km², personal records, layered explorer map, Pinpoint stats
 - **Activity session history** — last 100 finished sessions with detail sheets
