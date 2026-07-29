@@ -8,6 +8,7 @@ struct LiveMapOptionsSheet: View {
     @Binding var showsPlaces: Bool
     @Binding var showsFog: Bool
     @Binding var showsFrontier: Bool
+    @Binding var showsFactory: Bool
     let explorerLevel: Int
 
     @Environment(\.dismiss) private var dismiss
@@ -120,6 +121,12 @@ struct LiveMapOptionsSheet: View {
                         detail: "Show expedition edges and target sectors",
                         symbol: "flag.2.crossed.fill",
                         isOn: $showsFrontier
+                    )
+                    layerToggle(
+                        "Factory",
+                        detail: "Show roads, buildings, and production alerts",
+                        symbol: "gearshape.2.fill",
+                        isOn: $showsFactory
                     )
                 }
 

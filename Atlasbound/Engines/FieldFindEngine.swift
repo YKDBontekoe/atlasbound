@@ -78,10 +78,10 @@ struct FieldFindEngine: Sendable {
         return previews
     }
 
-    func canAssemble(recipe: ItemRecipe, stacks: [InventoryStack]) -> Bool {
+    func canAssemble(recipe: RecipeDefinition, stacks: [InventoryStack]) -> Bool {
         let quantities = Dictionary(uniqueKeysWithValues: stacks.map { ($0.itemID, $0.quantity) })
-        for (itemID, needed) in recipe.inputs {
-            guard (quantities[itemID] ?? 0) >= needed else { return false }
+        for input in recipe.inputs {
+            guard (quantities[input.itemID] ?? 0) >= input.quantity else { return false }
         }
         return true
     }

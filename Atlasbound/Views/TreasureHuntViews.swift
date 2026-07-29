@@ -7,11 +7,7 @@ struct TreasureAdventureCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                Image(systemName: store.weeklyVault.isUnlocked ? "lock.open.fill" : "map.fill")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(AtlasTheme.gold)
-                    .frame(width: 36, height: 36)
-                    .background(AtlasTheme.gold.opacity(0.15), in: Circle())
+                AtlasArtMark(name: "TreasureCacheMark", size: 42)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(store.weeklyVault.isUnlocked ? "Weekly vault revealed" : "Today’s treasure trail")
                         .font(.subheadline.weight(.semibold))
@@ -109,9 +105,7 @@ struct TreasureEncounterSheet: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: encounter.isVault ? "shippingbox.fill" : "sparkles")
-                .font(.system(size: 46, weight: .bold))
-                .foregroundStyle(AtlasTheme.gold)
+            AtlasArtMark(name: "TreasureCacheMark", size: 94)
                 .padding(.top, 24)
             VStack(spacing: 6) {
                 Text(encounter.isVault ? "Vault discovered!" : "Cache discovered!")
@@ -160,9 +154,7 @@ struct RelicRewardSheet: View {
     var body: some View {
         VStack(spacing: 18) {
             Spacer()
-            Image(systemName: reward.relic.theme.symbolName)
-                .font(.system(size: 58, weight: .bold))
-                .foregroundStyle(AtlasTheme.gold)
+            AtlasArtMark(name: "RelicMark", size: 112)
             Text("Relic recovered")
                 .font(.title2.weight(.bold))
             Text(reward.relic.name)

@@ -278,19 +278,21 @@ final class InventoryStore: ObservableObject {
     @discardableResult
     func assemble(recipeID: String) -> ItemActionResult? {
         guard let recipe = ItemRecipes.recipe(id: recipeID),
+              recipe.isHandCraftable,
               engine.canAssemble(recipe: recipe, stacks: stacks) else { return nil }
-        for (itemID, needed) in recipe.inputs {
-            guard consume(itemID, amount: needed) else { return nil }
+        guard consume(recipe.inputs) else { return nil }
+        for output in recipe.outputs {
+            addQuantity(output.itemID, amount: output.quantity)
         }
-        addQuantity(recipe.outputItemID, amount: 1)
-        let name = ItemCatalog.definition(for: recipe.outputItemID)?.name ?? recipe.displayName
+        let primary = recipe.primaryOutput
+        let name = primary.flatMap { ItemCatalog.definition(for: $0.itemID)?.name } ?? recipe.displayName
         let result = ItemActionResult(
             action: .assemble,
             message: "Assembled \(name).",
             grantedFamiliarityXP: 0,
             grantedDiscoveryXP: 0,
-            outputItemID: recipe.outputItemID,
-            outputQuantity: 1
+            outputItemID: primary?.itemID,
+            outputQuantity: primary?.quantity ?? 0
         )
         latestActionMessage = result.message
         persist()
@@ -358,8 +360,31 @@ final class InventoryStore: ObservableObject {
         stacks.first { $0.itemID == itemID }?.quantity ?? 0
     }
 
-    func craftableRecipes() -> [ItemRecipe] {
-        ItemRecipes.all.filter { engine.canAssemble(recipe: $0, stacks: stacks) }
+    func craftableRecipes() -> [RecipeDefinition] {
+        ItemRecipes.all.filter { $0.isHandCraftable && engine.canAssemble(recipe: $0, stacks: stacks) }
+    }
+
+    func canConsume(_ amounts: [ItemAmount]) -> Bool {
+        amounts.allSatisfy { quantity(of: $0.itemID) >= $0.quantity }
+    }
+
+    @discardableResult
+    func consume(_ amounts: [ItemAmount]) -> Bool {
+        guard !amounts.isEmpty, canConsume(amounts) else { return false }
+        for amount in amounts {
+            _ = consume(amount.itemID, amount: amount.quantity)
+        }
+        persist()
+        return true
+    }
+
+    func deposit(_ amounts: [ItemAmount]) {
+        for amount in amounts where amount.quantity > 0 {
+            addQuantity(amount.itemID, amount: amount.quantity)
+        }
+        if amounts.contains(where: { $0.quantity > 0 }) {
+            persist()
+        }
     }
 
     // MARK: - Private

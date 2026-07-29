@@ -66,6 +66,8 @@ struct ExplorerProgressionView: View {
                 }
 
                 Spacer(minLength: 0)
+
+                AtlasArtMark(name: "ExplorerMark", size: 62)
             }
 
             VStack(spacing: 8) {

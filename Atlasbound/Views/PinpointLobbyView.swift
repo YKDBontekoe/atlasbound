@@ -48,15 +48,7 @@ struct PinpointLobbyView: View {
 
     private var heroSection: some View {
         VStack(spacing: 8) {
-            Image(systemName: "scope")
-                .font(.system(size: 64))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [AtlasTheme.blue, AtlasTheme.teal],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+            AtlasArtMark(name: "PinpointMark", size: 104)
             Text("Pinpoint")
                 .font(.largeTitle.bold())
             Text("Guess your location from Look Around")

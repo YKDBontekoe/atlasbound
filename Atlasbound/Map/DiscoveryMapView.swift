@@ -17,6 +17,9 @@ struct DiscoveryMapView: View {
     var showsPlacesLayer: Bool = true
     var showsFogLayer: Bool = true
     var showsFrontierLayer: Bool = true
+    var showsFactoryLayer: Bool = true
+    @ObservedObject var factoryController: FactoryController
+    @Binding var factoryPreviewTileID: String?
     var onTreasureTap: () -> Void = {}
 
     @State private var visibleRegion: MKCoordinateRegion?
@@ -33,10 +36,11 @@ struct DiscoveryMapView: View {
     private var engine: TileEngine { store.tileEngine }
 
     var body: some View {
-        Map(
-            position: $position,
-            interactionModes: is3DEnabled ? .all : [.pan, .zoom, .rotate]
-        ) {
+        MapReader { proxy in
+            Map(
+                position: $position,
+                interactionModes: is3DEnabled ? .all : [.pan, .zoom, .rotate]
+            ) {
             if recorder.isSimulationActive, let coordinate = recorder.lastLocation?.coordinate {
                 Annotation("", coordinate: coordinate, anchor: .center) {
                     SimulatedUserDot()
@@ -133,14 +137,69 @@ struct DiscoveryMapView: View {
                 }
             }
 
+            ForEach(factoryController.isBuildModeActive ? factoryDepositPreviews : []) { preview in
+                if let axial = engine.parseTileID(preview.tileID) {
+                    Annotation(
+                        preview.deposit.kind.displayName,
+                        coordinate: engine.centerCoordinate(for: axial),
+                        anchor: .center
+                    ) {
+                        FactoryDepositMarkerView(deposit: preview.deposit)
+                    }
+                }
+            }
+
+            ForEach(showsFactoryLayer ? factoryRoadLinks : []) { link in
+                MapPolyline(coordinates: [link.start, link.end])
+                    .stroke(AtlasTheme.gold.opacity(0.62), lineWidth: 4)
+            }
+
+            ForEach(showsFactoryLayer ? visibleFactoryStructures.filter { structure in
+                FactoryCatalog.byID[structure.definitionID]?.kind == .road
+            } : []) { structure in
+                if let axial = engine.parseTileID(structure.tileID) {
+                    MapPolygon(coordinates: engine.polygon(for: axial))
+                        .foregroundStyle(AtlasTheme.gold.opacity(0.22))
+                        .stroke(AtlasTheme.gold.opacity(0.8), lineWidth: 1)
+                }
+            }
+
+            ForEach(showsFactoryLayer ? visibleFactoryStructures.filter { structure in
+                FactoryCatalog.byID[structure.definitionID]?.kind != .road
+            } : []) { structure in
+                if let axial = engine.parseTileID(structure.tileID),
+                   let definition = FactoryCatalog.byID[structure.definitionID] {
+                    Annotation(definition.name, coordinate: engine.centerCoordinate(for: axial), anchor: .center) {
+                        Button {
+                            factoryController.selectedStructureID = structure.tileID
+                        } label: {
+                            FactoryMapMarkerView(
+                                definition: definition,
+                                status: factoryController.status(for: structure)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if factoryController.isBuildModeActive,
+               let previewID = factoryPreviewTileID,
+               let axial = engine.parseTileID(previewID) {
+                let validation = factoryController.validation(for: previewID)
+                MapPolygon(coordinates: engine.polygon(for: axial))
+                    .foregroundStyle((validation.isAllowed ? AtlasTheme.teal : AtlasTheme.finishRed).opacity(0.28))
+                    .stroke(validation.isAllowed ? AtlasTheme.teal : AtlasTheme.finishRed, lineWidth: 2.5)
+            }
+
             if controller.liveRoute.count >= 2 {
                 MapPolyline(coordinates: controller.liveRoute)
                     .stroke(AtlasTheme.routeOutline, lineWidth: AtlasTheme.routeOutlineWidth)
                 MapPolyline(coordinates: controller.liveRoute)
                     .stroke(AtlasTheme.blue, lineWidth: AtlasTheme.routeLineWidth)
             }
-        }
-        .modifier(LiveMapStyleModifier(style: mapStyle))
+            }
+            .modifier(LiveMapStyleModifier(style: mapStyle))
         .mapControls {
             MapCompass()
             MapScaleView()
@@ -155,6 +214,9 @@ struct DiscoveryMapView: View {
             refreshOverlays()
         }
         .onReceive(store.$tiles) { _ in
+            refreshOverlays()
+        }
+        .onReceive(factoryController.store.$state) { _ in
             refreshOverlays()
         }
         .onChange(of: controller.sessionDiscoveredIDs.count) { _, _ in
@@ -217,6 +279,18 @@ struct DiscoveryMapView: View {
                     )
                 }
             }
+        }
+        .simultaneousGesture(
+            SpatialTapGesture().onEnded { value in
+                guard let coordinate = proxy.convert(value.location, from: .local) else { return }
+                let tileID = engine.tileID(for: coordinate)
+                if factoryController.isBuildModeActive {
+                    factoryPreviewTileID = tileID
+                } else if factoryController.store.structures[tileID] != nil {
+                    factoryController.selectedStructureID = tileID
+                }
+            }
+        )
         }
     }
 
@@ -306,6 +380,121 @@ struct DiscoveryMapView: View {
         return isPerimeter ? 1.5 : 0
     }
 
+    private var visibleFactoryStructures: [PlacedFactoryStructure] {
+        let all = factoryController.structures
+        guard let region = visibleRegion else { return Array(all.prefix(500)) }
+        let minLat = region.center.latitude - region.span.latitudeDelta * 0.65
+        let maxLat = region.center.latitude + region.span.latitudeDelta * 0.65
+        let minLon = region.center.longitude - region.span.longitudeDelta * 0.65
+        let maxLon = region.center.longitude + region.span.longitudeDelta * 0.65
+        return Array(all.filter { structure in
+            guard let axial = engine.parseTileID(structure.tileID) else { return false }
+            let coordinate = engine.centerCoordinate(for: axial)
+            return coordinate.latitude >= minLat && coordinate.latitude <= maxLat
+                && coordinate.longitude >= minLon && coordinate.longitude <= maxLon
+        }.prefix(500))
+    }
+
+    private var factoryRoadLinks: [FactoryRoadLink] {
+        let roads = Dictionary(uniqueKeysWithValues: visibleFactoryStructures.compactMap { structure -> (String, PlacedFactoryStructure)? in
+            FactoryCatalog.byID[structure.definitionID]?.kind == .road ? (structure.tileID, structure) : nil
+        })
+        return roads.keys.sorted().flatMap { tileID -> [FactoryRoadLink] in
+            guard let axial = engine.parseTileID(tileID) else { return [] }
+            return engine.neighbors(of: axial).compactMap { neighbor in
+                let neighborID = TileEngine.makeTileID(q: neighbor.q, r: neighbor.r, sizeMeters: engine.tileSizeMeters)
+                guard neighborID > tileID, roads[neighborID] != nil else { return nil }
+                return FactoryRoadLink(
+                    id: "\(tileID)|\(neighborID)",
+                    start: engine.centerCoordinate(for: axial),
+                    end: engine.centerCoordinate(for: neighbor)
+                )
+            }
+        }
+    }
+
+    private var factoryDepositPreviews: [FactoryDepositPreview] {
+        Array(
+            cachedDiscovered.lazy
+                .filter { $0.state.rawValue >= TileState.explored.rawValue }
+                .filter { factoryController.store.structures[$0.id] == nil }
+                .compactMap { tile in
+                    let deposit = ConstructionEngine().deposit(for: tile.id)
+                    guard deposit.kind != .empty else { return nil }
+                    return FactoryDepositPreview(tileID: tile.id, deposit: deposit)
+                }
+                .prefix(80)
+        )
+    }
+
+}
+
+private struct FactoryRoadLink: Identifiable {
+    let id: String
+    let start: CLLocationCoordinate2D
+    let end: CLLocationCoordinate2D
+}
+
+private struct FactoryDepositPreview: Identifiable {
+    var id: String { tileID }
+    let tileID: String
+    let deposit: FactoryDeposit
+}
+
+struct FactoryDepositMarkerView: View {
+    let deposit: FactoryDeposit
+
+    var body: some View {
+        Image(systemName: symbolName)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 20, height: 20)
+            .background(AtlasTheme.gold.opacity(0.88), in: Circle())
+            .overlay(Circle().stroke(.white.opacity(0.8), lineWidth: 1))
+            .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+            .allowsHitTesting(false)
+            .accessibilityLabel("\(deposit.kind.displayName), \(deposit.capacity) units")
+            .accessibilityHint("A Gathering Outpost can extract this revealed deposit.")
+    }
+
+    private var symbolName: String {
+        switch deposit.kind {
+        case .cobble: "hexagon.fill"
+        case .moss: "leaf.fill"
+        case .copper: "circle.hexagongrid.fill"
+        case .amber: "drop.fill"
+        case .waystone: "diamond.fill"
+        case .empty: "minus"
+        }
+    }
+}
+
+struct FactoryMapMarkerView: View {
+    let definition: FactoryStructureDefinition
+    let status: FactoryOperationalStatus
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Image(systemName: definition.symbolName)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(AtlasTheme.slate.gradient, in: HexShape())
+                .overlay {
+                    HexShape().stroke(AtlasTheme.gold.opacity(0.9), lineWidth: 1.5)
+                }
+                .shadow(color: .black.opacity(0.24), radius: 3, y: 1)
+            if status != .running {
+                Circle()
+                    .fill(status == .idle ? AtlasTheme.gold : AtlasTheme.finishRed)
+                    .frame(width: 9, height: 9)
+                    .overlay(Circle().stroke(.white, lineWidth: 1))
+                    .offset(x: 2, y: -2)
+            }
+        }
+        .accessibilityLabel("\(definition.name), \(status.displayName)")
+        .accessibilityHint("Tap to open structure details.")
+    }
 }
 
 private struct LiveMapStyleModifier: ViewModifier {

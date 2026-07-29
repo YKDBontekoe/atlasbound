@@ -5,6 +5,7 @@ import CoreLocation
 struct MainMapScreen: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
+    @ObservedObject var factoryController: FactoryController
     @ObservedObject private var recorder: ActivityRecorder
     @ObservedObject private var treasureStore: TreasureStore
     @ObservedObject private var inventoryStore: InventoryStore
@@ -18,6 +19,8 @@ struct MainMapScreen: View {
     @State private var showMapOptions = false
     @State private var showTreasureSheet = false
     @State private var showDailyChallenge = false
+    @State private var showFactoryBuildSheet = false
+    @State private var factoryPreviewTileID: String?
     @State private var presentedSummary: ActivitySummary?
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
     @AppStorage(OnboardingPreference.storageKey) private var onboardingVersion = 0
@@ -28,11 +31,17 @@ struct MainMapScreen: View {
     @AppStorage("map.layer.places") private var showsPlacesLayer = true
     @AppStorage("map.layer.fog") private var showsFogLayer = true
     @AppStorage("map.layer.frontier") private var showsFrontierLayer = true
+    @AppStorage("map.layer.factory") private var showsFactoryLayer = true
     @State private var onboardingStep = 0
 
-    init(controller: WorldController, store: TileStore) {
+    init(
+        controller: WorldController,
+        store: TileStore,
+        factoryController: FactoryController
+    ) {
         self.controller = controller
         self.store = store
+        self.factoryController = factoryController
         self._recorder = ObservedObject(wrappedValue: controller.recorder)
         self._treasureStore = ObservedObject(wrappedValue: controller.treasureStore)
         self._inventoryStore = ObservedObject(wrappedValue: controller.inventoryStore)
@@ -65,6 +74,9 @@ struct MainMapScreen: View {
                 showsPlacesLayer: showsPlacesLayer,
                 showsFogLayer: showsFogLayer,
                 showsFrontierLayer: showsFrontierLayer,
+                showsFactoryLayer: showsFactoryLayer,
+                factoryController: factoryController,
+                factoryPreviewTileID: $factoryPreviewTileID,
                 onTreasureTap: { showTreasureSheet = true }
             )
             .ignoresSafeArea()
@@ -73,7 +85,7 @@ struct MainMapScreen: View {
                 if controller.isRecording {
                     activeHeader
                         .transition(.move(edge: .top).combined(with: .opacity))
-                } else {
+                } else if !factoryController.isBuildModeActive {
                     idleHeader
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
@@ -98,6 +110,10 @@ struct MainMapScreen: View {
             #endif
 
             VStack(spacing: 12) {
+                if factoryController.isBuildModeActive, let tileID = factoryPreviewTileID {
+                    factoryBuildPreview(tileID: tileID)
+                        .padding(.horizontal, 12)
+                }
                 if let effect = inventoryStore.primaryActiveEffect {
                     ActiveEffectChip(effect: effect)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -165,6 +181,7 @@ struct MainMapScreen: View {
             SettingsSheet(
                 controller: controller,
                 store: store,
+                factoryController: factoryController,
                 showSimGPSControls: $showSimGPSControls
             )
             .presentationDetents([.medium, .large])
@@ -182,6 +199,7 @@ struct MainMapScreen: View {
                 showsPlaces: $showsPlacesLayer,
                 showsFog: $showsFogLayer,
                 showsFrontier: $showsFrontierLayer,
+                showsFactory: $showsFactoryLayer,
                 explorerLevel: ExplorerProgressionEngine().level(
                     forTotalXP: store.discoveryXPTotal + store.familiarityXPTotal
                 )
@@ -195,6 +213,24 @@ struct MainMapScreen: View {
         .sheet(isPresented: $showDailyChallenge) {
             DailyChallengeSheet(snapshot: dailyChallenge)
                 .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showFactoryBuildSheet) {
+            FactoryBuildCatalogSheet(controller: factoryController) {
+                showFactoryBuildSheet = false
+                factoryPreviewTileID = nil
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { factoryController.selectedStructureID != nil },
+                set: { if !$0 { factoryController.selectedStructureID = nil } }
+            )
+        ) {
+            if let tileID = factoryController.selectedStructureID {
+                FactoryStructureInspector(controller: factoryController, tileID: tileID)
+                    .presentationDetents([.medium, .large])
+            }
         }
         .sheet(item: $treasureStore.pendingEncounter) { encounter in
             TreasureEncounterSheet(encounter: encounter) { choice in
@@ -229,11 +265,16 @@ struct MainMapScreen: View {
             #endif
         }
         .onAppear {
+            factoryController.updatePlayerLocation(recorder.lastLocation)
+            factoryController.advance()
             #if DEBUG
             if !DevConfig.isSimGPSFeatureAvailable || !showSimGPSControls {
                 controller.debugDisableSimulation()
             }
             #endif
+        }
+        .onChange(of: recorder.lastLocation?.timestamp) { _, _ in
+            factoryController.updatePlayerLocation(recorder.lastLocation)
         }
         .task(id: recorder.lastErrorMessage) {
             guard recorder.lastErrorMessage != nil else { return }
@@ -465,6 +506,19 @@ struct MainMapScreen: View {
                 }
 
                 Button {
+                    showFactoryBuildSheet = true
+                    AtlasHaptics.select()
+                } label: {
+                    Image(systemName: factoryController.isBuildModeActive ? "hammer.fill" : "hammer")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(factoryController.isBuildModeActive ? AtlasTheme.gold : .secondary)
+                        .frame(width: 42, height: 42)
+                }
+                .buttonStyle(GlassButtonStyle(shape: .circle))
+                .accessibilityLabel("Build factory")
+                .accessibilityHint("Opens construction kits. Placement requires your current or an adjacent discovered hex.")
+
+                Button {
                     showMapOptions = true
                     AtlasHaptics.select()
                 } label: {
@@ -488,7 +542,8 @@ struct MainMapScreen: View {
             !showsMasteryLayer ||
             !showsPlacesLayer ||
             !showsFogLayer ||
-            !showsFrontierLayer
+            !showsFrontierLayer ||
+            !showsFactoryLayer
     }
 
     private var explorerLevel: Int {
@@ -509,6 +564,60 @@ struct MainMapScreen: View {
 
     private var uses3DMap: Bool {
         prefers3DMap && explorerLevel >= ExplorerProgressionEngine.threeDMapRequiredLevel
+    }
+
+    private func factoryBuildPreview(tileID: String) -> some View {
+        let validation = factoryController.validation(for: tileID)
+        return HStack(spacing: 12) {
+            Image(systemName: validation.isAllowed ? "checkmark.hexagon.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(validation.isAllowed ? AtlasTheme.teal : AtlasTheme.finishRed)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(factoryController.selectedBuildDefinition?.name ?? "Construction")
+                    .font(.subheadline.weight(.semibold))
+                Text(validation.message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                if let tile = store.tiles[tileID],
+                   tile.state.rawValue >= TileState.explored.rawValue {
+                    let deposit = ConstructionEngine().deposit(for: tileID)
+                    Text("\(deposit.kind.displayName) · \(deposit.capacity) units")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(deposit.kind == .empty ? .secondary : AtlasTheme.gold)
+                }
+            }
+            Spacer()
+            if validation.isAllowed {
+                Button("Place") {
+                    if factoryController.placeSelected(at: tileID) {
+                        factoryPreviewTileID = nil
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AtlasTheme.teal)
+                .accessibilityLabel("Place \(factoryController.selectedBuildDefinition?.name ?? "structure")")
+                .accessibilityHint("Consumes one kit and constructs on the selected hex.")
+            }
+            Button {
+                factoryPreviewTileID = nil
+                factoryController.selectBuildDefinition(nil)
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel("Cancel construction")
+        }
+        .padding(12)
+        .background(cardBackground)
+        .accessibilityIdentifier("factoryBuildPreview")
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(factoryController.selectedBuildDefinition?.name ?? "Construction preview")
+        .accessibilityValue(validation.message)
+        .accessibilityHint(
+            validation.isAllowed
+                ? "Choose Place to construct on this hex."
+                : "Select another hex or resolve the stated requirement."
+        )
     }
 
     // MARK: - Helpers
@@ -592,6 +701,7 @@ struct MainMapScreen: View {
 struct SettingsSheet: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
+    @ObservedObject var factoryController: FactoryController
     @Binding var showSimGPSControls: Bool
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
     @AppStorage(BackgroundRecordingPreference.storageKey) private var backgroundRecordingEnabled = false
@@ -670,9 +780,10 @@ struct SettingsSheet: View {
                 #endif
 
                 Section {
-                    Button("Clear discovered tiles", role: .destructive) {
+                    Button("Clear world and factory", role: .destructive) {
                         store.clearAtlas()
                         controller.inventoryStore.clearClaimedFindIDs()
+                        factoryController.clearFactory()
                     }
                     .disabled(controller.isRecording)
                 }

@@ -12,6 +12,10 @@ AtlasboundApp
   │    daily trail + weekly vault + relic persistence
   ├─ InventoryStore (@MainActor ObservableObject)
   │    field finds + stackable inventory + active effects
+  ├─ FactoryStore (@MainActor ObservableObject)
+  │    placed structures + factory production + research persistence
+  ├─ FactoryController (@MainActor ObservableObject)
+  │    nearby construction + simulation + inventory transactions
   └─ WorldController (@MainActor ObservableObject)
        ├─ ActivityRecorder     — shared explicit/passive GPS samples
        ├─ TileEngine           — via store.tileEngine
@@ -32,6 +36,11 @@ AtlasboundApp
 | `ExplorerProgressionEngine` | Lifetime XP → level, title, reward track, achievements | `Sendable` value type |
 | `DailyChallengeEngine` | Today’s tile timestamps → Scout Circuit goals | `Sendable` value type |
 | `WorldTile` / models | Domain records | `Sendable` where pure |
+| `FactoryController` | Construction, lifecycle simulation, research, transfers | `@MainActor` |
+| `FactoryStore` | Load/save factory state in its independent schema | `@MainActor` |
+| `ConstructionEngine` | Deposit derivation and placement/demolition rules | `Sendable` |
+| `FactoryNetworkEngine` | Derived road components and deterministic routes | `Sendable` |
+| `FactorySimulationEngine` | Minute-step power, logistics, extraction, and recipes | `Sendable` |
 
 ## Session flow
 
@@ -44,7 +53,10 @@ AtlasboundApp
 
 - **Persisted:** 20 m tile IDs, axial `q`/`r`, mastery fields, activity stamps, dates, and totals.
 - **Derived at render:** hex polygons, map overlays, fog rings.
-- Save files: `Documents/atlasbound-world.json`, `atlasbound-treasures.json`, and `atlasbound-inventory.json`.
+- Save files: `Documents/atlasbound-world.json`, `atlasbound-treasures.json`, `atlasbound-inventory.json`, and the independently versioned `atlasbound-factory.json`.
+
+Factory saves contain canonical tile IDs and mutable gameplay state only. Deposits,
+road connectivity, routes, power totals, and MapKit geometry are derived at runtime.
 
 ## UI notes
 

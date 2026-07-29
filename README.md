@@ -6,7 +6,7 @@ Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily l
 
 ## Current capabilities
 
-- SwiftUI app with four tabs: **Map**, **Pinpoint**, **Journal**, and **Progress (Atlas Stats)**
+- SwiftUI app with five tabs: **Map**, **Pinpoint**, **Journal**, **Progress (Atlas Stats)**, and **Factory**
 - Automatic foreground exploration plus opt-in screen-locked exploration
 - Optional walk/run/cycle/hike/drive/transit tracking and activity history
 - One canonical **20 m** hex atlas
@@ -17,6 +17,7 @@ Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily l
 - **Frontier Expeditions** — weekly missions, combo scoring, Game Center leaderboards
 - **Treasure trails** — three daily landmark clues, route choices, collectible relics, and weekly vaults
 - **Field finds** — deterministic tile pickups into a stackable inventory (materials, boosts, charges); assemble, salvage, use, and activate
+- **Real-world factory** — reveal deterministic deposits, craft construction kits, place roads and buildings on nearby discovered hexes, automate production, route goods, generate power, and research upgrades
 - **Pinpoint** — 5-round Look Around location guessing (dynamic Worldwide streets + Home Turf)
 - **Atlas Stats** — territory km², personal records, layered explorer map, Pinpoint stats
 - **Activity session history** — last 100 finished sessions with detail sheets
@@ -55,6 +56,7 @@ Best validation for GPS noise, landmark routing, automatic exploration, and scre
 | `TileStore` | JSON FileManager persistence (`Documents/atlasbound-world.json`) |
 | `WorldController` | Exploration-mode, progression, Frontier, and treasure orchestration |
 | `TreasureEventEngine` / `TreasureStore` | Daily trails, choices, relics, vaults, and persistence |
+| `FactoryController` / `FactoryStore` | Construction, road networks, production simulation, research, and isolated factory persistence |
 | `DiscoveryMapView` | MapKit overlay of discovered hexes + live route |
 
 Progress stores tile IDs and mastery fields only — hex geometry is derived at render time.

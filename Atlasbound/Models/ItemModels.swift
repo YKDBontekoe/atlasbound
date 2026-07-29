@@ -4,16 +4,20 @@ import Foundation
 
 enum ItemCategory: String, Codable, Sendable, CaseIterable {
     case material
+    case component
     case boost
     case charge
     case assembled
+    case construction
 
     var displayName: String {
         switch self {
         case .material: "Material"
+        case .component: "Component"
         case .boost: "Boost"
         case .charge: "Charge"
         case .assembled: "Assembled"
+        case .construction: "Construction"
         }
     }
 }
@@ -76,7 +80,7 @@ struct ItemDefinition: Codable, Hashable, Sendable, Identifiable {
 }
 
 enum ItemCatalog {
-    static let all: [ItemDefinition] = materials + boosts + charges + assembled
+    static let all: [ItemDefinition] = materials + components + boosts + charges + assembled + construction
     static let byID: [String: ItemDefinition] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
 
     static func definition(for id: String) -> ItemDefinition? { byID[id] }
@@ -96,6 +100,15 @@ enum ItemCatalog {
         ItemDefinition(id: "river_pebble", name: "River Pebble", detail: "Smooth stone carried from a wet path.", category: .material, rarity: .common, symbolName: "circle.fill", effectKind: nil, isConsumable: false, canSalvage: false),
         ItemDefinition(id: "amber_resin", name: "Amber Resin", detail: "Sticky resin that catches atlas dust.", category: .material, rarity: .uncommon, symbolName: "seal.fill", effectKind: nil, isConsumable: false, canSalvage: false),
         ItemDefinition(id: "copper_wire", name: "Copper Wire", detail: "A short coil useful for instruments.", category: .material, rarity: .uncommon, symbolName: "link", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "copper_ore", name: "Copper Ore", detail: "Raw copper-bearing stone from an atlas deposit.", category: .material, rarity: .common, symbolName: "circle.hexagongrid.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+    ]
+
+    static let components: [ItemDefinition] = [
+        ItemDefinition(id: "stone_block", name: "Stone Block", detail: "Refined cobble for permanent works.", category: .component, rarity: .common, symbolName: "square.stack.3d.up.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "composite_fiber", name: "Composite Fiber", detail: "Resin-bound moss fiber for mechanisms and roads.", category: .component, rarity: .uncommon, symbolName: "point.3.filled.connected.trianglepath.dotted", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "waystone_plate", name: "Waystone Plate", detail: "A resonant plate cut from paired shards.", category: .component, rarity: .rare, symbolName: "diamond.inset.filled", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "mechanism", name: "Brass Mechanism", detail: "A compact drive for automated atlas works.", category: .component, rarity: .rare, symbolName: "gearshape.2.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "atlas_insight", name: "Atlas Insight", detail: "A bound observation consumed by factory research.", category: .component, rarity: .rare, symbolName: "lightbulb.max.fill", effectKind: nil, isConsumable: false, canSalvage: false),
     ]
 
     // Consumable boosts
@@ -124,52 +137,83 @@ enum ItemCatalog {
         ItemDefinition(id: "inkbound_lens", name: "Inkbound Lens", detail: "Assembled lens that fuels a survey pulse.", category: .assembled, rarity: .rare, symbolName: "camera.aperture", effectKind: .surveyBeacon, isConsumable: true, canSalvage: true),
         ItemDefinition(id: "sector_talisman", name: "Sector Talisman", detail: "Assembled talisman that oils Frontier streaks.", category: .assembled, rarity: .legendary, symbolName: "shield.lefthalf.filled", effectKind: .streakOil, isConsumable: true, canSalvage: true),
     ]
+
+    static let construction: [ItemDefinition] = [
+        ItemDefinition(id: "trail_road_kit", name: "Trail Road Kit", detail: "Marks one atlas hex as a logistics road.", category: .construction, rarity: .common, symbolName: "road.lanes", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "paved_road_kit", name: "Paved Road Kit", detail: "Upgrades a trail road for greater throughput.", category: .construction, rarity: .uncommon, symbolName: "road.lanes.curved.left", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "waystone_road_kit", name: "Waystone Road Kit", detail: "Upgrades a paved road into a high-capacity route.", category: .construction, rarity: .rare, symbolName: "point.topleft.down.to.point.bottomright.curvepath.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "trailhead_depot_kit", name: "Trailhead Depot Kit", detail: "Places a compact logistics depot.", category: .construction, rarity: .common, symbolName: "shippingbox.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "gathering_outpost_kit", name: "Gathering Outpost Kit", detail: "Places an extractor on a revealed deposit.", category: .construction, rarity: .uncommon, symbolName: "pickaxe", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "waystone_dynamo_kit", name: "Waystone Dynamo Kit", detail: "Places an amber-fueled power source.", category: .construction, rarity: .uncommon, symbolName: "bolt.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "atlas_refinery_kit", name: "Atlas Refinery Kit", detail: "Places a refinery for raw materials.", category: .construction, rarity: .uncommon, symbolName: "flame.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "research_observatory_kit", name: "Research Observatory Kit", detail: "Places an observatory that binds Atlas Insights.", category: .construction, rarity: .rare, symbolName: "scope", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "gearworks_kit", name: "Gearworks Kit", detail: "Places a workshop for brass mechanisms.", category: .construction, rarity: .rare, symbolName: "gearshape.2.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "assembly_hall_kit", name: "Assembly Hall Kit", detail: "Places an automated construction hall.", category: .construction, rarity: .legendary, symbolName: "building.2.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "grand_depot_kit", name: "Grand Depot Kit", detail: "Places a high-capacity logistics depot.", category: .construction, rarity: .legendary, symbolName: "shippingbox.and.arrow.backward.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+    ]
 }
 
 // MARK: - Recipes
 
-struct ItemRecipe: Codable, Hashable, Sendable, Identifiable {
+struct ItemAmount: Codable, Hashable, Sendable, Identifiable {
+    var id: String { itemID }
+    let itemID: String
+    let quantity: Int
+}
+
+struct RecipeDefinition: Codable, Hashable, Sendable, Identifiable {
     let id: String
-    let outputItemID: String
-    let inputs: [String: Int]
     let displayName: String
+    let inputs: [ItemAmount]
+    let outputs: [ItemAmount]
+    let durationMinutes: Int
+    let producerIDs: [String]
+    let requiredResearchID: String?
+
+    var isHandCraftable: Bool { producerIDs.contains("hand") }
+    var primaryOutput: ItemAmount? { outputs.first }
 }
 
 enum ItemRecipes {
-    static let all: [ItemRecipe] = [
-        ItemRecipe(
+    static let all: [RecipeDefinition] = [
+        RecipeDefinition(
             id: "craft_waystone_charm",
-            outputItemID: "waystone_charm",
-            inputs: ["waystone_shard": 2, "moss_scrap": 3],
-            displayName: "Waystone Charm"
+            displayName: "Waystone Charm",
+            inputs: [.init(itemID: "waystone_shard", quantity: 2), .init(itemID: "moss_scrap", quantity: 3)],
+            outputs: [.init(itemID: "waystone_charm", quantity: 1)],
+            durationMinutes: 0, producerIDs: ["hand"], requiredResearchID: nil
         ),
-        ItemRecipe(
+        RecipeDefinition(
             id: "craft_brass_sextant",
-            outputItemID: "brass_sextant",
-            inputs: ["brass_rivet": 2, "compass_filament": 1, "cobble_chip": 2],
-            displayName: "Brass Sextant"
+            displayName: "Brass Sextant",
+            inputs: [.init(itemID: "brass_rivet", quantity: 2), .init(itemID: "compass_filament", quantity: 1), .init(itemID: "cobble_chip", quantity: 2)],
+            outputs: [.init(itemID: "brass_sextant", quantity: 1)],
+            durationMinutes: 0, producerIDs: ["hand"], requiredResearchID: nil
         ),
-        ItemRecipe(
+        RecipeDefinition(
             id: "craft_ribboned_cache_key",
-            outputItemID: "ribboned_cache_key",
-            inputs: ["trail_ribbon": 3, "landmark_fibers": 1, "brass_rivet": 1],
-            displayName: "Ribboned Cache Key"
+            displayName: "Ribboned Cache Key",
+            inputs: [.init(itemID: "trail_ribbon", quantity: 3), .init(itemID: "landmark_fibers", quantity: 1), .init(itemID: "brass_rivet", quantity: 1)],
+            outputs: [.init(itemID: "ribboned_cache_key", quantity: 1)],
+            durationMinutes: 0, producerIDs: ["hand"], requiredResearchID: nil
         ),
-        ItemRecipe(
+        RecipeDefinition(
             id: "craft_inkbound_lens",
-            outputItemID: "inkbound_lens",
-            inputs: ["survey_ink": 2, "fog_lint": 2, "waystone_shard": 1],
-            displayName: "Inkbound Lens"
+            displayName: "Inkbound Lens",
+            inputs: [.init(itemID: "survey_ink", quantity: 2), .init(itemID: "fog_lint", quantity: 2), .init(itemID: "waystone_shard", quantity: 1)],
+            outputs: [.init(itemID: "inkbound_lens", quantity: 1)],
+            durationMinutes: 0, producerIDs: ["hand"], requiredResearchID: nil
         ),
-        ItemRecipe(
+        RecipeDefinition(
             id: "craft_sector_talisman",
-            outputItemID: "sector_talisman",
-            inputs: ["sector_dust": 3, "compass_filament": 1, "landmark_fibers": 1],
-            displayName: "Sector Talisman"
+            displayName: "Sector Talisman",
+            inputs: [.init(itemID: "sector_dust", quantity: 3), .init(itemID: "compass_filament", quantity: 1), .init(itemID: "landmark_fibers", quantity: 1)],
+            outputs: [.init(itemID: "sector_talisman", quantity: 1)],
+            durationMinutes: 0, producerIDs: ["hand"], requiredResearchID: nil
         ),
-    ]
+    ] + FactoryRecipeCatalog.handRecipes
 
-    static func recipe(id: String) -> ItemRecipe? {
+    static func recipe(id: String) -> RecipeDefinition? {
         all.first { $0.id == id }
     }
 }

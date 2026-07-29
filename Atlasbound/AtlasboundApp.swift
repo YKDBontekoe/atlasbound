@@ -8,7 +8,9 @@ struct AtlasboundApp: App {
     @StateObject private var gameCenterManager = GameCenterManager()
     @StateObject private var treasureStore = TreasureStore()
     @StateObject private var inventoryStore = InventoryStore()
+    @StateObject private var factoryStore = FactoryStore()
     @StateObject private var controllerHolder = ControllerHolder()
+    @StateObject private var factoryHolder = FactoryHolder()
     @StateObject private var pinpointHolder = PinpointHolder()
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
 
@@ -16,13 +18,15 @@ struct AtlasboundApp: App {
         WindowGroup {
             Group {
                 if let controller = controllerHolder.controller,
+                   let factoryController = factoryHolder.controller,
                    let pinpointController = pinpointHolder.controller {
                     RootTabView(
                         controller: controller,
                         store: store,
                         activityHistory: activityHistory,
                         regionLookup: regionLookup,
-                        pinpointController: pinpointController
+                        pinpointController: pinpointController,
+                        factoryController: factoryController
                     )
                 } else {
                     ProgressView("Loading world…")
@@ -41,9 +45,33 @@ struct AtlasboundApp: App {
                     treasureStore: treasureStore,
                     inventoryStore: inventoryStore
                 )
+                factoryHolder.bootstrap(
+                    store: factoryStore,
+                    tileStore: store,
+                    inventoryStore: inventoryStore
+                )
                 pinpointHolder.bootstrap(tileStore: store, gameCenterManager: gameCenterManager)
             }
         }
+    }
+}
+
+@MainActor
+final class FactoryHolder: ObservableObject {
+    @Published var controller: FactoryController?
+
+    func bootstrap(
+        store: FactoryStore,
+        tileStore: TileStore,
+        inventoryStore: InventoryStore
+    ) {
+        guard controller == nil else { return }
+        controller = FactoryController(
+            store: store,
+            tileStore: tileStore,
+            inventoryStore: inventoryStore
+        )
+        controller?.advance()
     }
 }
 

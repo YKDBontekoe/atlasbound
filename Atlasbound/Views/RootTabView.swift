@@ -6,6 +6,7 @@ struct RootTabView: View {
     @ObservedObject var activityHistory: ActivityHistoryStore
     @ObservedObject var regionLookup: RegionLookupStore
     @ObservedObject var pinpointController: PinpointController
+    @ObservedObject var factoryController: FactoryController
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
 
@@ -13,7 +14,11 @@ struct RootTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            MainMapScreen(controller: controller, store: store)
+            MainMapScreen(
+                controller: controller,
+                store: store,
+                factoryController: factoryController
+            )
                 .tabItem {
                     Label("Map", systemImage: "map.fill")
                 }
@@ -51,6 +56,13 @@ struct RootTabView: View {
                 }
                 .accessibilityIdentifier("progressTab")
                 .tag(3)
+
+            FactoryTabView(controller: factoryController)
+                .tabItem {
+                    Label("Factory", systemImage: "gearshape.2.fill")
+                }
+                .accessibilityIdentifier("factoryTab")
+                .tag(4)
         }
         .tint(AtlasTheme.blue)
         .toolbar(pinpointController.isGameInProgress ? .hidden : .visible, for: .tabBar)
@@ -63,6 +75,10 @@ struct RootTabView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .background, controller.isRecording {
                 store.flushToDiskIfNeeded()
+            }
+            if phase == .active {
+                factoryController.advance()
+                factoryController.updatePlayerLocation(controller.recorder.lastLocation)
             }
         }
     }

@@ -121,14 +121,14 @@ final class InventoryStoreTests: XCTestCase {
 
     func testAssembleConsumesInputsAndAddsOutput() {
         let recipe = try! XCTUnwrap(ItemRecipes.recipe(id: "craft_waystone_charm"))
-        for (itemID, qty) in recipe.inputs {
+        for input in recipe.inputs {
             _ = store.collect(
                 FieldFind(
-                    id: "find:test:\(itemID)",
-                    tileID: "hex:20:\(itemID.hashValue):0",
+                    id: "find:test:\(input.itemID)",
+                    tileID: "hex:20:\(input.itemID.hashValue):0",
                     dayKey: "test",
-                    itemID: itemID,
-                    quantity: qty,
+                    itemID: input.itemID,
+                    quantity: input.quantity,
                     isDiscoveryDrop: true
                 )
             )
@@ -137,8 +137,8 @@ final class InventoryStoreTests: XCTestCase {
         let result = store.assemble(recipeID: recipe.id)
         XCTAssertEqual(result?.outputItemID, "waystone_charm")
         XCTAssertEqual(store.quantity(of: "waystone_charm"), 1)
-        for (itemID, _) in recipe.inputs {
-            XCTAssertEqual(store.quantity(of: itemID), 0)
+        for input in recipe.inputs {
+            XCTAssertEqual(store.quantity(of: input.itemID), 0)
         }
     }
 
@@ -220,6 +220,30 @@ final class InventoryStoreTests: XCTestCase {
         XCTAssertTrue(store.claimedFindIDs.isEmpty)
         XCTAssertEqual(store.findsClaimedToday, 0)
         XCTAssertEqual(store.quantity(of: "cobble_chip"), 1)
+    }
+
+    func testAtomicMultiItemConsumption() {
+        _ = store.collect(
+            FieldFind(
+                id: "find:test:atomic",
+                tileID: "hex:20:2:3",
+                dayKey: "test",
+                itemID: "cobble_chip",
+                quantity: 2,
+                isDiscoveryDrop: true
+            )
+        )
+        store.dismissPickup()
+        let request = [
+            ItemAmount(itemID: "cobble_chip", quantity: 2),
+            ItemAmount(itemID: "moss_scrap", quantity: 1),
+        ]
+        XCTAssertFalse(store.consume(request))
+        XCTAssertEqual(store.quantity(of: "cobble_chip"), 2)
+        store.deposit([ItemAmount(itemID: "moss_scrap", quantity: 1)])
+        XCTAssertTrue(store.consume(request))
+        XCTAssertEqual(store.quantity(of: "cobble_chip"), 0)
+        XCTAssertEqual(store.quantity(of: "moss_scrap"), 0)
     }
 
     func testGrantFreeRerollOnTreasureStore() {

@@ -79,3 +79,15 @@ areaPerTile = (√3 / 2) × W²   // square meters
 ### Places visited
 
 Discovered tile centers are quantized into ~2 km cache cells and reverse-geocoded via `CLGeocoder` (`GeocodeLimiter`). Results live in `Documents/atlasbound-regions.json` (`RegionLookupStore`) — placemark label strings only, never polygons. Aggregation is pure (`RegionLookupEngine` / `StatsEngine.placesVisited`). Empty placemark fields are omitted; unresolved cells do not block other stats.
+
+## Real-world factory
+
+- Structures and roads occupy one canonical 20 m hex and persist only their tile ID and mutable state.
+- Construction requires a recent accepted location on the target or an adjacent discovered tile.
+- Deposits are deterministically derived from `StableHash(tileID)` and become visible at `explored`.
+- Road components, shortest paths, throughput, power balance, and deposit geometry are derived rather than persisted.
+- Production advances in deterministic one-minute steps with at most eight hours of offline progress.
+- Factory research consumes Atlas Insight and is also gated by the existing Explorer level.
+- Research bootstraps with a slower field-material Insight recipe; Mechanics unlocks the faster mechanism-based recipe.
+- Nearby players can manually load or unload machine buffers, while connected depots automate transfers.
+- The factory has its own `atlasbound-factory.json` schema so a factory reset or incompatibility cannot erase the canonical atlas.

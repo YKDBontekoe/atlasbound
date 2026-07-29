@@ -11,6 +11,7 @@ final class SmokeUITests: XCTestCase {
             "-AppleLocale", "en_US",
             "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryM",
             "-atlasbound.onboardingVersion", "2",
+            "-atlasbound.factoryTutorialVersion", "1",
         ]
         // Avoid first-run permission races; CI also grants via simctl.
         app.launchEnvironment["OS_ACTIVITY_MODE"] = "disable"
@@ -99,6 +100,43 @@ final class SmokeUITests: XCTestCase {
             || revealStaticText("Lifetime XP")
         guard hasExplorerContent else {
             throw XCTSkip("Progress explorer sections not available in this simulator session")
+        }
+    }
+
+    func testFactoryTabShowsProductionAndResearch() throws {
+        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 12))
+        let factoryTab = app.tabBars.buttons["Factory"]
+        XCTAssertTrue(factoryTab.waitForExistence(timeout: 5))
+        factoryTab.tap()
+
+        guard app.navigationBars["Factory"].waitForExistence(timeout: 8)
+            || app.staticTexts["Factory overview"].waitForExistence(timeout: 3) else {
+            throw XCTSkip("Factory tab not available in this simulator session")
+        }
+        XCTAssertTrue(
+            app.staticTexts["Factory overview"].exists
+                || app.staticTexts["Road networks"].exists
+                || app.staticTexts["Manage"].exists
+        )
+        let help = app.buttons["Factory help"]
+        if help.waitForExistence(timeout: 3) {
+            help.tap()
+            XCTAssertTrue(
+                app.navigationBars["Factory Help"].waitForExistence(timeout: 5)
+                    || app.staticTexts["Quick start"].waitForExistence(timeout: 3)
+            )
+            let done = app.buttons["Done"]
+            if done.exists {
+                done.tap()
+            }
+        }
+        let research = app.buttons["Research"]
+        if research.waitForExistence(timeout: 3) {
+            research.tap()
+            XCTAssertTrue(
+                app.navigationBars["Research"].waitForExistence(timeout: 5)
+                    || app.staticTexts["Research tree"].waitForExistence(timeout: 3)
+            )
         }
     }
 

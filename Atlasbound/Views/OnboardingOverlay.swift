@@ -31,6 +31,10 @@ struct OnboardingOverlay: View {
         )
     ]
 
+    private var artName: String {
+        ["FieldKitMark", "TreasureCacheMark", "PinpointMark", "FactoryMark"][step]
+    }
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.55)
@@ -40,6 +44,7 @@ struct OnboardingOverlay: View {
                 Spacer()
 
                 VStack(spacing: 16) {
+                    AtlasArtMark(name: artName, size: 76)
                     Image(systemName: steps[step].icon)
                         .font(.system(size: 48, weight: .semibold))
                         .foregroundStyle(

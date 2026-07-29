@@ -87,6 +87,8 @@ struct DailyChallengeSheet: View {
                                     endPoint: .bottomTrailing
                                 )
                             )
+                        AtlasArtMark(name: "ScoutCircuitMark", size: 120)
+                            .opacity(0.20)
                         DailyChallengeRing(snapshot: snapshot, size: 104)
                     }
                     .frame(width: 132, height: 132)

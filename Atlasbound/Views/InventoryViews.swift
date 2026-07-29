@@ -7,9 +7,7 @@ struct FieldFindPickupSheet: View {
     var body: some View {
         VStack(spacing: 18) {
             Spacer()
-            Image(systemName: pickup.symbolName)
-                .font(.system(size: 54, weight: .bold))
-                .foregroundStyle(AtlasTheme.teal)
+            AtlasArtMark(name: "FieldKitMark", size: 112)
             Text("Field find")
                 .font(.title2.weight(.bold))
             Text(pickup.itemName)
@@ -147,7 +145,7 @@ struct AssembleSheet: View {
                                     Text(recipe.displayName).font(.headline)
                                     Text(
                                         recipe.inputs
-                                            .map { "\(ItemCatalog.definition(for: $0.key)?.name ?? $0.key) ×\($0.value)" }
+                                            .map { "\(ItemCatalog.definition(for: $0.itemID)?.name ?? $0.itemID) ×\($0.quantity)" }
                                             .sorted()
                                             .joined(separator: " · ")
                                     )
@@ -163,10 +161,10 @@ struct AssembleSheet: View {
                     ForEach(ItemRecipes.all) { recipe in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(recipe.displayName).font(.subheadline.weight(.semibold))
-                            ForEach(recipe.inputs.keys.sorted(), id: \.self) { key in
-                                let have = controller.inventoryStore.quantity(of: key)
-                                let need = recipe.inputs[key] ?? 0
-                                let name = ItemCatalog.definition(for: key)?.name ?? key
+                            ForEach(recipe.inputs.sorted { $0.itemID < $1.itemID }) { input in
+                                let have = controller.inventoryStore.quantity(of: input.itemID)
+                                let need = input.quantity
+                                let name = ItemCatalog.definition(for: input.itemID)?.name ?? input.itemID
                                 Text("\(name): \(have)/\(need)")
                                     .font(.caption)
                                     .foregroundStyle(have >= need ? AtlasTheme.teal : .secondary)

@@ -118,7 +118,7 @@ final class FieldFindEngineTests: XCTestCase {
 
     func testCanAssembleWhenInputsPresent() {
         let recipe = try! XCTUnwrap(ItemRecipes.all.first)
-        let stacks = recipe.inputs.map { InventoryStack(itemID: $0.key, quantity: $0.value) }
+        let stacks = recipe.inputs.map { InventoryStack(itemID: $0.itemID, quantity: $0.quantity) }
         XCTAssertTrue(engine.canAssemble(recipe: recipe, stacks: stacks))
         XCTAssertFalse(engine.canAssemble(recipe: recipe, stacks: []))
     }
@@ -149,12 +149,13 @@ final class FieldFindEngineTests: XCTestCase {
     }
 
     func testCatalogHasContentRichCoverage() {
-        XCTAssertGreaterThanOrEqual(ItemCatalog.all.count, 25)
-        XCTAssertEqual(ItemCatalog.materials.count, 13)
+        XCTAssertGreaterThanOrEqual(ItemCatalog.all.count, 40)
+        XCTAssertEqual(ItemCatalog.materials.count, 14)
+        XCTAssertEqual(ItemCatalog.components.count, 5)
         XCTAssertEqual(ItemCatalog.boosts.count, 5)
         XCTAssertEqual(ItemCatalog.charges.count, 5)
         XCTAssertEqual(ItemCatalog.assembled.count, 5)
-        XCTAssertEqual(ItemRecipes.all.count, 5)
+        XCTAssertGreaterThanOrEqual(ItemRecipes.all.count, 11)
     }
 
     func testPreviewFindsRespectClaimedIDs() {
