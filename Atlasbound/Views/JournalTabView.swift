@@ -44,12 +44,9 @@ struct JournalTabView: View {
 
                     Section {
                         if inventoryStore.sortedStacks.isEmpty {
-                            ContentUnavailableView {
-                                Label("Empty pack", systemImage: "shippingbox")
-                            } description: {
-                                Text("Explore tiles to gather field finds — materials, boosts, and charges.")
-                            }
-                            .listRowBackground(Color.clear)
+                            Text("Explore tiles to gather field finds — materials, boosts, and charges.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         } else {
                             ForEach(inventoryStore.sortedStacks) { stack in
                                 InventoryItemRow(

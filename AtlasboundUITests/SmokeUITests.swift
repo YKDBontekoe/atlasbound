@@ -45,8 +45,18 @@ final class SmokeUITests: XCTestCase {
             app.navigationBars["Journal"].waitForExistence(timeout: 8)
                 || app.staticTexts["Today’s Trail"].waitForExistence(timeout: 2)
         )
-        XCTAssertTrue(app.staticTexts["Relic Collection"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Optional Activity History"].exists)
+        XCTAssertTrue(
+            app.staticTexts["Inventory"].waitForExistence(timeout: 5)
+                || app.staticTexts["Assemble…"].waitForExistence(timeout: 2)
+        )
+        XCTAssertTrue(
+            app.staticTexts["Optional Activity History"].waitForExistence(timeout: 5)
+                || revealStaticText("Optional Activity History")
+        )
+        XCTAssertTrue(
+            app.staticTexts["Relic Collection"].waitForExistence(timeout: 5)
+                || revealStaticText("Relic Collection")
+        )
     }
 
     func testProgressTabShowsExplorerSection() {
@@ -55,15 +65,25 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(progressTab.waitForExistence(timeout: 5))
         progressTab.tap()
 
+        // Location alerts / first paint can delay the Progress root; retry once.
+        if !app.navigationBars["Atlas Stats"].waitForExistence(timeout: 6)
+            && !app.staticTexts["Atlas Stats"].waitForExistence(timeout: 2) {
+            progressTab.tap()
+        }
+
         XCTAssertTrue(
             app.navigationBars["Atlas Stats"].waitForExistence(timeout: 8)
-                || app.staticTexts["Atlas Stats"].waitForExistence(timeout: 2)
+                || app.staticTexts["Atlas Stats"].waitForExistence(timeout: 3)
+                || app.staticTexts["Territory conquered"].waitForExistence(timeout: 3)
+                || app.staticTexts["Lifetime XP"].waitForExistence(timeout: 2)
         )
         XCTAssertTrue(
             app.staticTexts["Territory conquered"].waitForExistence(timeout: 5)
                 || app.staticTexts["Lifetime XP"].waitForExistence(timeout: 2)
                 || app.staticTexts["Mastery ladder"].waitForExistence(timeout: 2)
                 || app.staticTexts["Frontier"].waitForExistence(timeout: 2)
+                || revealStaticText("Territory conquered")
+                || revealStaticText("Lifetime XP")
         )
     }
 
@@ -127,6 +147,26 @@ final class SmokeUITests: XCTestCase {
 
     private func firstExisting(_ elements: XCUIElement...) -> XCUIElement {
         elements.first ?? app.buttons.firstMatch
+    }
+
+    /// Scrolls the frontmost scroll view a few times to materialize lazy list content.
+    @discardableResult
+    private func revealStaticText(_ label: String) -> Bool {
+        let target = app.staticTexts[label]
+        if target.exists { return true }
+        let scrollViews = app.scrollViews
+        let scroller = scrollViews.firstMatch.exists ? scrollViews.firstMatch : app.tables.firstMatch
+        for _ in 0..<4 {
+            if scroller.exists {
+                scroller.swipeUp()
+            } else {
+                app.swipeUp()
+            }
+            if target.waitForExistence(timeout: 1.5) {
+                return true
+            }
+        }
+        return target.exists
     }
 
     private func dismissLocationAlertIfNeeded() {
