@@ -144,6 +144,11 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 12))
         app.tabBars.buttons["Map"].tap()
 
+        let expandAdventures = app.buttons["expandAdventuresButton"]
+        if expandAdventures.waitForExistence(timeout: 4) {
+            expandAdventures.tap()
+        }
+
         let banner = firstExisting(
             app.buttons["mapMissionsExpeditions"],
             app.buttons["frontierMissionBanner"]
