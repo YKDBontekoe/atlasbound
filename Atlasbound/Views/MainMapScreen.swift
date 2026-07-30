@@ -33,6 +33,8 @@ struct MainMapScreen: View {
     @AppStorage("map.layer.frontier") private var showsFrontierLayer = true
     @AppStorage("map.layer.factory") private var showsFactoryLayer = true
     @State private var onboardingStep = 0
+    /// Measured height of the bottom chrome stack; keeps side controls clear of treasure/missions panels.
+    @State private var bottomChromeHeight: CGFloat = 220
 
     init(
         controller: WorldController,
@@ -96,16 +98,16 @@ struct MainMapScreen: View {
 
             mapSideControls
                 .padding(.trailing, 16)
-                .padding(.bottom, controller.isRecording ? 240 : 72)
-                .animation(AtlasMotion.chrome, value: controller.isRecording)
+                .padding(.bottom, bottomChromeHeight)
+                .animation(AtlasMotion.chrome, value: bottomChromeHeight)
 
             #if DEBUG
             if showsSimGPSPad {
                 DebugLocationPad(controller: controller, followsUser: $followsUser)
                     .padding(.leading, 16)
-                    .padding(.bottom, controller.isRecording ? 240 : 72)
+                    .padding(.bottom, bottomChromeHeight)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                    .animation(AtlasMotion.chrome, value: controller.isRecording)
+                    .animation(AtlasMotion.chrome, value: bottomChromeHeight)
             }
             #endif
 
@@ -155,6 +157,18 @@ struct MainMapScreen: View {
                 }
             }
             .padding(.bottom, 8)
+            .background {
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: BottomChromeHeightKey.self,
+                        value: geo.size.height
+                    )
+                }
+            }
+            .onPreferenceChange(BottomChromeHeightKey.self) { height in
+                guard height > 0 else { return }
+                bottomChromeHeight = height
+            }
             .animation(AtlasMotion.chrome, value: controller.isRecording)
             .animation(AtlasMotion.fade, value: controller.sessionFeedback.map(\.id))
             .animation(AtlasMotion.fade, value: inventoryStore.primaryActiveEffect?.id)
@@ -797,5 +811,13 @@ struct SettingsSheet: View {
                 }
             }
         }
+    }
+}
+
+private enum BottomChromeHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
