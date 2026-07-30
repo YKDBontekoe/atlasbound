@@ -33,6 +33,7 @@ struct MainMapScreen: View {
     @AppStorage("map.layer.frontier") private var showsFrontierLayer = true
     @AppStorage("map.layer.factory") private var showsFactoryLayer = true
     @State private var onboardingStep = 0
+    @State private var isIdleAdventureExpanded = true
 
     init(
         controller: WorldController,
@@ -96,14 +97,14 @@ struct MainMapScreen: View {
 
             mapSideControls
                 .padding(.trailing, 16)
-                .padding(.bottom, controller.isRecording ? 240 : 72)
+                .padding(.bottom, controller.isRecording ? 240 : 16)
                 .animation(AtlasMotion.chrome, value: controller.isRecording)
 
             #if DEBUG
             if showsSimGPSPad {
                 DebugLocationPad(controller: controller, followsUser: $followsUser)
                     .padding(.leading, 16)
-                    .padding(.bottom, controller.isRecording ? 240 : 72)
+                    .padding(.bottom, controller.isRecording ? 240 : 16)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                     .animation(AtlasMotion.chrome, value: controller.isRecording)
             }
@@ -139,23 +140,13 @@ struct MainMapScreen: View {
                     activeBottomPanel
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 } else {
-                    TreasureAdventureCard(store: treasureStore) {
-                        showTreasureSheet = true
-                    }
-                    .padding(.horizontal, 12)
-                    MapMissionsStrip(
-                        controller: controller,
-                        store: store,
-                        dailyChallenge: dailyChallenge,
-                        onDailyTap: { showDailyChallenge = true },
-                        onExpeditionsTap: { showExpeditionSheet = true }
-                    )
-                    idleBottomSheet
+                    idleAdventureChrome
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .padding(.bottom, 8)
             .animation(AtlasMotion.chrome, value: controller.isRecording)
+            .animation(AtlasMotion.panel, value: isIdleAdventureExpanded)
             .animation(AtlasMotion.fade, value: controller.sessionFeedback.map(\.id))
             .animation(AtlasMotion.fade, value: inventoryStore.primaryActiveEffect?.id)
         }
@@ -323,14 +314,96 @@ struct MainMapScreen: View {
         .padding(.top, 8)
     }
 
+    private var idleAdventureChrome: some View {
+        Group {
+            if isIdleAdventureExpanded {
+                VStack(spacing: 12) {
+                    TreasureAdventureCard(store: treasureStore) {
+                        showTreasureSheet = true
+                    }
+                    .padding(.horizontal, 12)
+
+                    MapMissionsStrip(
+                        controller: controller,
+                        store: store,
+                        dailyChallenge: dailyChallenge,
+                        onDailyTap: { showDailyChallenge = true },
+                        onExpeditionsTap: { showExpeditionSheet = true }
+                    )
+
+                    idleBottomSheet
+                }
+                .padding(.trailing, Self.mapSideControlGutter)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .leading).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+            } else {
+                Button {
+                    withAnimation(AtlasMotion.panel) {
+                        isIdleAdventureExpanded = true
+                    }
+                    AtlasHaptics.select()
+                } label: {
+                    HStack(spacing: 8) {
+                        AtlasArtMark(name: "TreasureCacheMark", size: 28)
+                        Text("Adventures")
+                            .font(.caption.weight(.semibold))
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background {
+                    GlassChrome(
+                        shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
+                        weight: .regular
+                    )
+                }
+                .padding(.leading, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Show adventures")
+                .accessibilityIdentifier("expandAdventuresButton")
+                .transition(.asymmetric(
+                    insertion: .move(edge: .leading).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+            }
+        }
+    }
+
+    /// Trailing space so expanded adventure cards leave a clear column for map side controls.
+    private static let mapSideControlGutter: CGFloat = 70
+
     private var idleBottomSheet: some View {
-        VStack(spacing: 10) {
+        HStack(spacing: 10) {
+            Button {
+                withAnimation(AtlasMotion.panel) {
+                    isIdleAdventureExpanded = false
+                }
+                AtlasHaptics.select()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 42, height: 42)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Collapse adventures")
+            .accessibilityIdentifier("collapseAdventuresButton")
+
             Button {
                 showActivityPicker = true
             } label: {
                 Label("Track an activity (optional)", systemImage: "figure.walk.motion")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
+                    .frame(height: 42)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
