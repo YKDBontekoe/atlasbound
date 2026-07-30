@@ -16,6 +16,9 @@ final class WorldController: ObservableObject {
     @Published private(set) var sessionFeedback: [SessionFeedbackEvent] = []
     @Published private(set) var lastSummary: ActivitySummary?
     @Published private(set) var explorationMode: ExplorationMode = .idle
+    /// Cached frontier wash tiles — rebuilt on a throttle, not every GPS tick.
+    @Published private(set) var frontierEdgeTileIDs: Set<String> = []
+    @Published private(set) var targetSectorBoundaryTileIDs: Set<String> = []
 
     let recorder: ActivityRecorder
     let store: TileStore
@@ -38,6 +41,11 @@ final class WorldController: ObservableObject {
     private var automaticVisitedTileIDs: Set<String> = []
     private var treasurePreparationTask: Task<Void, Never>?
     private var treasurePreparationDayKey: String?
+    private var persistenceFlushTask: Task<Void, Never>?
+    private var frontierCacheRebuildTask: Task<Void, Never>?
+    private var frontierDiscoveredCache: Set<TileCoordinate> = []
+    private var frontierTerritoryCache: Set<TileCoordinate> = []
+    private var lastDiscoveryHapticAt = Date.distantPast
 
     private static let selectedActivityKey = "atlasbound.selectedActivityType"
 
@@ -146,39 +154,14 @@ final class WorldController: ObservableObject {
 
     var targetSectorConnected: Bool {
         guard let offer = activeExpedition else { return false }
-        let discovered = frontierEngine.discoveredTileCoordinates(from: mergedTiles)
-        let territory = frontierEngine.territoryAnchor(
-            playerTile: playerTileCoordinate,
-            discovered: discovered
-        )
+        let discovered = frontierDiscoveredCoordinates()
+        let territory = frontierTerritoryCoordinates()
         return frontierEngine.routeConnectsTerritoryToSector(
             territory: territory,
             discovered: discovered,
             targetSectorID: offer.targetSectorID,
             tileEngine: tileEngine
         )
-    }
-
-    var frontierEdgeTileIDs: Set<String> {
-        let discovered = frontierEngine.discoveredTileCoordinates(from: mergedTiles)
-        let territory = frontierEngine.territoryAnchor(
-            playerTile: playerTileCoordinate,
-            discovered: discovered
-        )
-        let frontier = frontierEngine.frontierTileCoordinates(territory: territory, discovered: discovered)
-        return Set(frontier.map {
-            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: tileEngine.tileSizeMeters)
-        })
-    }
-
-    var targetSectorBoundaryTileIDs: Set<String> {
-        guard let offer = activeExpedition,
-              let parsed = sectorEngine.parseSectorID(offer.targetSectorID) else {
-            return []
-        }
-        return Set(sectorEngine.boundaryTiles(for: parsed.sector).map {
-            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: tileEngine.tileSizeMeters)
-        })
     }
 
     var expeditionBeaconCoordinate: CLLocationCoordinate2D? {
@@ -373,6 +356,7 @@ final class WorldController: ObservableObject {
         }
         recorder.startMonitoringIfNeeded()
         store.applyWeeklyChargeResetIfNeeded()
+        beginDeferredPersistence()
         refreshFrontierPresentation()
         prepareTreasureTrail()
         gameCenterManager.authenticate()
@@ -448,7 +432,7 @@ final class WorldController: ObservableObject {
         lastSummary = nil
         AtlasHaptics.prepare()
         explorationMode = mode
-        store.setDeferPersistence(true)
+        beginDeferredPersistence()
     }
 
     func pauseActivity() {
@@ -473,7 +457,7 @@ final class WorldController: ObservableObject {
         let covering = engine.tileIDsCoveringRoute(result.samples)
         processTileIDs(covering, at: result.endedAt, activity: recorder.activityType)
 
-        store.setDeferPersistence(false, flush: true)
+        endDeferredPersistence(flush: true)
         store.applySessionProgress(
             sessionProgress,
             updatedTiles: sessionTiles,
@@ -506,27 +490,32 @@ final class WorldController: ObservableObject {
         automaticPreviousSample = nil
         if recorder.automaticExplorationEnabled {
             explorationMode = .automatic
+            beginDeferredPersistence()
             recorder.startMonitoringIfNeeded()
         }
 
         Task {
             await gameCenterManager.submitFrontierScore(store.frontierState.weeklyScore)
         }
+        rebuildFrontierPresentationCaches(forceDiscoveredRebuild: true)
     }
 
     func refreshFrontierPresentation() {
         store.refreshFrontierState(playerTile: playerTileCoordinate)
+        rebuildFrontierPresentationCaches(forceDiscoveredRebuild: true)
     }
 
     func setAutomaticExploration(foreground: Bool, background: Bool) {
         recorder.setAutomaticExploration(foreground: foreground, background: background)
         if foreground {
             explorationMode = isRecording ? explorationMode : .automatic
+            beginDeferredPersistence()
             prepareTreasureTrail()
         } else if !isRecording {
             explorationMode = .idle
             automaticPreviousSample = nil
             automaticVisitedTileIDs = []
+            endDeferredPersistence(flush: true)
         }
     }
 
@@ -580,8 +569,106 @@ final class WorldController: ObservableObject {
         )
     }
 
+    private func beginDeferredPersistence() {
+        store.setDeferPersistence(true)
+        guard persistenceFlushTask == nil else { return }
+        persistenceFlushTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(AtlasTheme.persistenceFlushInterval))
+                guard let self, !Task.isCancelled else { return }
+                self.store.flushToDiskIfNeeded()
+            }
+        }
+    }
+
+    private func endDeferredPersistence(flush: Bool) {
+        persistenceFlushTask?.cancel()
+        persistenceFlushTask = nil
+        store.setDeferPersistence(false, flush: flush)
+    }
+
+    private func appendLiveRoute(_ coordinate: CLLocationCoordinate2D) {
+        liveRoute.append(coordinate)
+        if liveRoute.count > AtlasTheme.maxLiveRoutePoints {
+            liveRoute = LiveRouteSimplifier.downsample(
+                liveRoute,
+                maxPoints: AtlasTheme.maxLiveRoutePoints
+            )
+        }
+    }
+
+    private func frontierDiscoveredCoordinates() -> Set<TileCoordinate> {
+        if frontierDiscoveredCache.isEmpty {
+            frontierDiscoveredCache = frontierEngine.discoveredTileCoordinates(from: mergedTiles)
+        }
+        return frontierDiscoveredCache
+    }
+
+    private func frontierTerritoryCoordinates() -> Set<TileCoordinate> {
+        if frontierTerritoryCache.isEmpty {
+            frontierTerritoryCache = frontierEngine.territoryAnchor(
+                playerTile: playerTileCoordinate,
+                discovered: frontierDiscoveredCoordinates()
+            )
+        }
+        return frontierTerritoryCache
+    }
+
+    private func noteFrontierDiscoveries(tileIDs: [String]) {
+        if frontierDiscoveredCache.isEmpty {
+            frontierDiscoveredCache = frontierEngine.discoveredTileCoordinates(from: mergedTiles)
+        }
+        var added = false
+        for id in tileIDs {
+            guard let axial = tileEngine.parseTileID(id) else { continue }
+            if frontierDiscoveredCache.insert(axial).inserted {
+                added = true
+            }
+        }
+        if added {
+            // Territory / edge washes rebuild on a throttle; scoring can use a slightly stale territory.
+            scheduleFrontierPresentationCacheRebuild()
+        }
+    }
+
+    private func scheduleFrontierPresentationCacheRebuild() {
+        frontierCacheRebuildTask?.cancel()
+        frontierCacheRebuildTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(450))
+            guard let self, !Task.isCancelled else { return }
+            self.rebuildFrontierPresentationCaches(forceDiscoveredRebuild: false)
+        }
+    }
+
+    private func rebuildFrontierPresentationCaches(forceDiscoveredRebuild: Bool) {
+        if forceDiscoveredRebuild || frontierDiscoveredCache.isEmpty {
+            frontierDiscoveredCache = frontierEngine.discoveredTileCoordinates(from: mergedTiles)
+        }
+        let discovered = frontierDiscoveredCache
+        frontierTerritoryCache = frontierEngine.territoryAnchor(
+            playerTile: playerTileCoordinate,
+            discovered: discovered
+        )
+        let frontier = frontierEngine.frontierTileCoordinates(
+            territory: frontierTerritoryCache,
+            discovered: discovered
+        )
+        frontierEdgeTileIDs = Set(frontier.map {
+            TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: tileEngine.tileSizeMeters)
+        })
+
+        if let offer = activeExpedition,
+           let parsed = sectorEngine.parseSectorID(offer.targetSectorID) {
+            targetSectorBoundaryTileIDs = Set(sectorEngine.boundaryTiles(for: parsed.sector).map {
+                TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: tileEngine.tileSizeMeters)
+            })
+        } else {
+            targetSectorBoundaryTileIDs = []
+        }
+    }
+
     private func handleSample(_ sample: LocationSample) {
-        liveRoute.append(sample.coordinate)
+        appendLiveRoute(sample.coordinate)
         let engine = tileEngine
 
         if let previous = recorder.samples.dropLast().last {
@@ -605,6 +692,7 @@ final class WorldController: ObservableObject {
     private func handleAutomaticSample(_ sample: LocationSample) {
         guard recorder.automaticExplorationEnabled, !recorder.isRecording else { return }
         explorationMode = .automatic
+        beginDeferredPersistence()
         store.applyWeeklyChargeResetIfNeeded()
         let engine = tileEngine
         let ids: [String]
@@ -647,6 +735,7 @@ final class WorldController: ObservableObject {
         )
         treasureStore.processVisitedTileIDs(newIDs)
         inventoryStore.processVisitedTileIDs(newIDs, discoveryTileIDs: discoveryCandidates, date: date)
+        noteFrontierDiscoveries(tileIDs: Array(discoveryCandidates))
         objectWillChange.send()
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
         if progress.tilesDiscovered > 0 {
@@ -714,6 +803,7 @@ final class WorldController: ObservableObject {
 
         treasureStore.processVisitedTileIDs(newIDs)
         inventoryStore.processVisitedTileIDs(newIDs, discoveryTileIDs: discoveryCandidates, date: date)
+        noteFrontierDiscoveries(tileIDs: Array(discoveryCandidates))
         objectWillChange.send()
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
 
@@ -731,11 +821,8 @@ final class WorldController: ObservableObject {
     private func processFrontierScoring(newDiscoveryIDs: [String], at date: Date) {
         guard !newDiscoveryIDs.isEmpty else { return }
 
-        let discovered = frontierEngine.discoveredTileCoordinates(from: mergedTiles)
-        let territory = frontierEngine.territoryAnchor(
-            playerTile: playerTileCoordinate,
-            discovered: discovered
-        )
+        let discovered = frontierDiscoveredCoordinates()
+        let territory = frontierTerritoryCoordinates()
         let activeOffer = store.frontierState.activeOffer
         var connectionBonuses = Set(store.frontierState.connectionBonusesAwarded)
         var targetCount = activeOffer.map {
@@ -748,6 +835,7 @@ final class WorldController: ObservableObject {
         var completedOffer: ExpeditionOffer?
         var newCalloutIDs: [UUID] = []
         var chargedTiles: [WorldTile] = []
+        var calloutsCreated = 0
 
         for id in newDiscoveryIDs {
             guard let coordinate = tileEngine.parseTileID(id) else { continue }
@@ -803,16 +891,27 @@ final class WorldController: ObservableObject {
             }
             chargedTiles.append(updatedTile)
 
-            let calloutID = UUID()
-            newCalloutIDs.append(calloutID)
-            frontierScoreCallouts.append(
-                FrontierScoreCallout(id: calloutID, tileID: id, points: scaledPoints, createdAt: date)
-            )
+            if calloutsCreated < AtlasTheme.maxFrontierCallouts {
+                let calloutID = UUID()
+                newCalloutIDs.append(calloutID)
+                frontierScoreCallouts.append(
+                    FrontierScoreCallout(id: calloutID, tileID: id, points: scaledPoints, createdAt: date)
+                )
+                calloutsCreated += 1
+            }
+        }
+
+        if frontierScoreCallouts.count > AtlasTheme.maxFrontierCallouts {
+            frontierScoreCallouts = Array(frontierScoreCallouts.suffix(AtlasTheme.maxFrontierCallouts))
         }
 
         if !newCalloutIDs.isEmpty {
             pruneFrontierCallouts(after: newCalloutIDs)
-            AtlasHaptics.light()
+            let now = date
+            if now.timeIntervalSince(lastDiscoveryHapticAt) >= 0.45 {
+                lastDiscoveryHapticAt = now
+                AtlasHaptics.light()
+            }
         }
 
         guard batchTilePoints > 0 || batchConnectionBonus > 0 || batchCompletionBonus > 0 else { return }
@@ -822,24 +921,12 @@ final class WorldController: ObservableObject {
         sessionFrontier.completionBonus += batchCompletionBonus
         sessionFrontierScore += batchTilePoints + batchConnectionBonus + batchCompletionBonus
 
-        store.updateFrontierState({ state in
-            var next = state
-            next.weeklyScore += batchTilePoints + batchConnectionBonus + batchCompletionBonus
-            next.connectionBonusesAwarded = Array(Set(next.connectionBonusesAwarded).union(connectionBonuses))
-            for tile in chargedTiles where tile.weeklyCharge > 0 {
-                if !next.chargedTileIDs.contains(tile.id) {
-                    next.chargedTileIDs.append(tile.id)
-                }
-            }
-            if let completedOffer {
-                if !next.completedOfferIDs.contains(completedOffer.id) {
-                    next.completedOfferIDs.append(completedOffer.id)
-                    next.lifetimeCompletedExpeditions += 1
-                }
-                next.activeOfferID = nil
-            }
-            return next
-        }, playerTile: playerTileCoordinate, updatedTiles: chargedTiles)
+        store.applyLiveFrontierScore(
+            weeklyScoreDelta: batchTilePoints + batchConnectionBonus + batchCompletionBonus,
+            connectionBonuses: connectionBonuses,
+            chargedTiles: chargedTiles,
+            completedOffer: completedOffer
+        )
 
         sessionFrontier.weeklyTotalAfter = store.frontierState.weeklyScore
     }
@@ -854,7 +941,10 @@ final class WorldController: ObservableObject {
 
         if discoveredCount > 0 {
             events.append(SessionFeedbackEvent(kind: .discovery(count: discoveredCount), createdAt: date))
-            AtlasHaptics.discovery()
+            if date.timeIntervalSince(lastDiscoveryHapticAt) >= 0.45 {
+                lastDiscoveryHapticAt = date
+                AtlasHaptics.discovery()
+            }
         }
 
         var masteryUps: [TileState] = []

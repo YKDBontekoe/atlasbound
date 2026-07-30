@@ -32,6 +32,9 @@ struct DiscoveryMapView: View {
     @State private var cachedPerimeterIDs: Set<String> = []
     @State private var cachedMaximumVisitCount = 1
     @State private var lastCamera: MapCamera?
+    @State private var overlayRefreshTask: Task<Void, Never>?
+    @State private var overlayNeedsRefresh = false
+    @State private var lastCameraFollowAt = Date.distantPast
 
     private var engine: TileEngine { store.tileEngine }
 
@@ -207,78 +210,55 @@ struct DiscoveryMapView: View {
         .onMapCameraChange(frequency: .onEnd) { context in
             visibleRegion = context.region
             lastCamera = context.camera
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onAppear {
             controller.prepareLocation()
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onReceive(store.$tiles) { _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onReceive(factoryController.store.$state) { _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onChange(of: controller.sessionDiscoveredIDs.count) { _, _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onChange(of: controller.frontierEdgeTileIDs) { _, _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onChange(of: controller.targetSectorBoundaryTileIDs) { _, _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onChange(of: controller.regionLookup.resolvedCellCount) { _, _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onChange(of: showsMasteryLayer) { _, _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onChange(of: dataLayer) { _, _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onChange(of: showsPlacesLayer) { _, _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onChange(of: showsFogLayer) { _, _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onChange(of: showsFrontierLayer) { _, _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onChange(of: is3DEnabled) { _, _ in
             applyCameraPitch()
         }
         .onChange(of: controller.isRecording) { _, _ in
-            refreshOverlays()
+            scheduleOverlayRefresh()
         }
         .onChange(of: recorder.lastLocation?.timestamp) { _, _ in
             controller.prepareTreasureTrail()
-            refreshOverlays()
-            guard followsUser, let location = recorder.lastLocation else { return }
-            let span = controller.isRecording
-                ? AtlasTheme.mapSpanRecordingMeters
-                : AtlasTheme.mapSpanIdleMeters
-            withAnimation(AtlasMotion.camera) {
-                if is3DEnabled {
-                    position = .camera(
-                        MapCamera(
-                            centerCoordinate: location.coordinate,
-                            distance: span,
-                            heading: lastCamera?.heading ?? 0,
-                            pitch: 58
-                        )
-                    )
-                } else {
-                    position = .region(
-                        MKCoordinateRegion(
-                            center: location.coordinate,
-                            latitudinalMeters: span,
-                            longitudinalMeters: span
-                        )
-                    )
-                }
-            }
+            scheduleOverlayRefresh()
+            followUserIfNeeded()
         }
         .simultaneousGesture(
             SpatialTapGesture().onEnded { value in
@@ -291,6 +271,49 @@ struct DiscoveryMapView: View {
                 }
             }
         )
+        }
+    }
+
+    private func scheduleOverlayRefresh() {
+        overlayNeedsRefresh = true
+        guard overlayRefreshTask == nil else { return }
+        overlayRefreshTask = Task { @MainActor in
+            defer { overlayRefreshTask = nil }
+            while overlayNeedsRefresh {
+                overlayNeedsRefresh = false
+                refreshOverlays()
+                try? await Task.sleep(for: .seconds(AtlasTheme.mapOverlayRefreshInterval))
+            }
+        }
+    }
+
+    private func followUserIfNeeded() {
+        guard followsUser, let location = recorder.lastLocation else { return }
+        let now = Date()
+        guard now.timeIntervalSince(lastCameraFollowAt) >= AtlasTheme.mapCameraFollowInterval else { return }
+        lastCameraFollowAt = now
+        let span = controller.isRecording
+            ? AtlasTheme.mapSpanRecordingMeters
+            : AtlasTheme.mapSpanIdleMeters
+        withAnimation(AtlasMotion.camera) {
+            if is3DEnabled {
+                position = .camera(
+                    MapCamera(
+                        centerCoordinate: location.coordinate,
+                        distance: span,
+                        heading: lastCamera?.heading ?? 0,
+                        pitch: 58
+                    )
+                )
+            } else {
+                position = .region(
+                    MKCoordinateRegion(
+                        center: location.coordinate,
+                        latitudinalMeters: span,
+                        longitudinalMeters: span
+                    )
+                )
+            }
         }
     }
 
@@ -338,10 +361,14 @@ struct DiscoveryMapView: View {
     }
 
     private func cullDiscovered(engine: TileEngine) -> [WorldTile] {
-        MapOverlayCuller.cullTiles(
-            store.discoveredTiles,
+        let maxCount = controller.isRecording || recorder.isRecording
+            ? AtlasTheme.maxVisiblePolygonsRecording
+            : AtlasTheme.maxVisiblePolygons
+        return MapOverlayCuller.cullTiles(
+            store.discoveredTilesUnordered,
             engine: engine,
-            visibleRegion: visibleRegion
+            visibleRegion: visibleRegion,
+            maxCount: maxCount
         )
     }
 

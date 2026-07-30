@@ -63,7 +63,8 @@ road connectivity, routes, power totals, and MapKit geometry are derived at runt
 - Primary chrome: `MainMapScreen` + settings sheet.
 - Map: `DiscoveryMapView` (MapKit polygons / polyline / user annotation).
 - Live-map presentation preferences use `AppStorage`: basemap style, mastery/visit-heat data lens, places, fog, and Frontier visibility.
-- Discovered markers are capped (~80 highest-ranked) for performance.
+- Discovered markers are capped (~40 highest-ranked) for performance; polygon overlays are viewport-culled and coalesced during GPS bursts.
+- Live recording / automatic exploration **defers** world JSON writes (periodic + background flush) so car-speed discovery cannot stall the main thread on every sample.
 - Map header uses procedural hex **sectors** (`HexSectorEngine`), not political geography.
 - Atlas Stats **Places visited** uses reverse-geocoded country / province / city labels from a coarse-cell cache (`RegionLookupStore`).
 
