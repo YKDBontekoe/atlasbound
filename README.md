@@ -17,6 +17,7 @@ Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily l
 - **Frontier Expeditions** — weekly missions, combo scoring, Game Center leaderboards
 - **Treasure trails** — three daily landmark clues, route choices, collectible relics, and weekly vaults
 - **Field finds** — deterministic tile pickups into a stackable inventory (materials, boosts, charges); assemble, salvage, use, and activate
+- **Home Base / territory claims** — claim neighborhood sectors, designate one Home Base, soft familiarity XP and find-rate buffs inside claims
 - **Real-world factory** — reveal deterministic deposits, craft construction kits, place roads and buildings on nearby discovered hexes, automate production, route goods, generate power, and research upgrades
 - **Pinpoint** — 5-round Look Around location guessing (dynamic Worldwide streets + Home Turf)
 - **Atlas Stats** — territory km², personal records, layered explorer map, Pinpoint stats

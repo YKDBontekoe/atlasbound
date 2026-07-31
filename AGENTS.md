@@ -48,6 +48,7 @@ Atlasbound/
     RegionLookupEngine.swift   # Coarse-cell place labels + places-visited aggregate
     GeocodeLimiter.swift       # Shared throttled CLGeocoder
     FrontierEngine.swift       # Weekly expeditions + frontier scoring
+    TerritoryEngine.swift      # Home Base + sector claim eligibility / buffs
     TreasureEventEngine.swift  # Daily trails, weekly vaults, and relic rewards
     FieldFindEngine.swift      # Field-find rolls, loot tables, craft/salvage
     PinpointController.swift   # Pinpoint game orchestration
@@ -58,14 +59,14 @@ Atlasbound/
   Persistence/                 # SQLite AtlasDatabase + store facades
     SQLiteDatabase.swift       # Low-level SQLite3 wrapper
     AtlasDatabase.swift        # Schema, tile upserts, legacy JSON import
-    TileStore.swift            # Canonical atlas + Frontier
+    TileStore.swift            # Canonical atlas + Frontier + territory claims
     RegionLookupStore.swift    # Reverse-geocode place cache
     PinpointStore.swift        # Pinpoint game history
     ActivityHistoryStore.swift # Activity session history + per-type records
     TreasureStore.swift        # Trail, vault, relic persistence
     InventoryStore.swift       # Field finds + stackable inventory
     FactoryStore.swift         # Factory structures + research
-  Models/                      # WorldTile, activity types, FrontierModels, TreasureModels, ItemModels, PinpointModels
+  Models/                      # WorldTile, activity types, FrontierModels, TerritoryModels, TreasureModels, ItemModels, PinpointModels
   Map/                         # DiscoveryMapView, AtlasStatsMapView, GuessMapView (MapKit)
   Views/                       # MainMapScreen, summary, tabs, Pinpoint + inventory views
   Theme/                       # AtlasTheme

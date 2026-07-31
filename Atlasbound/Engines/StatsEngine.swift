@@ -37,6 +37,36 @@ struct StatsEngine: Sendable {
         )
     }
 
+    /// Discovered tiles that fall inside any claimed sector.
+    static func claimedTerritoryArea(
+        state: TerritoryState,
+        tiles: [WorldTile],
+        tileEngine: TileEngine
+    ) -> TerritorySummary {
+        guard !state.claims.isEmpty else {
+            return TerritorySummary(totalTileCount: 0, totalAreaSquareMeters: 0)
+        }
+        let sectorEngine = HexSectorEngine()
+        let claimedSectors: Set<SectorCoordinate> = Set(
+            state.claims.compactMap { sectorEngine.parseSectorID($0.sectorID)?.sector }
+        )
+        guard !claimedSectors.isEmpty else {
+            return TerritorySummary(totalTileCount: 0, totalAreaSquareMeters: 0)
+        }
+        let count = tiles.filter { tile in
+            guard tile.isDiscovered else { return false }
+            let sector = sectorEngine.sectorCoordinate(for: tile.coordinate)
+            return claimedSectors.contains(sector)
+        }.count
+        return TerritorySummary(
+            totalTileCount: count,
+            totalAreaSquareMeters: areaSquareMeters(
+                tileCount: count,
+                flatToFlatMeters: tileEngine.tileSizeMeters
+            )
+        )
+    }
+
     // MARK: - Places visited
 
     /// Aggregate countries / provinces / cities from resolved coarse-cell labels.

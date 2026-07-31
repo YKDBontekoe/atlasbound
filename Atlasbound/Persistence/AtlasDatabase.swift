@@ -6,7 +6,7 @@ import os
 /// Geometry is never stored — tiles keep IDs + mastery fields only.
 @MainActor
 final class AtlasDatabase {
-    static let schemaVersion = 1
+    static let schemaVersion = 2
     static let fileName = "atlasbound.sqlite"
 
     private static let logger = Logger(subsystem: "com.atlasbound.app", category: "database")
@@ -152,6 +152,19 @@ final class AtlasDatabase {
                 );
                 """
             )
+            setMetaValue("1", for: "schema_version")
+        }
+
+        let afterV1 = Int(metaValue(for: "schema_version") ?? "0") ?? 0
+        if afterV1 < 2 {
+            try db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS territory_state (
+                  id INTEGER PRIMARY KEY CHECK (id = 1),
+                  payload TEXT NOT NULL
+                );
+                """
+            )
             setMetaValue("\(Self.schemaVersion)", for: "schema_version")
         }
     }
@@ -278,7 +291,12 @@ final class AtlasDatabase {
 
     // MARK: - World / tiles
 
-    func loadWorld() -> (tiles: [String: WorldTile], progress: PersistedProgressRecord, frontier: FrontierState) {
+    func loadWorld() -> (
+        tiles: [String: WorldTile],
+        progress: PersistedProgressRecord,
+        frontier: FrontierState,
+        territory: TerritoryState
+    ) {
         var tiles: [String: WorldTile] = [:]
         if let statement = try? db.prepare(
             """
@@ -323,7 +341,21 @@ final class AtlasDatabase {
             }
         }
 
-        return (tiles, progress, frontier)
+        return (tiles, progress, frontier, loadTerritory())
+    }
+
+    func loadTerritory() -> TerritoryState {
+        guard let statement = try? db.prepare("SELECT payload FROM territory_state WHERE id = 1;") else {
+            return .empty
+        }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW,
+              let payload = SQLiteDatabase.columnText(statement, index: 0),
+              let data = payload.data(using: .utf8),
+              let record = try? decoder.decode(PersistedTerritoryRecord.self, from: data) else {
+            return .empty
+        }
+        return record.asTerritoryState()
     }
 
     func upsertTiles(_ tiles: [WorldTile]) {
@@ -396,15 +428,37 @@ final class AtlasDatabase {
         _ = sqlite3_step(statement)
     }
 
-    func replaceWorld(tiles: [WorldTile], progress: PersistedProgressRecord, frontier: FrontierState) {
+    func saveTerritory(_ state: TerritoryState) {
+        let record = PersistedTerritoryRecord(from: state)
+        guard let data = try? encoder.encode(record),
+              let payload = String(data: data, encoding: .utf8),
+              let statement = try? db.prepare(
+                """
+                INSERT INTO territory_state(id, payload) VALUES(1, ?)
+                ON CONFLICT(id) DO UPDATE SET payload = excluded.payload;
+                """
+              ) else { return }
+        defer { sqlite3_finalize(statement) }
+        SQLiteDatabase.bindText(statement, index: 1, value: payload)
+        _ = sqlite3_step(statement)
+    }
+
+    func replaceWorld(
+        tiles: [WorldTile],
+        progress: PersistedProgressRecord,
+        frontier: FrontierState,
+        territory: TerritoryState = .empty
+    ) {
         try? db.transaction {
             try db.execute("DELETE FROM tiles;")
             try db.execute("DELETE FROM progress;")
             try db.execute("DELETE FROM frontier;")
+            try db.execute("DELETE FROM territory_state;")
         }
         upsertTiles(tiles)
         saveProgress(progress)
         saveFrontier(frontier)
+        saveTerritory(territory)
     }
 
     func clearWorld() {
@@ -415,7 +469,8 @@ final class AtlasDatabase {
                 familiarityXPTotal: 0,
                 activitiesCompleted: 0
             ),
-            frontier: .empty
+            frontier: .empty,
+            territory: .empty
         )
     }
 
@@ -423,6 +478,7 @@ final class AtlasDatabase {
         dirtyTiles: [WorldTile],
         progress: PersistedProgressRecord?,
         frontier: FrontierState?,
+        territory: TerritoryState? = nil,
         clearAllTiles: Bool = false
     ) {
         try? db.transaction {
@@ -433,6 +489,7 @@ final class AtlasDatabase {
         upsertTiles(dirtyTiles)
         if let progress { saveProgress(progress) }
         if let frontier { saveFrontier(frontier) }
+        if let territory { saveTerritory(territory) }
     }
 
     private func bindTile(_ tile: WorldTile, onto statement: OpaquePointer) {

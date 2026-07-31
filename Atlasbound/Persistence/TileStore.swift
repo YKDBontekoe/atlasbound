@@ -9,6 +9,7 @@ final class TileStore: ObservableObject {
     @Published private(set) var familiarityXPTotal = 0
     @Published private(set) var activitiesCompleted = 0
     @Published private(set) var frontierState: FrontierState = .empty
+    @Published private(set) var territoryState: TerritoryState = .empty
 
     let tileSize: TileSizeOption = .twenty
 
@@ -18,6 +19,7 @@ final class TileStore: ObservableObject {
     private var dirtyTileIDs: Set<String> = []
     private var progressDirty = false
     private var frontierDirty = false
+    private var territoryDirty = false
     private var pendingClear = false
 
     private static let installationIDKey = "atlasbound.installationID"
@@ -175,6 +177,14 @@ final class TileStore: ObservableObject {
         updateFrontierState({ $0 }, playerTile: playerTile)
     }
 
+    func updateTerritoryState(_ transform: (TerritoryState) -> TerritoryState) {
+        let next = transform(territoryState)
+        guard next != territoryState else { return }
+        territoryState = next
+        territoryDirty = true
+        persistToDisk()
+    }
+
     func applyWeeklyChargeResetIfNeeded() {
         let weekKey = FrontierEngine.isoWeekKey()
         guard frontierState.weekKey != weekKey else { return }
@@ -211,9 +221,11 @@ final class TileStore: ObservableObject {
         familiarityXPTotal = 0
         activitiesCompleted = 0
         frontierState = .empty
+        territoryState = .empty
         dirtyTileIDs = []
         progressDirty = true
         frontierDirty = true
+        territoryDirty = true
         pendingClear = true
         persistToDisk(force: true)
     }
@@ -226,7 +238,9 @@ final class TileStore: ObservableObject {
     }
 
     func flushToDiskIfNeeded() {
-        guard pendingClear || progressDirty || frontierDirty || !dirtyTileIDs.isEmpty else { return }
+        guard pendingClear || progressDirty || frontierDirty || territoryDirty || !dirtyTileIDs.isEmpty else {
+            return
+        }
         writeSaveToDisk()
     }
 
@@ -244,6 +258,7 @@ final class TileStore: ObservableObject {
         familiarityXPTotal = world.progress.familiarityXPTotal
         activitiesCompleted = world.progress.activitiesCompleted
         frontierState = world.frontier
+        territoryState = world.territory
     }
 
     private func persistToDisk(force: Bool = false) {
@@ -263,6 +278,7 @@ final class TileStore: ObservableObject {
               )
             : nil
         let frontier = frontierDirty ? frontierState : nil
+        let territory = territoryDirty ? territoryState : nil
 
         if pendingClear {
             database.clearWorld()
@@ -272,17 +288,20 @@ final class TileStore: ObservableObject {
             }
             if let progress { database.saveProgress(progress) }
             if let frontier { database.saveFrontier(frontier) }
+            if let territory { database.saveTerritory(territory) }
         } else {
             database.persistWorldSnapshot(
                 dirtyTiles: dirtyTiles,
                 progress: progress,
-                frontier: frontier
+                frontier: frontier,
+                territory: territory
             )
         }
 
         dirtyTileIDs = []
         progressDirty = false
         frontierDirty = false
+        territoryDirty = false
         pendingClear = false
     }
 

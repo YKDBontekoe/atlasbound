@@ -27,6 +27,7 @@ final class WorldController: ObservableObject {
     private let progression = ProgressionEngine()
     private let frontierEngine = FrontierEngine()
     private let sectorEngine = HexSectorEngine()
+    private let territoryEngine = TerritoryEngine()
     private let landmarkResolver: any LandmarkResolving
 
     /// Tiles mutated during the active session (merged into store on stop).
@@ -80,6 +81,8 @@ final class WorldController: ObservableObject {
     var tileEngine: TileEngine { store.tileEngine }
 
     var frontierState: FrontierState { store.frontierState }
+
+    var territoryState: TerritoryState { store.territoryState }
 
     var activeExpedition: ExpeditionOffer? { store.frontierState.activeOffer }
 
@@ -188,6 +191,30 @@ final class WorldController: ObservableObject {
         }
         let center = sectorEngine.centerTile(for: parsed.sector)
         return tileEngine.centerCoordinate(for: center)
+    }
+
+    var territoryPresence: TerritoryPresenceSnapshot {
+        territoryEngine.presenceSnapshot(
+            playerTile: playerTileCoordinate,
+            state: store.territoryState,
+            discoveredTileIDs: store.discoveredTileIDs,
+            tileEngine: tileEngine
+        )
+    }
+
+    var claimedSectorBoundaryTileIDs: Set<String> {
+        territoryEngine.claimedBoundaryTileIDs(
+            state: store.territoryState,
+            sizeMeters: tileEngine.tileSizeMeters
+        )
+    }
+
+    var homeBaseCoordinate: CLLocationCoordinate2D? {
+        guard let homeID = store.territoryState.homeSectorID,
+              let center = territoryEngine.centerCoordinate(forSectorID: homeID, tileEngine: tileEngine) else {
+            return nil
+        }
+        return tileEngine.centerCoordinate(for: TileCoordinate(q: center.q, r: center.r))
     }
 
     var placeMapPins: [PlaceMapPin] {
@@ -404,6 +431,57 @@ final class WorldController: ObservableObject {
             return next
         }, playerTile: playerTileCoordinate)
         refreshFrontierPresentation()
+    }
+
+    @discardableResult
+    func claimCurrentSector() -> Bool {
+        guard let sectorID = territoryPresence.playerSectorID else { return false }
+        return claimSector(sectorID)
+    }
+
+    @discardableResult
+    func claimSector(_ sectorID: String) -> Bool {
+        guard let next = territoryEngine.claimSector(
+            sectorID: sectorID,
+            state: store.territoryState,
+            playerTile: playerTileCoordinate,
+            discoveredTileIDs: store.discoveredTileIDs,
+            tileEngine: tileEngine
+        ) else {
+            return false
+        }
+        store.updateTerritoryState { _ in next }
+        AtlasHaptics.success()
+        objectWillChange.send()
+        return true
+    }
+
+    @discardableResult
+    func setHomeBase(sectorID: String) -> Bool {
+        guard let next = territoryEngine.setHomeBase(
+            sectorID: sectorID,
+            state: store.territoryState
+        ) else {
+            return false
+        }
+        store.updateTerritoryState { _ in next }
+        AtlasHaptics.success()
+        objectWillChange.send()
+        return true
+    }
+
+    @discardableResult
+    func setHomeBaseToCurrentSector() -> Bool {
+        guard let sectorID = territoryPresence.playerSectorID else { return false }
+        return setHomeBase(sectorID: sectorID)
+    }
+
+    func territoryDisplayName(forSectorID sectorID: String) -> String {
+        territoryEngine.displayName(forSectorID: sectorID)
+    }
+
+    func canSetHomeBase(sectorID: String) -> Bool {
+        territoryEngine.canSetHomeBase(sectorID: sectorID, state: store.territoryState)
     }
 
     private func restoreSelectedActivityType() {
@@ -640,13 +718,32 @@ final class WorldController: ObservableObject {
             discovery: progress.discoveryXP,
             familiarity: progress.familiarityXP
         )
+        let territoryFamiliarity = territoryEngine.modifiedFamiliarityXP(
+            base: modified.familiarity,
+            tileIDs: newIDs,
+            state: store.territoryState,
+            tileEngine: tileEngine
+        )
         store.applyLiveVisitProgress(
             updatedTiles: newIDs.compactMap { updated[$0] },
             discoveryXP: modified.discovery,
-            familiarityXP: modified.familiarity
+            familiarityXP: territoryFamiliarity
         )
         treasureStore.processVisitedTileIDs(newIDs)
-        inventoryStore.processVisitedTileIDs(newIDs, discoveryTileIDs: discoveryCandidates, date: date)
+        let territoryForFinds = store.territoryState
+        let findTileEngine = tileEngine
+        inventoryStore.processVisitedTileIDs(
+            newIDs,
+            discoveryTileIDs: discoveryCandidates,
+            date: date,
+            findChanceBonus: { tileID in
+                TerritoryEngine().findChanceBonusPercent(
+                    forTileID: tileID,
+                    state: territoryForFinds,
+                    tileEngine: findTileEngine
+                )
+            }
+        )
         objectWillChange.send()
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
         if progress.tilesDiscovered > 0 {
@@ -689,6 +786,12 @@ final class WorldController: ObservableObject {
             discovery: progress.discoveryXP,
             familiarity: progress.familiarityXP
         )
+        let territoryFamiliarity = territoryEngine.modifiedFamiliarityXP(
+            base: modified.familiarity,
+            tileIDs: newIDs,
+            state: store.territoryState,
+            tileEngine: tileEngine
+        )
 
         var discovered = sessionDiscoveredIDs
         for id in discoveryCandidates {
@@ -702,7 +805,7 @@ final class WorldController: ObservableObject {
         sessionProgress.tilesDiscovered += progress.tilesDiscovered
         sessionProgress.tilesRevisited += progress.tilesRevisited
         sessionProgress.discoveryXP += modified.discovery
-        sessionProgress.familiarityXP += modified.familiarity
+        sessionProgress.familiarityXP += territoryFamiliarity
         sessionDiscoveredCount = sessionProgress.tilesDiscovered
 
         emitSessionFeedback(
@@ -713,7 +816,20 @@ final class WorldController: ObservableObject {
         )
 
         treasureStore.processVisitedTileIDs(newIDs)
-        inventoryStore.processVisitedTileIDs(newIDs, discoveryTileIDs: discoveryCandidates, date: date)
+        let territoryForFinds = store.territoryState
+        let findTileEngine = tileEngine
+        inventoryStore.processVisitedTileIDs(
+            newIDs,
+            discoveryTileIDs: discoveryCandidates,
+            date: date,
+            findChanceBonus: { tileID in
+                TerritoryEngine().findChanceBonusPercent(
+                    forTileID: tileID,
+                    state: territoryForFinds,
+                    tileEngine: findTileEngine
+                )
+            }
+        )
         objectWillChange.send()
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
 

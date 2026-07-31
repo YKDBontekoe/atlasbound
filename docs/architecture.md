@@ -53,7 +53,7 @@ AtlasboundApp
 
 - **Persisted:** 20 m tile IDs, axial `q`/`r`, mastery fields, activity stamps, dates, and totals.
 - **Derived at render:** hex polygons, map overlays, fog rings.
-- Primary store: `Documents/atlasbound.sqlite` (WAL). Tiles are upserted incrementally; nested Frontier / treasure / inventory / factory / Pinpoint payloads live in the same database.
+- Primary store: `Documents/atlasbound.sqlite` (WAL). Tiles are upserted incrementally; nested Frontier / territory / treasure / inventory / factory / Pinpoint payloads live in the same database.
 - Legacy Documents JSON files are imported once on first SQLite open, then renamed to `*.json.bak`.
 
 Factory state remains independently versioned inside SQLite so a factory wipe cannot erase the atlas.
@@ -113,6 +113,17 @@ Deterministic pickups while exploring tiles; stackable pack separate from Treasu
 | `JournalTabView` | Inventory use / activate / assemble / salvage | SwiftUI |
 
 Find IDs are `find:{dayKey}:{tileID}` — claim once per local day. Atlas Tokens remain non-consumable; field items grant temporary modifiers and charges only.
+
+## Home Base / territory claims
+
+| Type | Role | Threading |
+|------|------|-----------|
+| `TerritoryEngine` | Claim eligibility, Home Base cooldown, XP/find buffs | `Sendable` |
+| `TerritoryState` | Claimed sector IDs + Home Base ID (no geometry) | `Sendable` |
+| `TileStore.territoryState` | Load/save with atlas clear | `@MainActor` |
+| `DiscoveryMapView` | Claimed-sector wash + Home Base marker | SwiftUI |
+
+Claim unit is `sector:{size}:{q}:{r}`. Unlock at ≥25% sector discovery while the player is inside or adjacent. First claim auto-sets Home Base; moving Home Base has a 24 h cooldown.
 
 ## Extension points
 
