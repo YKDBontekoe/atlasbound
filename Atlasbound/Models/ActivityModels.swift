@@ -21,7 +21,7 @@ struct ActivitySettings: Codable, Sendable {
     var minSampleDistance: Double
 
     static let `default` = ActivitySettings(
-        maxHorizontalAccuracy: 25,
+        maxHorizontalAccuracy: 50,
         minSampleDistance: 4
     )
 }

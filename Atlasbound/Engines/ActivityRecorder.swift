@@ -51,7 +51,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
         manager.distanceFilter = settings.minSampleDistance
         applyCoreLocationActivityType()
         manager.pausesLocationUpdatesAutomatically = true
-        // Structure for later background use; only active while recording if authorized.
+        // Only active while recording or automatic screen-locked exploration if Always authorized.
         manager.allowsBackgroundLocationUpdates = false
         manager.showsBackgroundLocationIndicator = true
         prefersBackgroundRecording = UserDefaults.standard.bool(
@@ -63,6 +63,33 @@ final class ActivityRecorder: NSObject, ObservableObject {
         automaticBackgroundEnabled = UserDefaults.standard.bool(
             forKey: AutomaticExplorationPreference.backgroundKey
         )
+        applyBackgroundRecordingPreference()
+    }
+
+    /// Mirrors `CLLocationManager.allowsBackgroundLocationUpdates` for tests.
+    var isBackgroundLocationUpdatesEnabled: Bool {
+        manager.allowsBackgroundLocationUpdates
+    }
+
+    /// Mirrors `CLLocationManager.pausesLocationUpdatesAutomatically` for tests.
+    var pausesUpdatesAutomatically: Bool {
+        manager.pausesLocationUpdatesAutomatically
+    }
+
+    /// Pure gate used by `applyBackgroundRecordingPreference` (testable without Always auth).
+    static func shouldAllowBackgroundLocationUpdates(
+        prefersBackgroundRecording: Bool,
+        isRecording: Bool,
+        automaticExplorationEnabled: Bool,
+        automaticBackgroundEnabled: Bool,
+        authorizationStatus: CLAuthorizationStatus,
+        isSimulationActive: Bool
+    ) -> Bool {
+        let shouldEnable = (prefersBackgroundRecording && isRecording)
+            || (automaticExplorationEnabled && automaticBackgroundEnabled)
+        return shouldEnable
+            && authorizationStatus == .authorizedAlways
+            && !isSimulationActive
     }
 
     private func applyCoreLocationActivityType() {
@@ -143,12 +170,17 @@ final class ActivityRecorder: NSObject, ObservableObject {
     }
 
     private func applyBackgroundRecordingPreference() {
-        let shouldEnable = (prefersBackgroundRecording && isRecording)
-            || (automaticExplorationEnabled && automaticBackgroundEnabled)
-        let canEnable = shouldEnable
-            && manager.authorizationStatus == .authorizedAlways
-            && !isSimulationActive
+        let canEnable = Self.shouldAllowBackgroundLocationUpdates(
+            prefersBackgroundRecording: prefersBackgroundRecording,
+            isRecording: isRecording,
+            automaticExplorationEnabled: automaticExplorationEnabled,
+            automaticBackgroundEnabled: automaticBackgroundEnabled,
+            authorizationStatus: manager.authorizationStatus,
+            isSimulationActive: isSimulationActive
+        )
         manager.allowsBackgroundLocationUpdates = canEnable
+        // Keep delivering updates when screen-locked; otherwise let Core Location pause.
+        manager.pausesLocationUpdatesAutomatically = !canEnable
     }
 
     @discardableResult
@@ -174,7 +206,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
 
         if isSimulationActive {
             manager.stopUpdatingLocation()
-            manager.allowsBackgroundLocationUpdates = false
+            applyBackgroundRecordingPreference()
             return true
         }
 
@@ -246,10 +278,11 @@ final class ActivityRecorder: NSObject, ObservableObject {
             accumulatedPause += ended.timeIntervalSince(pausedAt)
         }
         manager.stopUpdatingLocation()
-        manager.allowsBackgroundLocationUpdates = false
         isRecording = false
         isPaused = false
         pausedAt = nil
+        // Restore automatic screen-locked exploration when those prefs are still on.
+        applyBackgroundRecordingPreference()
         let started = startedAt ?? ended
         let activeDuration = max(0, ended.timeIntervalSince(started) - accumulatedPause)
         startedAt = nil
@@ -265,11 +298,13 @@ final class ActivityRecorder: NSObject, ObservableObject {
         isSimulationActive = active
         if active {
             manager.stopUpdatingLocation()
-            manager.allowsBackgroundLocationUpdates = false
+            applyBackgroundRecordingPreference()
             clearError()
         } else if isRecording, !isPaused {
+            applyBackgroundRecordingPreference()
             manager.startUpdatingLocation()
         } else if !isRecording {
+            applyBackgroundRecordingPreference()
             startMonitoringIfNeeded()
         }
     }
