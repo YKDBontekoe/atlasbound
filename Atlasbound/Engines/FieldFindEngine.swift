@@ -20,7 +20,8 @@ struct FieldFindEngine: Sendable {
         isDiscovery: Bool,
         dayKey: String,
         claimedFindIDs: Set<String>,
-        findsClaimedToday: Int
+        findsClaimedToday: Int,
+        chanceBonusPercent: Int = 0
     ) -> FieldFind? {
         guard findsClaimedToday < FieldFindConstants.maxFindsPerDay else { return nil }
         let id = findID(dayKey: dayKey, tileID: tileID)
@@ -28,9 +29,10 @@ struct FieldFindEngine: Sendable {
 
         let seed = StableHash.fnv1a64("find:\(dayKey):\(tileID)")
         let chanceRoll = Int(seed % 100)
-        let threshold = isDiscovery
+        let baseThreshold = isDiscovery
             ? FieldFindConstants.discoveryDropChancePercent
             : FieldFindConstants.revisitDropChancePercent
+        let threshold = min(100, baseThreshold + max(0, chanceBonusPercent))
         guard chanceRoll < threshold else { return nil }
 
         let itemID = pickItemID(seed: seed, isDiscovery: isDiscovery)

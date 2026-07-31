@@ -91,6 +91,26 @@ struct PersistedFrontierRecord: Codable, Hashable, Sendable {
     }
 }
 
+struct PersistedTerritoryRecord: Codable, Hashable, Sendable {
+    var homeSectorID: String?
+    var claims: [TerritoryClaim]
+    var homeMovedAt: Date?
+
+    init(from state: TerritoryState) {
+        homeSectorID = state.homeSectorID
+        claims = state.claims
+        homeMovedAt = state.homeMovedAt
+    }
+
+    func asTerritoryState() -> TerritoryState {
+        TerritoryState(
+            homeSectorID: homeSectorID,
+            claims: claims,
+            homeMovedAt: homeMovedAt
+        )
+    }
+}
+
 struct WorldSaveFile: Codable, Sendable {
     var version: Int
     var tiles: [PersistedTileRecord]

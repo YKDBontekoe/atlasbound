@@ -24,6 +24,14 @@ enum AtlasTheme {
     /// Soft gold wash for undiscovered frontier neighbors (fill-only; territory stroke carries the edge).
     static let frontierWashFill = Color(red: 0.95, green: 0.75, blue: 0.20).opacity(0.10)
 
+    /// Claimed sector boundary wash — cooler teal so it reads apart from Frontier gold.
+    static let claimedTerritoryWashFill = Color(red: 0.35, green: 0.78, blue: 0.72).opacity(0.14)
+    static let claimedTerritoryStroke = Color(red: 0.22, green: 0.62, blue: 0.58).opacity(0.72)
+    static let claimedTerritoryStrokeWidth: CGFloat = 1.4
+
+    /// Home Base marker / wash accent.
+    static let homeBaseAccent = Color(red: 0.92, green: 0.42, blue: 0.28)
+
     /// Expedition target sector outline — kept thinner than territory perimeter strokes.
     static let targetBoundaryStroke = Color(red: 0.20, green: 0.48, blue: 0.98).opacity(0.78)
     static let targetBoundaryStrokeWidth: CGFloat = 1.7

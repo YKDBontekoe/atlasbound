@@ -79,18 +79,20 @@ struct ProgressTabView: View {
                     }
                     frontierStatsCard
                         .staggeredAppear(index: 6)
-                    personalRecordsCard
+                    territoryClaimsCard
                         .staggeredAppear(index: 7)
+                    personalRecordsCard
+                        .staggeredAppear(index: 8)
                     if !activityFootprint.isEmpty {
                         activityFootprintCard
-                            .staggeredAppear(index: 8)
+                            .staggeredAppear(index: 9)
                     }
                     explorerVitalsCard
-                        .staggeredAppear(index: 9)
-                    xpTotalsCard
                         .staggeredAppear(index: 10)
-                    pinpointStatsCard
+                    xpTotalsCard
                         .staggeredAppear(index: 11)
+                    pinpointStatsCard
+                        .staggeredAppear(index: 12)
                 }
                 .padding(20)
             }
@@ -274,6 +276,72 @@ struct ProgressTabView: View {
                 .accessibilityIdentifier("progressFrontierLeaderboard")
             }
         }
+    }
+
+    // MARK: - Territory claims
+
+    private var territoryClaimsCard: some View {
+        let state = store.territoryState
+        let claimedArea = StatsEngine.claimedTerritoryArea(
+            state: state,
+            tiles: allTiles,
+            tileEngine: store.tileEngine
+        )
+        let homeName = state.homeSectorID.map { controller.territoryDisplayName(forSectorID: $0) }
+        return StatSectionCard {
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Home Base")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "house.fill")
+                        .foregroundStyle(AtlasTheme.homeBaseAccent.opacity(0.75))
+                }
+
+                HStack(spacing: 0) {
+                    StatKPI(value: "\(state.claimCount)", caption: "Sectors", accent: AtlasTheme.teal)
+                    StatKPI(
+                        value: String(format: "%.3f", claimedArea.totalAreaSquareMeters / 1_000_000),
+                        caption: "Claimed km²"
+                    )
+                    StatKPI(
+                        value: homeName ?? "—",
+                        caption: "Home"
+                    )
+                }
+
+                if state.claims.isEmpty {
+                    Text("Claim a neighborhood once you’ve explored 25% of its tiles.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ForEach(state.claims.prefix(4)) { claim in
+                        let name = controller.territoryDisplayName(forSectorID: claim.sectorID)
+                        HStack {
+                            Image(systemName: state.homeSectorID == claim.sectorID ? "house.fill" : "flag.fill")
+                                .foregroundStyle(
+                                    state.homeSectorID == claim.sectorID
+                                        ? AtlasTheme.homeBaseAccent
+                                        : AtlasTheme.teal
+                                )
+                            Text(name)
+                                .font(.caption.weight(.semibold))
+                            Spacer()
+                            Text(claim.claimedAt.formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if state.claimCount > 4 {
+                        Text("+\(state.claimCount - 4) more")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("progressTerritoryClaims")
     }
 
     // MARK: - Personal records

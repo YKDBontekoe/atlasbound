@@ -27,6 +27,7 @@ struct DiscoveryMapView: View {
     @State private var cachedMarkers: [WorldTile] = []
     @State private var cachedFrontierEdge: [TileCoordinate] = []
     @State private var cachedTargetBoundary: [TileCoordinate] = []
+    @State private var cachedClaimedBoundary: [TileCoordinate] = []
     @State private var cachedPlacePins: [PlaceMapPin] = []
     @State private var cachedPerimeterIDs: Set<String> = []
     @State private var cachedMaximumVisitCount = 1
@@ -81,6 +82,18 @@ struct DiscoveryMapView: View {
                 }
             }
 
+            ForEach(cachedClaimedBoundary, id: \.self) { axial in
+                let vertices = engine.polygon(for: axial)
+                if vertices.count >= 3 {
+                    MapPolygon(coordinates: vertices)
+                        .foregroundStyle(AtlasTheme.claimedTerritoryWashFill)
+                        .stroke(
+                            AtlasTheme.claimedTerritoryStroke,
+                            lineWidth: AtlasTheme.claimedTerritoryStrokeWidth
+                        )
+                }
+            }
+
             ForEach(showsFrontierLayer ? cachedTargetBoundary : [], id: \.self) { axial in
                 let vertices = engine.polygon(for: axial)
                 if vertices.count >= 3 {
@@ -93,6 +106,12 @@ struct DiscoveryMapView: View {
             if showsFrontierLayer, let beacon = controller.expeditionBeaconCoordinate {
                 Annotation("", coordinate: beacon, anchor: .center) {
                     ExpeditionBeaconView()
+                }
+            }
+
+            if let home = controller.homeBaseCoordinate {
+                Annotation("Home Base", coordinate: home, anchor: .center) {
+                    HomeBaseMapMarkerView()
                 }
             }
 
@@ -234,6 +253,9 @@ struct DiscoveryMapView: View {
         .onChange(of: controller.targetSectorBoundaryTileIDs) { _, _ in
             refreshOverlays()
         }
+        .onChange(of: store.territoryState) { _, _ in
+            refreshOverlays()
+        }
         .onChange(of: controller.regionLookup.resolvedCellCount) { _, _ in
             refreshOverlays()
         }
@@ -310,6 +332,11 @@ struct DiscoveryMapView: View {
         cachedFog = buildFog(engine: engine)
         cachedFrontierEdge = controller.frontierEdgeTileIDs.compactMap { engine.parseTileID($0) }
         cachedTargetBoundary = controller.targetSectorBoundaryTileIDs.compactMap { engine.parseTileID($0) }
+        cachedClaimedBoundary = Array(
+            controller.claimedSectorBoundaryTileIDs
+                .compactMap { engine.parseTileID($0) }
+                .prefix(AtlasTheme.maxVisiblePolygons)
+        )
         cachedPlacePins = showsPlacesLayer
             ? Array(controller.placeMapPins.prefix(AtlasTheme.maxVisiblePlacePins))
             : []
@@ -528,6 +555,33 @@ struct TreasureMapMarkerView: View {
             }
         }
         .accessibilityLabel(isVault ? "Weekly vault" : "Treasure clue")
+    }
+}
+
+struct HomeBaseMapMarkerView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(AtlasTheme.homeBaseAccent.opacity(0.4), lineWidth: 2.5)
+                .frame(width: pulse ? 44 : 32, height: pulse ? 44 : 32)
+                .opacity(pulse ? 0.2 : 0.75)
+            Image(systemName: "house.fill")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(9)
+                .background(AtlasTheme.homeBaseAccent, in: Circle())
+                .shadow(color: .black.opacity(0.24), radius: 4, y: 2)
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(AtlasMotion.ambient.repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
+        .accessibilityLabel("Home Base")
     }
 }
 

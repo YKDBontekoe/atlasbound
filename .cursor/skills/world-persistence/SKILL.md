@@ -17,10 +17,11 @@ description: >-
 
 ## Database (`AtlasDatabase`)
 
-- Schema version in `meta.schema_version` (currently **1**)
+- Schema version in `meta.schema_version` (currently **2**)
 - **`tiles`** table — one row per discovered tile (incremental `UPSERT`)
 - **`progress`** — lifetime XP + activity count
 - **`frontier`** — weekly expedition state as a JSON payload (IDs only, no geometry)
+- **`territory_state`** — Home Base + claimed sector IDs as a JSON payload (IDs only)
 - Other domains (activities, regions, pinpoint, treasure, inventory, factory) live in the same file
 
 No geometry is persisted. Tile coordinates are axial `q`/`r` only; polygons come from `TileEngine`.
@@ -28,7 +29,7 @@ No geometry is persisted. Tile coordinates are axial `q`/`r` only; polygons come
 ## Rules
 
 - There is one 20 m atlas and no grid switching.
-- Clearing wipes the atlas, its XP totals, activity count, and Frontier state.
+- Clearing wipes the atlas, its XP totals, activity count, Frontier state, and territory claims.
 - Live GPS updates upsert **dirty tiles only** — never rewrite the whole atlas file.
 - `TileStore.setDeferPersistence` batches dirty IDs until flush (pause / stop / background / timer).
 - `TileStore(fileURL:)` / `AtlasDatabase.makeIsolated` accept a temporary SQLite URL for tests (`.json` suffixes remap to `.sqlite`).

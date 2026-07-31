@@ -19,6 +19,7 @@ struct MainMapScreen: View {
     @State private var showMapOptions = false
     @State private var showTreasureSheet = false
     @State private var showDailyChallenge = false
+    @State private var showTerritorySheet = false
     @State private var showFactoryBuildSheet = false
     @State private var factoryPreviewTileID: String?
     @State private var presentedSummary: ActivitySummary?
@@ -57,6 +58,15 @@ struct MainMapScreen: View {
 
     private var dailyChallenge: DailyChallengeSnapshot {
         DailyChallengeEngine().snapshot(tiles: store.discoveredTiles)
+    }
+
+    private var shouldShowTerritoryCard: Bool {
+        let presence = controller.territoryPresence
+        return presence.canClaim
+            || presence.canSetHome
+            || presence.isClaimed
+            || presence.claimCount > 0
+            || presence.completionPercent >= 10
     }
 
     var body: some View {
@@ -243,6 +253,10 @@ struct MainMapScreen: View {
             ExpeditionSheet(controller: controller, store: store)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showTerritorySheet) {
+            TerritoryManageSheet(controller: controller)
+                .presentationDetents([.medium, .large])
+        }
         .onChange(of: showSimGPSControls) { _, enabled in
             #if DEBUG
             if !enabled {
@@ -327,6 +341,12 @@ struct MainMapScreen: View {
                         onDailyTap: { showDailyChallenge = true },
                         onExpeditionsTap: { showExpeditionSheet = true }
                     )
+
+                    if shouldShowTerritoryCard {
+                        TerritoryClaimCard(controller: controller) {
+                            showTerritorySheet = true
+                        }
+                    }
 
                     idleBottomSheet
                 }

@@ -75,13 +75,15 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | Activity switch | Map idle sheet / Journal | Walk → Cycle etc.; activity metadata changes, atlas stays 20 m |
 | Activity mid-record | Try change while recording | Blocked until finish |
 | Activity persistence | Pick Run, relaunch app | Still Run; Start button says Start Run |
-| Clear progress | Clear atlas | All atlas tiles and exploration totals are wiped |
+| Clear progress | Clear atlas | All atlas tiles, exploration totals, Frontier, and territory claims are wiped |
 | Device GPS noise | Explore on a real device | Samples outside the accuracy threshold are discarded |
 | Layers places pins | Toggle layers with resolved places | Locality pins appear; no Apple POIs |
 | Live map options | Map → layers button | Style picker, mastery/heat lens, fog, places, and Frontier toggles update independently |
 | 3D live map | Reach level 4 → Map → cube button | Camera pitches smoothly, preserves center/heading, and returns flat without moving the atlas |
 | Level rewards | Progress after earning XP | Level progress, nearby rewards, tokens, and achievement progress reflect lifetime atlas stats |
 | Scout Circuit | Discover 5 new tiles, return to 3 older tiles, visit 12 unique tiles in one local day | Map mission, active tracker, and Progress card stay in sync; circuit reaches 3/3 without changing XP |
+| Territory claim | Explore a sector to ≥25% while inside/adjacent | Adventures → Claim sector; claimed wash + Home Base marker appear; Progress shows claims |
+| Home Base move | Claim a second sector; wait 24 h or advance clock in tests | Set Home Base moves after cooldown; familiarity/find buffs follow the new home |
 | Automatic foreground | Open Map and move with app open | Tiles reveal without an explicit session or fitness record |
 | Automatic background | Enable screen-locked exploration and grant Always | Discovery continues with the iOS location indicator |
 | Daily treasure trail | Reach marker with Sim GPS and choose routes | Each target advances once; final target grants relic + key |

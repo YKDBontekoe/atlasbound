@@ -59,10 +59,12 @@ final class InventoryStore: ObservableObject {
     // MARK: - Field finds
 
     /// `discoveryTileIDs` are tiles first-discovered in this visit batch.
+    /// `findChanceBonus` maps tile ID → percent bonus (e.g. territory claim buffs).
     func processVisitedTileIDs(
         _ tileIDs: [String],
         discoveryTileIDs: Set<String>,
-        date: Date = .now
+        date: Date = .now,
+        findChanceBonus: (String) -> Int = { _ in 0 }
     ) {
         refreshDayState(date: date)
         pruneEffects(at: date)
@@ -76,7 +78,8 @@ final class InventoryStore: ObservableObject {
                 isDiscovery: isDiscovery,
                 dayKey: dayKey,
                 claimedFindIDs: claimedFindIDs,
-                findsClaimedToday: findsClaimedToday
+                findsClaimedToday: findsClaimedToday,
+                chanceBonusPercent: findChanceBonus(tileID)
             ) else { continue }
             collect(find)
             return
