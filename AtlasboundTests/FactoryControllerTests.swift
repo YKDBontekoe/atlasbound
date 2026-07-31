@@ -202,7 +202,7 @@ final class FactoryControllerTests: XCTestCase {
 
     private func temporaryURL(_ stem: String) -> URL {
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("atlasbound-\(stem)-\(UUID().uuidString).json")
+            .appendingPathComponent("atlasbound-\(stem)-\(UUID().uuidString).sqlite")
         URLs.append(url)
         return url
     }
