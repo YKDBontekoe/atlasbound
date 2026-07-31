@@ -840,7 +840,7 @@ final class WorldController: ObservableObject {
         store.applyLiveVisitProgress(
             updatedTiles: discoveredUpdates,
             discoveryXP: modified.discovery,
-            familiarityXP: modified.familiarity
+            familiarityXP: territoryFamiliarity
         )
     }
 
