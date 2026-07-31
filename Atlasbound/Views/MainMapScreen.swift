@@ -33,7 +33,7 @@ struct MainMapScreen: View {
     @AppStorage("map.layer.frontier") private var showsFrontierLayer = true
     @AppStorage("map.layer.factory") private var showsFactoryLayer = true
     @State private var onboardingStep = 0
-    @State private var isIdleAdventureExpanded = true
+    @State private var isIdleAdventureExpanded = false
 
     init(
         controller: WorldController,
