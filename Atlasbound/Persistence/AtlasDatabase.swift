@@ -33,18 +33,21 @@ final class AtlasDatabase {
 
     init(fileURL: URL, importLegacyJSON: Bool) {
         self.fileURL = fileURL
+        let opened: SQLiteDatabase
         do {
-            db = try SQLiteDatabase(fileURL: fileURL)
-            try migrateSchemaIfNeeded()
-            if importLegacyJSON {
-                importLegacyJSONIfNeeded()
-            }
+            opened = try SQLiteDatabase(fileURL: fileURL)
         } catch {
             Self.logger.error("Database open failed: \(String(describing: error), privacy: .public)")
-            // Fall back to an in-memory DB so the app can still run.
+            // Fall back to a throwaway file so the app can still run.
+            let fallback = FileManager.default.temporaryDirectory
+                .appendingPathComponent("atlasbound-fallback-\(UUID().uuidString).sqlite")
             // swiftlint:disable:next force_try
-            db = try! SQLiteDatabase(fileURL: URL(fileURLWithPath: ":memory:"))
-            try? migrateSchemaIfNeeded()
+            opened = try! SQLiteDatabase(fileURL: fallback)
+        }
+        db = opened
+        try? migrateSchemaIfNeeded()
+        if importLegacyJSON {
+            importLegacyJSONIfNeeded()
         }
     }
 
