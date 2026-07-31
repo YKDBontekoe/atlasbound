@@ -1,29 +1,36 @@
 import Foundation
 import Combine
 
-private struct FactorySaveFile: Codable {
-    let version: Int
-    let state: FactoryState
-}
-
 @MainActor
 final class FactoryStore: ObservableObject {
     static let schemaVersion = 1
-    private static let saveFileName = "atlasbound-factory.json"
 
     @Published private(set) var state: FactoryState
 
-    private let fileURL: URL
+    private let database: AtlasDatabase
 
-    init(fileURL: URL? = nil, now: Date = .now) {
-        self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: Self.saveFileName)
-        if let save = JSONFileStore.load(FactorySaveFile.self, from: self.fileURL),
-           save.version == Self.schemaVersion {
-            state = Self.sanitized(save.state)
+    init(fileURL: URL? = nil, database: AtlasDatabase? = nil, now: Date = .now) {
+        if let database {
+            self.database = database
+        } else if let fileURL {
+            self.database = AtlasDatabase.makeIsolated(fileURL: Self.sqliteURL(from: fileURL))
+        } else {
+            self.database = .shared
+        }
+
+        if let loaded = self.database.loadFactoryState() {
+            state = Self.sanitized(loaded)
         } else {
             state = .empty(at: now)
-            persist()
+            // Persist empty only when this DB has no factory row yet.
+            self.database.saveFactoryState(state)
         }
+    }
+
+    private static func sqliteURL(from fileURL: URL) -> URL {
+        fileURL.pathExtension.lowercased() == "json"
+            ? fileURL.deletingPathExtension().appendingPathExtension("sqlite")
+            : fileURL
     }
 
     var structures: [String: PlacedFactoryStructure] { state.structures }
@@ -48,10 +55,7 @@ final class FactoryStore: ObservableObject {
     }
 
     private func persist() {
-        JSONFileStore.save(
-            FactorySaveFile(version: Self.schemaVersion, state: state),
-            to: fileURL
-        )
+        database.saveFactoryState(state)
     }
 
     private static func sanitized(_ state: FactoryState) -> FactoryState {

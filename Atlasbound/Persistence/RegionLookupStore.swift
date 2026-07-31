@@ -9,17 +9,27 @@ final class RegionLookupStore: ObservableObject {
     @Published private(set) var isResolving = false
     @Published private(set) var resolvedCellCount = 0
 
-    private let fileURL: URL
+    private let database: AtlasDatabase
     private var resolveTask: Task<Void, Never>?
     private var pendingCellKeys: Set<String> = []
     private let failureBackoff: TimeInterval = 6 * 60 * 60
 
-    private static let fileName = "atlasbound-regions.json"
-
-    init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: Self.fileName)
+    init(fileURL: URL? = nil, database: AtlasDatabase? = nil) {
+        if let database {
+            self.database = database
+        } else if let fileURL {
+            self.database = AtlasDatabase.makeIsolated(fileURL: Self.sqliteURL(from: fileURL))
+        } else {
+            self.database = .shared
+        }
         loadFromDisk()
         resolvedCellCount = cells.values.filter(\.didSucceed).count
+    }
+
+    private static func sqliteURL(from fileURL: URL) -> URL {
+        fileURL.pathExtension.lowercased() == "json"
+            ? fileURL.deletingPathExtension().appendingPathExtension("sqlite")
+            : fileURL
     }
 
     /// Labels for successfully resolved cells only.
@@ -110,32 +120,16 @@ final class RegionLookupStore: ObservableObject {
 
     // MARK: - Disk
 
-    private struct SaveFile: Codable {
-        var version: Int
-        var cells: [PersistedRegionCell]
-    }
-
     private func loadFromDisk() {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        guard let save = JSONFileStore.load(SaveFile.self, from: fileURL),
-              save.version == JSONFileStore.currentSchemaVersion else {
-            cells = [:]
-            return
-        }
-        cells = save.cells.reduce(into: [:]) { result, cell in
-            guard RegionLookupEngine.representativeCoordinate(forCellKey: cell.cellKey) != nil else {
-                return
-            }
-            result[cell.cellKey] = cell
+        cells = database.loadRegionCells().filter { key, _ in
+            RegionLookupEngine.representativeCoordinate(forCellKey: key) != nil
         }
     }
 
     private func persistToDisk() {
-        let save = SaveFile(
-            version: JSONFileStore.currentSchemaVersion,
-            cells: cells.values.sorted { $0.cellKey < $1.cellKey }
-        )
-        JSONFileStore.save(save, to: fileURL)
+        for cell in cells.values {
+            database.upsertRegionCell(cell)
+        }
     }
 }
 
@@ -182,7 +176,7 @@ struct PersistedRegionCell: Codable, Hashable, Sendable {
         )
     }
 
-    private init(
+    init(
         cellKey: String,
         countryCode: String?,
         countryName: String?,

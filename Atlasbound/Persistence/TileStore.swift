@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// Loads and saves the single canonical 20 m atlas.
+/// Loads and saves the single canonical 20 m atlas via SQLite.
 @MainActor
 final class TileStore: ObservableObject {
     @Published private(set) var tiles: [String: WorldTile] = [:]
@@ -12,12 +12,14 @@ final class TileStore: ObservableObject {
 
     let tileSize: TileSizeOption = .twenty
 
-    private let fileURL: URL
+    private let database: AtlasDatabase
     private let installationID: String
     private var deferPersistence = false
-    private var persistenceDirty = false
+    private var dirtyTileIDs: Set<String> = []
+    private var progressDirty = false
+    private var frontierDirty = false
+    private var pendingClear = false
 
-    private static let saveFileName = "atlasbound-world.json"
     private static let installationIDKey = "atlasbound.installationID"
 
     var tileEngine: TileEngine { TileEngine(option: tileSize) }
@@ -36,8 +38,22 @@ final class TileStore: ObservableObject {
         tiles.values.lazy.filter(\.isDiscovered).count
     }
 
-    init(fileURL: URL? = nil, installationID: String? = nil) {
-        self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: Self.saveFileName)
+    var isDeferringPersistence: Bool { deferPersistence }
+
+    var databaseURL: URL { database.fileURL }
+
+    /// - Parameters:
+    ///   - fileURL: Optional SQLite URL. `.json` suffixes from older tests are remapped to `.sqlite`.
+    ///   - database: Shared or isolated `AtlasDatabase`. When nil, uses Documents shared DB (or creates from `fileURL`).
+    ///   - installationID: Stable install id for Frontier seeding.
+    init(fileURL: URL? = nil, database: AtlasDatabase? = nil, installationID: String? = nil) {
+        if let database {
+            self.database = database
+        } else if let fileURL {
+            self.database = AtlasDatabase.makeIsolated(fileURL: Self.sqliteURL(from: fileURL))
+        } else {
+            self.database = .shared
+        }
 
         if let installationID {
             self.installationID = installationID
@@ -52,6 +68,13 @@ final class TileStore: ObservableObject {
         loadFromDisk()
     }
 
+    private static func sqliteURL(from fileURL: URL) -> URL {
+        if fileURL.pathExtension.lowercased() == "json" {
+            return fileURL.deletingPathExtension().appendingPathExtension("sqlite")
+        }
+        return fileURL
+    }
+
     func upsert(_ tile: WorldTile) {
         upsertMany([tile])
     }
@@ -59,11 +82,14 @@ final class TileStore: ObservableObject {
     func upsertMany(_ newTiles: [WorldTile]) {
         guard !newTiles.isEmpty else { return }
         var next = tiles
+        var changedIDs: [String] = []
         for tile in newTiles where isCanonical(tile) {
             next[tile.id] = tile
+            changedIDs.append(tile.id)
         }
         guard next != tiles else { return }
         tiles = next
+        markTilesDirty(changedIDs)
         persistToDisk()
     }
 
@@ -74,13 +100,17 @@ final class TileStore: ObservableObject {
     ) {
         if !updatedTiles.isEmpty {
             var next = tiles
+            var changedIDs: [String] = []
             for (_, tile) in updatedTiles where isCanonical(tile) {
                 next[tile.id] = tile
+                changedIDs.append(tile.id)
             }
             tiles = next
+            markTilesDirty(changedIDs)
         }
         if countsAsActivity {
             activitiesCompleted += 1
+            progressDirty = true
         }
         persistToDisk()
     }
@@ -89,6 +119,7 @@ final class TileStore: ObservableObject {
         guard discovery != 0 || familiarity != 0 else { return }
         discoveryXPTotal += discovery
         familiarityXPTotal += familiarity
+        progressDirty = true
         persistToDisk()
     }
 
@@ -96,13 +127,17 @@ final class TileStore: ObservableObject {
         guard !updatedTiles.isEmpty || discoveryXP != 0 || familiarityXP != 0 else { return }
         if !updatedTiles.isEmpty {
             var next = tiles
+            var changedIDs: [String] = []
             for tile in updatedTiles where isCanonical(tile) {
                 next[tile.id] = tile
+                changedIDs.append(tile.id)
             }
             tiles = next
+            markTilesDirty(changedIDs)
         }
         discoveryXPTotal += discoveryXP
         familiarityXPTotal += familiarityXP
+        progressDirty = true
         persistToDisk()
     }
 
@@ -113,10 +148,13 @@ final class TileStore: ObservableObject {
     ) {
         if !updatedTiles.isEmpty {
             var next = tiles
+            var changedIDs: [String] = []
             for tile in updatedTiles where isCanonical(tile) {
                 next[tile.id] = tile
+                changedIDs.append(tile.id)
             }
             tiles = next
+            markTilesDirty(changedIDs)
         }
         let engine = FrontierEngine()
         var state = engine.ensureWeeklyState(
@@ -129,6 +167,7 @@ final class TileStore: ObservableObject {
         )
         state = transform(state)
         frontierState = state
+        frontierDirty = true
         persistToDisk()
     }
 
@@ -141,11 +180,14 @@ final class TileStore: ObservableObject {
         guard frontierState.weekKey != weekKey else { return }
 
         var updatedTiles = tiles
+        var changedIDs: [String] = []
         for (id, var tile) in updatedTiles where tile.weeklyCharge > 0 {
             tile.weeklyCharge = 0
             updatedTiles[id] = tile
+            changedIDs.append(id)
         }
         tiles = updatedTiles
+        markTilesDirty(changedIDs)
 
         updateFrontierState({ state in
             var next = state
@@ -169,6 +211,10 @@ final class TileStore: ObservableObject {
         familiarityXPTotal = 0
         activitiesCompleted = 0
         frontierState = .empty
+        dirtyTileIDs = []
+        progressDirty = true
+        frontierDirty = true
+        pendingClear = true
         persistToDisk(force: true)
     }
 
@@ -180,50 +226,64 @@ final class TileStore: ObservableObject {
     }
 
     func flushToDiskIfNeeded() {
-        guard persistenceDirty else { return }
-        persistenceDirty = false
+        guard pendingClear || progressDirty || frontierDirty || !dirtyTileIDs.isEmpty else { return }
         writeSaveToDisk()
     }
 
-    private func loadFromDisk() {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        guard let save = JSONFileStore.load(WorldSaveFile.self, from: fileURL),
-              save.version == JSONFileStore.currentSchemaVersion else {
-            writeSaveToDisk()
-            return
-        }
+    private func markTilesDirty(_ ids: [String]) {
+        dirtyTileIDs.formUnion(ids)
+    }
 
-        tiles = save.tiles.reduce(into: [:]) { result, record in
-            let tile = record.asWorldTile()
-            guard isCanonical(tile) else { return }
-            result[tile.id] = tile
+    private func loadFromDisk() {
+        let world = database.loadWorld()
+        tiles = world.tiles.reduce(into: [:]) { result, entry in
+            guard isCanonical(entry.value) else { return }
+            result[entry.key] = entry.value
         }
-        discoveryXPTotal = save.progress.discoveryXPTotal
-        familiarityXPTotal = save.progress.familiarityXPTotal
-        activitiesCompleted = save.progress.activitiesCompleted
-        frontierState = save.frontier.asFrontierState()
+        discoveryXPTotal = world.progress.discoveryXPTotal
+        familiarityXPTotal = world.progress.familiarityXPTotal
+        activitiesCompleted = world.progress.activitiesCompleted
+        frontierState = world.frontier
     }
 
     private func persistToDisk(force: Bool = false) {
         if deferPersistence && !force {
-            persistenceDirty = true
             return
         }
-        persistenceDirty = false
         writeSaveToDisk()
     }
 
     private func writeSaveToDisk() {
-        let save = WorldSaveFile(
-            tiles: discoveredTiles.map(PersistedTileRecord.init),
-            progress: PersistedProgressRecord(
+        let dirtyTiles = dirtyTileIDs.compactMap { tiles[$0] }.filter(\.isDiscovered)
+        let progress = progressDirty
+            ? PersistedProgressRecord(
                 discoveryXPTotal: discoveryXPTotal,
                 familiarityXPTotal: familiarityXPTotal,
                 activitiesCompleted: activitiesCompleted
-            ),
-            frontier: PersistedFrontierRecord(from: frontierState)
-        )
-        JSONFileStore.save(save, to: fileURL)
+              )
+            : nil
+        let frontier = frontierDirty ? frontierState : nil
+
+        if pendingClear {
+            database.clearWorld()
+            // Re-apply any tiles that were upserted after clear in the same flush window.
+            if !dirtyTiles.isEmpty {
+                database.upsertTiles(dirtyTiles)
+            }
+            if let progress { database.saveProgress(progress) }
+            if let frontier { database.saveFrontier(frontier) }
+        } else {
+            database.persistWorldSnapshot(
+                dirtyTiles: dirtyTiles,
+                progress: progress,
+                frontier: frontier
+            )
+        }
+
+        dirtyTileIDs = []
+        progressDirty = false
+        frontierDirty = false
+        pendingClear = false
     }
 
     private func isCanonical(_ tile: WorldTile) -> Bool {

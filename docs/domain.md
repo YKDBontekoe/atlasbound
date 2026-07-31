@@ -66,7 +66,7 @@ Automatic Explore discovers without fitness history while the app is open. Scree
 
 ## Activity history & territory stats
 
-Finished sessions are persisted in `Documents/atlasbound-activities.json` (`ActivityHistoryStore`): distance, duration, activity type, XP totals, frontier bonuses, and rolling per-activity bests/totals (longest session distance, lifetime km, session counts). The Activity tab shows recent sessions; tap any row for a read-only detail sheet.
+Finished sessions are persisted in SQLite (`ActivityHistoryStore`): distance, duration, activity type, XP totals, frontier bonuses, and rolling per-activity bests/totals (longest session distance, lifetime km, session counts). The Activity tab shows recent sessions; tap any row for a read-only detail sheet.
 
 **Unlocked area** is derived at runtime — never stored. Per hex tile (flat-to-flat width `W` meters):
 
@@ -78,7 +78,7 @@ areaPerTile = (√3 / 2) × W²   // square meters
 
 ### Places visited
 
-Discovered tile centers are quantized into ~2 km cache cells and reverse-geocoded via `CLGeocoder` (`GeocodeLimiter`). Results live in `Documents/atlasbound-regions.json` (`RegionLookupStore`) — placemark label strings only, never polygons. Aggregation is pure (`RegionLookupEngine` / `StatsEngine.placesVisited`). Empty placemark fields are omitted; unresolved cells do not block other stats.
+Discovered tile centers are quantized into ~2 km cache cells and reverse-geocoded via `CLGeocoder` (`GeocodeLimiter`). Results live in SQLite (`RegionLookupStore`) — placemark label strings only, never polygons. Aggregation is pure (`RegionLookupEngine` / `StatsEngine.placesVisited`). Empty placemark fields are omitted; unresolved cells do not block other stats.
 
 ## Real-world factory
 
@@ -90,4 +90,4 @@ Discovered tile centers are quantized into ~2 km cache cells and reverse-geocode
 - Factory research consumes Atlas Insight and is also gated by the existing Explorer level.
 - Research bootstraps with a slower field-material Insight recipe; Mechanics unlocks the faster mechanism-based recipe.
 - Nearby players can manually load or unload machine buffers, while connected depots automate transfers.
-- The factory has its own `atlasbound-factory.json` schema so a factory reset or incompatibility cannot erase the canonical atlas.
+- The factory has its own schema version inside SQLite so a factory reset or incompatibility cannot erase the canonical atlas.

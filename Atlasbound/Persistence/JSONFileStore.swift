@@ -1,12 +1,12 @@
 import Foundation
 import os
 
-/// Shared Documents JSON read/write for app stores.
-/// Stores keep domain APIs; this owns encoder/decoder + atomic disk I/O only.
+/// Shared JSON codec helpers and one-shot legacy Documents import.
+/// Live game state persists in SQLite via `AtlasDatabase` — not these JSON files.
 enum JSONFileStore {
     private static let logger = Logger(subsystem: "com.atlasbound.app", category: "persistence")
 
-    /// Exact save contract. Mismatched versions start a fresh atlas.
+    /// Legacy JSON save contract used only when importing older Documents files.
     static let currentSchemaVersion = 3
 
     static let encoder: JSONEncoder = {

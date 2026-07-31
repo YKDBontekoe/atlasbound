@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// Persists finished activity sessions and rolling per-activity aggregates.
+/// Persists finished activity sessions and rolling per-activity aggregates in SQLite.
 @MainActor
 final class ActivityHistoryStore: ObservableObject {
     static let maxSessions = 100
@@ -12,13 +12,23 @@ final class ActivityHistoryStore: ObservableObject {
     @Published private(set) var totalDurationByActivity: [ActivityType: TimeInterval] = [:]
     @Published private(set) var sessionCountByActivity: [ActivityType: Int] = [:]
 
-    private let fileURL: URL
+    private let database: AtlasDatabase
 
-    private static let fileName = "atlasbound-activities.json"
-
-    init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: Self.fileName)
+    init(fileURL: URL? = nil, database: AtlasDatabase? = nil) {
+        if let database {
+            self.database = database
+        } else if let fileURL {
+            self.database = AtlasDatabase.makeIsolated(fileURL: Self.sqliteURL(from: fileURL))
+        } else {
+            self.database = .shared
+        }
         loadFromDisk()
+    }
+
+    private static func sqliteURL(from fileURL: URL) -> URL {
+        fileURL.pathExtension.lowercased() == "json"
+            ? fileURL.deletingPathExtension().appendingPathExtension("sqlite")
+            : fileURL
     }
 
     func record(_ summary: ActivitySummary) {
@@ -49,58 +59,30 @@ final class ActivityHistoryStore: ObservableObject {
         sessionCountByActivity[activity, default: 0]
     }
 
-    // MARK: - Disk
-
-    private struct SaveFile: Codable {
-        var version: Int
-        var sessions: [PersistedActivityRecord]
-        var longestDistanceByActivity: [String: Double]
-        var totalDistanceByActivity: [String: Double]
-        var totalDurationByActivity: [String: Double]
-        var sessionCountByActivity: [String: Int]
-    }
-
     private func loadFromDisk() {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        guard let save = JSONFileStore.load(SaveFile.self, from: fileURL),
-              save.version == JSONFileStore.currentSchemaVersion else {
-            sessions = []
-            longestDistanceByActivity = [:]
-            totalDistanceByActivity = [:]
-            totalDurationByActivity = [:]
-            sessionCountByActivity = [:]
-            return
-        }
-        sessions = save.sessions
-        longestDistanceByActivity = Self.decodeActivityMap(save.longestDistanceByActivity)
-        totalDistanceByActivity = Self.decodeActivityMap(save.totalDistanceByActivity)
-        totalDurationByActivity = Self.decodeActivityMap(save.totalDurationByActivity)
-        sessionCountByActivity = Self.decodeActivityMap(save.sessionCountByActivity)
+        let loaded = database.loadActivities()
+        sessions = loaded.sessions
+        longestDistanceByActivity = loaded.longest
+        totalDistanceByActivity = loaded.totalDistance
+        totalDurationByActivity = loaded.totalDuration
+        sessionCountByActivity = loaded.sessionCount
     }
 
     private func persistToDisk() {
-        let save = SaveFile(
-            version: JSONFileStore.currentSchemaVersion,
-            sessions: sessions,
-            longestDistanceByActivity: Self.encodeActivityMap(longestDistanceByActivity),
-            totalDistanceByActivity: Self.encodeActivityMap(totalDistanceByActivity),
-            totalDurationByActivity: Self.encodeActivityMap(totalDurationByActivity),
-            sessionCountByActivity: Self.encodeActivityMap(sessionCountByActivity)
-        )
-        JSONFileStore.save(save, to: fileURL)
-    }
-
-    private static func encodeActivityMap<T>(_ map: [ActivityType: T]) -> [String: T] {
-        Dictionary(uniqueKeysWithValues: map.map { ($0.key.rawValue, $0.value) })
-    }
-
-    private static func decodeActivityMap<T>(_ map: [String: T]) -> [ActivityType: T] {
-        var result: [ActivityType: T] = [:]
-        for (key, value) in map {
-            if let type = ActivityType(rawValue: key) {
-                result[type] = value
-            }
+        database.replaceActivitySessions(sessions)
+        for type in Set(
+            Array(longestDistanceByActivity.keys)
+                + Array(totalDistanceByActivity.keys)
+                + Array(totalDurationByActivity.keys)
+                + Array(sessionCountByActivity.keys)
+        ) {
+            database.upsertActivityAggregate(
+                type: type,
+                longest: longestDistanceByActivity[type, default: 0],
+                totalDistance: totalDistanceByActivity[type, default: 0],
+                totalDuration: totalDurationByActivity[type, default: 0],
+                sessionCount: sessionCountByActivity[type, default: 0]
+            )
         }
-        return result
     }
 }

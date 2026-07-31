@@ -1,7 +1,6 @@
 import Foundation
 
-/// Persists Pinpoint game history and high scores as JSON.
-/// Single responsibility: persistence only — no game logic.
+/// Persists Pinpoint game history and high scores in SQLite.
 @MainActor
 final class PinpointStore: ObservableObject {
     @Published private(set) var gameHistory: [PinpointGame] = []
@@ -10,14 +9,24 @@ final class PinpointStore: ObservableObject {
     @Published private(set) var gamesPlayed: Int = 0
     @Published private(set) var exactTileHits: Int = 0
 
-    private let fileURL: URL
-
-    private static let fileName = "atlasbound-pinpoint.json"
+    private let database: AtlasDatabase
     private static let maxRetainedGames = 100
 
-    init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: Self.fileName)
+    init(fileURL: URL? = nil, database: AtlasDatabase? = nil) {
+        if let database {
+            self.database = database
+        } else if let fileURL {
+            self.database = AtlasDatabase.makeIsolated(fileURL: Self.sqliteURL(from: fileURL))
+        } else {
+            self.database = .shared
+        }
         loadFromDisk()
+    }
+
+    private static func sqliteURL(from fileURL: URL) -> URL {
+        fileURL.pathExtension.lowercased() == "json"
+            ? fileURL.deletingPathExtension().appendingPathExtension("sqlite")
+            : fileURL
     }
 
     func highScore(for mode: PinpointGameMode) -> Int {
@@ -57,40 +66,22 @@ final class PinpointStore: ObservableObject {
         persistToDisk()
     }
 
-    // MARK: - Disk
-
-    private struct SaveFile: Codable {
-        var version: Int
-        let games: [PinpointGame]
-        let highScoreWorldwide: Int
-        let highScoreHomeTurf: Int
-        let exactTileHits: Int
-        let gamesPlayed: Int?
-    }
-
     private func loadFromDisk() {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
-        guard let save = JSONFileStore.load(SaveFile.self, from: fileURL),
-              save.version == JSONFileStore.currentSchemaVersion else {
-            gameHistory = []
-            return
-        }
-        gameHistory = Array(save.games.suffix(Self.maxRetainedGames))
-        gamesPlayed = max(save.gamesPlayed ?? save.games.count, gameHistory.count)
-        highScoreWorldwide = max(0, save.highScoreWorldwide)
-        highScoreHomeTurf = max(0, save.highScoreHomeTurf)
-        exactTileHits = max(0, save.exactTileHits)
+        let loaded = database.loadPinpoint()
+        gameHistory = Array(loaded.games.suffix(Self.maxRetainedGames))
+        gamesPlayed = max(loaded.gamesPlayed, gameHistory.count)
+        highScoreWorldwide = max(0, loaded.highScoreWorldwide)
+        highScoreHomeTurf = max(0, loaded.highScoreHomeTurf)
+        exactTileHits = max(0, loaded.exactTileHits)
     }
 
     private func persistToDisk() {
-        let save = SaveFile(
-            version: JSONFileStore.currentSchemaVersion,
+        database.replacePinpoint(
             games: gameHistory,
             highScoreWorldwide: highScoreWorldwide,
             highScoreHomeTurf: highScoreHomeTurf,
-            exactTileHits: exactTileHits,
-            gamesPlayed: gamesPlayed
+            gamesPlayed: gamesPlayed,
+            exactTileHits: exactTileHits
         )
-        JSONFileStore.save(save, to: fileURL)
     }
 }

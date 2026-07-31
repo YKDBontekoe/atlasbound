@@ -1,17 +1,6 @@
 import Foundation
 import Combine
 
-private struct InventorySaveFile: Codable {
-    var version: Int
-    var stacks: [InventoryStack]
-    var claimedFindIDs: [String]
-    var claimedFindDayKey: String
-    var findsClaimedToday: Int
-    var activeEffects: [ActiveItemEffect]
-    var cartographerPins: [CartographerPin]
-    var lifetimeFindsCollected: Int
-}
-
 @MainActor
 final class InventoryStore: ObservableObject {
     @Published private(set) var stacks: [InventoryStack] = []
@@ -23,15 +12,27 @@ final class InventoryStore: ObservableObject {
     @Published var latestPickup: ItemPickup?
     @Published var latestActionMessage: String?
 
-    private let fileURL: URL
+    private let database: AtlasDatabase
     private let engine = FieldFindEngine()
     private var claimedFindDayKey: String = ""
 
-    init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: "atlasbound-inventory.json")
+    init(fileURL: URL? = nil, database: AtlasDatabase? = nil) {
+        if let database {
+            self.database = database
+        } else if let fileURL {
+            self.database = AtlasDatabase.makeIsolated(fileURL: Self.sqliteURL(from: fileURL))
+        } else {
+            self.database = .shared
+        }
         load()
         refreshDayState()
         pruneEffects()
+    }
+
+    private static func sqliteURL(from fileURL: URL) -> URL {
+        fileURL.pathExtension.lowercased() == "json"
+            ? fileURL.deletingPathExtension().appendingPathExtension("sqlite")
+            : fileURL
     }
 
     var sortedStacks: [InventoryStack] {
@@ -434,8 +435,7 @@ final class InventoryStore: ObservableObject {
     }
 
     private func load() {
-        guard let save = JSONFileStore.load(InventorySaveFile.self, from: fileURL),
-              save.version == JSONFileStore.currentSchemaVersion else { return }
+        guard let save = database.loadInventory() else { return }
         stacks = save.stacks.filter { ItemCatalog.definition(for: $0.itemID) != nil && $0.quantity > 0 }
         claimedFindIDs = Set(save.claimedFindIDs)
         claimedFindDayKey = save.claimedFindDayKey
@@ -446,8 +446,8 @@ final class InventoryStore: ObservableObject {
     }
 
     private func persist() {
-        JSONFileStore.save(
-            InventorySaveFile(
+        database.saveInventory(
+            LegacyInventorySave(
                 version: JSONFileStore.currentSchemaVersion,
                 stacks: stacks,
                 claimedFindIDs: Array(claimedFindIDs).sorted(),
@@ -456,8 +456,7 @@ final class InventoryStore: ObservableObject {
                 activeEffects: activeEffects,
                 cartographerPins: cartographerPins,
                 lifetimeFindsCollected: lifetimeFindsCollected
-            ),
-            to: fileURL
+            )
         )
     }
 }

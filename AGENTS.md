@@ -4,14 +4,14 @@ Guidance for AI agents and contributors working in this repo.
 
 ## What this is
 
-**Atlasbound** is an iPhone location RPG: movement discovers hexagonal MapKit tiles; revisits award familiarity XP. Single SwiftUI target, local JSON persistence, unsigned IPA via AltStore/SideStore.
+**Atlasbound** is an iPhone location RPG: movement discovers hexagonal MapKit tiles; revisits award familiarity XP. Single SwiftUI target, local SQLite persistence, unsigned IPA via AltStore/SideStore.
 
 | | |
 |--|--|
 | Platform | iOS 17+, Xcode 16+ |
 | Bundle ID | `com.atlasbound.app` |
 | Scheme | `Atlasbound` |
-| Persistence | `Documents/atlasbound-world.json` + `atlasbound-pinpoint.json` + `atlasbound-activities.json` + `atlasbound-regions.json` + `atlasbound-treasures.json` + `atlasbound-inventory.json` + UserDefaults tile size |
+| Persistence | `Documents/atlasbound.sqlite` (legacy JSON imported once) + UserDefaults prefs |
 | Distribution | Unsigned IPA → GitHub Releases + Pages AltStore source |
 
 ## Read first
@@ -55,12 +55,16 @@ Atlasbound/
     LookAroundLocationPool.swift # Coverage-region + Home Turf targets (Sendable)
     LookAroundSnapshotEngine.swift # Spoiler-free Look Around gallery snapshots
     GameCenterManager.swift    # GameKit auth + leaderboards
-  Persistence/                 # JSON save + Codable records
-    RegionLookupStore.swift    # Reverse-geocode place cache (JSON)
-    PinpointStore.swift        # Pinpoint game history (JSON)
+  Persistence/                 # SQLite AtlasDatabase + store facades
+    SQLiteDatabase.swift       # Low-level SQLite3 wrapper
+    AtlasDatabase.swift        # Schema, tile upserts, legacy JSON import
+    TileStore.swift            # Canonical atlas + Frontier
+    RegionLookupStore.swift    # Reverse-geocode place cache
+    PinpointStore.swift        # Pinpoint game history
     ActivityHistoryStore.swift # Activity session history + per-type records
     TreasureStore.swift        # Trail, vault, relic persistence
-    InventoryStore.swift       # Field finds + stackable inventory (JSON)
+    InventoryStore.swift       # Field finds + stackable inventory
+    FactoryStore.swift         # Factory structures + research
   Models/                      # WorldTile, activity types, FrontierModels, TreasureModels, ItemModels, PinpointModels
   Map/                         # DiscoveryMapView, AtlasStatsMapView, GuessMapView (MapKit)
   Views/                       # MainMapScreen, summary, tabs, Pinpoint + inventory views
