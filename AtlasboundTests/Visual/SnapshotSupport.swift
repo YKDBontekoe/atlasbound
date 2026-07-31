@@ -82,7 +82,8 @@ enum SnapshotSupport {
 
         guard FileManager.default.fileExists(atPath: referenceURL.path) else {
             // CI / explicit record: write the missing golden so the artifact can be committed.
-            if isRecording || ProcessInfo.processInfo.environment["CI"] == "true" {
+            // Prefer TEST_RUNNER_CI — xcodebuild forwards that into the simulator test host.
+            if isRecording || Self.envFlag("TEST_RUNNER_CI") || Self.envFlag("CI") {
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                 try png.write(to: referenceURL, options: .atomic)
                 let tmpCopy = failureDirectory().appendingPathComponent("\(name).png")
