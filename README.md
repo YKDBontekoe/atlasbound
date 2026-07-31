@@ -11,8 +11,8 @@ Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily l
 - Optional walk/run/cycle/hike/drive/transit tracking and activity history
 - One canonical **20 m** hex atlas
 - Fog vs discovered tile overlay on the map; mastery ladder and familiarity XP
-- Configurable live atlas with 3D terrain, Explorer, Satellite, and Hybrid styles plus mastery, visit-heat, places, fog, and Frontier layers
-- **Explorer progression** — 50 account levels, rank titles, Atlas Tokens, map unlocks, and achievement milestones
+- Configurable live atlas with muted Explorer basemap, optional 3D terrain, plus mastery, visit-heat, places, fog, and Frontier layers
+- **Explorer progression** — 50 account levels, rank titles, Atlas Tokens, map-layer unlocks, and achievement milestones
 - **Scout Circuit** — three fresh daily goals for discovery, revisits, and route coverage, tracked on the map and Progress tab
 - **Frontier Expeditions** — weekly missions, combo scoring, Game Center leaderboards
 - **Treasure trails** — three daily landmark clues, route choices, collectible relics, and weekly vaults

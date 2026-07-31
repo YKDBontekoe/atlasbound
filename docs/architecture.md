@@ -62,7 +62,7 @@ Factory state remains independently versioned inside SQLite so a factory wipe ca
 
 - Primary chrome: `MainMapScreen` + settings sheet.
 - Map: `DiscoveryMapView` (MapKit polygons / polyline / user annotation).
-- Live-map presentation preferences use `AppStorage`: basemap style, mastery/visit-heat data lens, places, fog, and Frontier visibility.
+- Live-map presentation preferences use `AppStorage`: mastery/visit-heat data lens, 3D terrain, places, fog, and Frontier visibility. The basemap is always the muted Explorer standard style.
 - Discovered markers are capped (~80 highest-ranked) for performance.
 - Map header uses procedural hex **sectors** (`HexSectorEngine`), not political geography.
 - Atlas Stats **Places visited** uses reverse-geocoded country / province / city labels from a coarse-cell cache (`RegionLookupStore`).

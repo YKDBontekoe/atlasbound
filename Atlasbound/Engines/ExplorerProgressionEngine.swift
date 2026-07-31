@@ -69,10 +69,6 @@ struct ExplorerProgressionEngine: Sendable {
         }
     }
 
-    func isMapStyleUnlocked(_ style: LiveMapStyle, atLevel level: Int) -> Bool {
-        level >= style.requiredLevel
-    }
-
     func is3DMapUnlocked(atLevel level: Int) -> Bool {
         level >= Self.threeDMapRequiredLevel
     }
@@ -102,14 +98,6 @@ struct ExplorerProgressionEngine: Sendable {
                     detail: "Highlight the routes you know best",
                     symbolName: "flame.fill"
                 ))
-            case 3:
-                rewards.append(.init(
-                    level: level,
-                    kind: .mapStyle,
-                    name: "Satellite",
-                    detail: "Unlock satellite imagery on the live atlas",
-                    symbolName: "globe.americas.fill"
-                ))
             case Self.threeDMapRequiredLevel:
                 rewards.append(.init(
                     level: level,
@@ -117,14 +105,6 @@ struct ExplorerProgressionEngine: Sendable {
                     name: "3D Terrain",
                     detail: "Tilt the live atlas into an elevated perspective",
                     symbolName: "cube.fill"
-                ))
-            case 5:
-                rewards.append(.init(
-                    level: level,
-                    kind: .mapStyle,
-                    name: "Hybrid",
-                    detail: "Combine satellite imagery with labels",
-                    symbolName: "map.fill"
                 ))
             default:
                 break

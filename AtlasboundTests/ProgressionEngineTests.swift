@@ -136,14 +136,10 @@ final class ExplorerProgressionEngineTests: XCTestCase {
         XCTAssertEqual(snapshot.title, "Scout")
         XCTAssertTrue(snapshot.achievements.allSatisfy(\.isUnlocked))
         XCTAssertGreaterThan(snapshot.atlasTokens, 0)
-        XCTAssertTrue(snapshot.rewards.contains { $0.level == 3 && $0.kind == .mapStyle })
+        XCTAssertTrue(snapshot.rewards.contains { $0.level == 2 && $0.kind == .mapLayer })
     }
 
     func testMapRewardsUnlockAtTheirRequiredLevels() {
-        XCTAssertFalse(engine.isMapStyleUnlocked(.satellite, atLevel: 2))
-        XCTAssertTrue(engine.isMapStyleUnlocked(.satellite, atLevel: 3))
-        XCTAssertFalse(engine.isMapStyleUnlocked(.hybrid, atLevel: 4))
-        XCTAssertTrue(engine.isMapStyleUnlocked(.hybrid, atLevel: 5))
         XCTAssertFalse(engine.is3DMapUnlocked(atLevel: 3))
         XCTAssertTrue(engine.is3DMapUnlocked(atLevel: 4))
         XCTAssertTrue(
@@ -162,6 +158,23 @@ final class ExplorerProgressionEngineTests: XCTestCase {
             )
             .rewards
             .contains { $0.level == 4 && $0.name == "3D Terrain" }
+        )
+        XCTAssertFalse(
+            engine.snapshot(
+                metrics: ExplorerProgressionMetrics(
+                    totalXP: engine.xpRequired(forLevel: 5),
+                    discoveredTiles: 0,
+                    masteredTiles: 0,
+                    legendaryTiles: 0,
+                    totalVisits: 0,
+                    activeDays: 0,
+                    activitiesCompleted: 0,
+                    stampedActivityTypes: 0,
+                    expeditionsCompleted: 0
+                )
+            )
+            .rewards
+            .contains { $0.name == "Satellite" || $0.name == "Hybrid" }
         )
     }
 }

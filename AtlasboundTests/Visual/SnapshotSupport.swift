@@ -81,6 +81,15 @@ enum SnapshotSupport {
         }
 
         guard FileManager.default.fileExists(atPath: referenceURL.path) else {
+            // CI / explicit record: write the missing golden so the artifact can be committed.
+            // Prefer TEST_RUNNER_CI — xcodebuild forwards that into the simulator test host.
+            if isRecording || Self.envFlag("TEST_RUNNER_CI") || Self.envFlag("CI") {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try png.write(to: referenceURL, options: .atomic)
+                let tmpCopy = failureDirectory().appendingPathComponent("\(name).png")
+                try? png.write(to: tmpCopy, options: .atomic)
+                return
+            }
             let failureURL = failureDirectory().appendingPathComponent("\(name)-missing-ref.png")
             try? png.write(to: failureURL)
             // Soft-skip until goldens are committed. Render-size tests still gate visuals.

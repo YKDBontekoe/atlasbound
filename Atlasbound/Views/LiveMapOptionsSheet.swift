@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct LiveMapOptionsSheet: View {
-    @Binding var selectedStyleRaw: String
     @Binding var selectedDataLayerRaw: String
     @Binding var uses3DMap: Bool
     @Binding var showsMastery: Bool
@@ -16,38 +15,7 @@ struct LiveMapOptionsSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Map style") {
-                    ForEach(LiveMapStyle.allCases) { style in
-                        let unlocked = explorerLevel >= style.requiredLevel
-                        Button {
-                            guard unlocked else { return }
-                            selectedStyleRaw = style.rawValue
-                            AtlasHaptics.select()
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: style.symbolName)
-                                    .foregroundStyle(unlocked ? AtlasTheme.blue : .secondary)
-                                    .frame(width: 24)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(style.displayName)
-                                        .foregroundStyle(.primary)
-                                    Text(unlocked ? style.detail : "Unlocks at explorer level \(style.requiredLevel)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if selectedStyleRaw == style.rawValue {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(AtlasTheme.blue)
-                                } else if !unlocked {
-                                    Image(systemName: "lock.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .disabled(!unlocked)
-                    }
-
+                Section("Terrain") {
                     Toggle(isOn: $uses3DMap) {
                         Label {
                             VStack(alignment: .leading, spacing: 2) {
@@ -143,7 +111,7 @@ struct LiveMapOptionsSheet: View {
                     .padding(.vertical, 4)
                 }
             }
-            .navigationTitle("Map & Layers")
+            .navigationTitle("Map Layers")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

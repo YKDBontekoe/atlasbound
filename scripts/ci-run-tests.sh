@@ -41,6 +41,8 @@ print(devices[0])
 bootstrap_snapshots_if_needed() {
   local count
   count="$(find AtlasboundTests/Visual/__Snapshots__ -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
+  # Forward CI into the simulator test host (plain CI= is not inherited by XCTest).
+  export TEST_RUNNER_CI=true
   if [[ "$count" -eq 0 ]]; then
     echo "No reference PNGs — recording snapshots this run"
     export BOOTSTRAP_SNAPSHOTS=1

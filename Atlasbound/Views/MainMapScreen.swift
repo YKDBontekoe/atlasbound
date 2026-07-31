@@ -24,7 +24,6 @@ struct MainMapScreen: View {
     @State private var presentedSummary: ActivitySummary?
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
     @AppStorage(OnboardingPreference.storageKey) private var onboardingVersion = 0
-    @AppStorage("map.style") private var mapStyleRaw = LiveMapStyle.explorer.rawValue
     @AppStorage("map.dataLayer") private var mapDataLayerRaw = LiveMapDataLayer.mastery.rawValue
     @AppStorage("map.uses3D") private var prefers3DMap = false
     @AppStorage("map.layer.mastery") private var showsMasteryLayer = true
@@ -68,7 +67,6 @@ struct MainMapScreen: View {
                 recorder: recorder,
                 position: $position,
                 followsUser: $followsUser,
-                mapStyle: availableMapStyle,
                 dataLayer: availableMapDataLayer,
                 is3DEnabled: uses3DMap,
                 showsMasteryLayer: showsMasteryLayer,
@@ -183,7 +181,6 @@ struct MainMapScreen: View {
         }
         .sheet(isPresented: $showMapOptions) {
             LiveMapOptionsSheet(
-                selectedStyleRaw: $mapStyleRaw,
                 selectedDataLayerRaw: $mapDataLayerRaw,
                 uses3DMap: $prefers3DMap,
                 showsMastery: $showsMasteryLayer,
@@ -602,15 +599,14 @@ struct MainMapScreen: View {
                         .animation(AtlasMotion.fade, value: hasCustomMapPresentation)
                 }
                 .buttonStyle(GlassButtonStyle(shape: .circle))
-                .accessibilityLabel("Map styles and layers")
+                .accessibilityLabel("Map layers")
             }
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     private var hasCustomMapPresentation: Bool {
-        mapStyleRaw != LiveMapStyle.explorer.rawValue ||
-            mapDataLayerRaw != LiveMapDataLayer.mastery.rawValue ||
+        mapDataLayerRaw != LiveMapDataLayer.mastery.rawValue ||
             uses3DMap ||
             !showsMasteryLayer ||
             !showsPlacesLayer ||
@@ -623,11 +619,6 @@ struct MainMapScreen: View {
         ExplorerProgressionEngine().level(
             forTotalXP: store.discoveryXPTotal + store.familiarityXPTotal
         )
-    }
-
-    private var availableMapStyle: LiveMapStyle {
-        let selected = LiveMapStyle(rawValue: mapStyleRaw) ?? .explorer
-        return selected.requiredLevel <= explorerLevel ? selected : .explorer
     }
 
     private var availableMapDataLayer: LiveMapDataLayer {
