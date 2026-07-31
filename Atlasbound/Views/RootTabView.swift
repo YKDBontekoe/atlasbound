@@ -73,7 +73,7 @@ struct RootTabView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background, controller.isRecording {
+            if phase == .background {
                 store.flushToDiskIfNeeded()
             }
             if phase == .active {

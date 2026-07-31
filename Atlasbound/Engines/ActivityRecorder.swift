@@ -296,7 +296,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
         if let previous = lastAcceptedLocation {
             guard location.timestamp > previous.timestamp else { return }
             let delta = location.distance(from: previous)
-            guard delta >= settings.minSampleDistance else { return }
+            guard delta >= effectiveMinSampleDistance(for: location) else { return }
             distanceMeters += delta
         }
 
@@ -319,7 +319,7 @@ final class ActivityRecorder: NSObject, ObservableObject {
               location.horizontalAccuracy <= settings.maxHorizontalAccuracy else { return }
         if let previous = lastPassiveLocation {
             guard location.timestamp > previous.timestamp,
-                  location.distance(from: previous) >= settings.minSampleDistance else {
+                  location.distance(from: previous) >= effectiveMinSampleDistance(for: location) else {
                 return
             }
         }
@@ -334,6 +334,22 @@ final class ActivityRecorder: NSObject, ObservableObject {
                 speed: location.speed
             )
         )
+    }
+
+    /// Widen spacing at car / transit speeds; hexLine still fills skipped hexes.
+    private func effectiveMinSampleDistance(for location: CLLocation) -> Double {
+        let speed = location.speed
+        guard speed >= 0 else { return settings.minSampleDistance }
+        if speed >= 15 {
+            return max(settings.minSampleDistance, 40)
+        }
+        if speed >= 8 {
+            return max(settings.minSampleDistance, 22)
+        }
+        if speed >= 4 {
+            return max(settings.minSampleDistance, 10)
+        }
+        return settings.minSampleDistance
     }
 
     func clearError() {
@@ -376,7 +392,10 @@ extension ActivityRecorder: CLLocationManagerDelegate {
         Task { @MainActor in
             guard !self.isSimulationActive else { return }
             guard let latest = locations.last else { return }
-            self.lastLocation = latest
+            // Keep a fresh fix for chrome / follow-camera without accepting noisy samples.
+            if !self.isRecording || self.isPaused {
+                self.lastLocation = latest
+            }
             if self.isRecording, !self.isPaused {
                 for location in locations {
                     self.accept(location)

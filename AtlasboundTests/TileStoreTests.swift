@@ -98,6 +98,7 @@ final class TileStoreTests: XCTestCase {
                 lastVisitedAt: .now
             )
         )
+        XCTAssertTrue(store.isDeferringPersistence)
         XCTAssertFalse(FileManager.default.fileExists(atPath: tempURL.path))
 
         store.flushToDiskIfNeeded()
@@ -105,6 +106,35 @@ final class TileStoreTests: XCTestCase {
 
         let reloaded = TileStore(fileURL: tempURL)
         XCTAssertEqual(reloaded.discoveredTiles.count, 1)
+    }
+
+    func testDiscoveredTilesUnorderedSkipsSortContract() {
+        let store = TileStore(fileURL: tempURL)
+        let older = Date(timeIntervalSince1970: 1_700_000_000)
+        let newer = older.addingTimeInterval(60)
+        store.upsertMany([
+            WorldTile(
+                id: "hex:20:0:0",
+                coordinate: TileCoordinate(q: 0, r: 0),
+                state: .discovered,
+                masteryXP: 100,
+                visitCount: 1,
+                firstVisitedAt: newer,
+                lastVisitedAt: newer
+            ),
+            WorldTile(
+                id: "hex:20:1:0",
+                coordinate: TileCoordinate(q: 1, r: 0),
+                state: .discovered,
+                masteryXP: 100,
+                visitCount: 1,
+                firstVisitedAt: older,
+                lastVisitedAt: older
+            )
+        ])
+
+        XCTAssertEqual(store.discoveredTilesUnordered.count, 2)
+        XCTAssertEqual(store.discoveredTiles.map(\.id), ["hex:20:1:0", "hex:20:0:0"])
     }
 
     func testPersistsAcrossReload() {

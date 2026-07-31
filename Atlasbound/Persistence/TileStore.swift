@@ -23,9 +23,13 @@ final class TileStore: ObservableObject {
     var tileEngine: TileEngine { TileEngine(option: tileSize) }
 
     var discoveredTiles: [WorldTile] {
-        tiles.values
-            .filter(\.isDiscovered)
+        discoveredTilesUnordered
             .sorted { ($0.firstVisitedAt ?? .distantPast) < ($1.firstVisitedAt ?? .distantPast) }
+    }
+
+    /// Unsorted discovered tiles for map culling — avoids O(n log n) on every GPS tick.
+    var discoveredTilesUnordered: [WorldTile] {
+        Array(tiles.values.lazy.filter(\.isDiscovered))
     }
 
     var discoveredTileIDs: Set<String> {
@@ -35,6 +39,8 @@ final class TileStore: ObservableObject {
     var discoveredTileCount: Int {
         tiles.values.lazy.filter(\.isDiscovered).count
     }
+
+    var isDeferringPersistence: Bool { deferPersistence }
 
     init(fileURL: URL? = nil, installationID: String? = nil) {
         self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: Self.saveFileName)
@@ -128,6 +134,49 @@ final class TileStore: ObservableObject {
             installationID: installationID
         )
         state = transform(state)
+        frontierState = state
+        persistToDisk()
+    }
+
+    /// Lightweight live scoring path — skips weekly offer regeneration on every GPS batch.
+    func applyLiveFrontierScore(
+        weeklyScoreDelta: Int,
+        connectionBonuses: Set<String>,
+        chargedTiles: [WorldTile],
+        completedOffer: ExpeditionOffer?
+    ) {
+        guard weeklyScoreDelta != 0
+            || !connectionBonuses.isEmpty
+            || !chargedTiles.isEmpty
+            || completedOffer != nil else { return }
+
+        if !chargedTiles.isEmpty {
+            var next = tiles
+            for tile in chargedTiles where isCanonical(tile) {
+                next[tile.id] = tile
+            }
+            tiles = next
+        }
+
+        var state = frontierState
+        state.weeklyScore += weeklyScoreDelta
+        if !connectionBonuses.isEmpty {
+            state.connectionBonusesAwarded = Array(
+                Set(state.connectionBonusesAwarded).union(connectionBonuses)
+            )
+        }
+        for tile in chargedTiles where tile.weeklyCharge > 0 {
+            if !state.chargedTileIDs.contains(tile.id) {
+                state.chargedTileIDs.append(tile.id)
+            }
+        }
+        if let completedOffer {
+            if !state.completedOfferIDs.contains(completedOffer.id) {
+                state.completedOfferIDs.append(completedOffer.id)
+                state.lifetimeCompletedExpeditions += 1
+            }
+            state.activeOfferID = nil
+        }
         frontierState = state
         persistToDisk()
     }
