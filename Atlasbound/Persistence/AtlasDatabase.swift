@@ -813,7 +813,11 @@ final class AtlasDatabase {
     }
 
     func loadFactoryState() -> FactoryState? {
-        loadBlob(table: "factory_state", as: LegacyFactorySave.self)?.state
+        guard let save = loadBlob(table: "factory_state", as: LegacyFactorySave.self),
+              save.version == FactoryStore.schemaVersion else {
+            return nil
+        }
+        return save.state
     }
 
     func saveFactoryState(_ state: FactoryState) {
