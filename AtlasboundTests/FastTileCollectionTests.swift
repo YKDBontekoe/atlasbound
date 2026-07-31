@@ -46,6 +46,11 @@ final class FastTileCollectionTests: XCTestCase {
         recorder.setSimulationActive(true)
         controller.setAutomaticExploration(foreground: true, background: false)
 
+        // WorldController bootstrap may write an empty frontier snapshot before defer engages.
+        // Clear it so this assertion only covers discovery writes during automatic exploration.
+        try? FileManager.default.removeItem(at: worldURL)
+        XCTAssertTrue(store.isDeferringPersistence)
+
         // Highway-scale leaps: hexLine must still fill, but world JSON stays deferred.
         recorder.ingestSimulatedLocation(location(latitude: 51.8133, longitude: 4.6901, speed: 25))
         recorder.ingestSimulatedLocation(location(latitude: 51.8140, longitude: 4.6915, speed: 25))
@@ -53,10 +58,14 @@ final class FastTileCollectionTests: XCTestCase {
 
         XCTAssertFalse(store.discoveredTiles.isEmpty)
         XCTAssertTrue(store.isDeferringPersistence)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: worldURL.path))
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: worldURL.path),
+            "Deferred automatic exploration must not flush discoveries to disk yet"
+        )
 
         store.flushToDiskIfNeeded()
         XCTAssertTrue(FileManager.default.fileExists(atPath: worldURL.path))
+        XCTAssertEqual(TileStore(fileURL: worldURL).discoveredTiles.count, store.discoveredTiles.count)
     }
 
     func testLargeSampleGapStillCoversIntermediateHexes() {
