@@ -10,7 +10,6 @@ struct DiscoveryMapView: View {
     @Binding var position: MapCameraPosition
     @Binding var followsUser: Bool
 
-    var mapStyle: LiveMapStyle = .explorer
     var dataLayer: LiveMapDataLayer = .mastery
     var is3DEnabled: Bool = false
     var showsMasteryLayer: Bool = true
@@ -199,7 +198,14 @@ struct DiscoveryMapView: View {
                     .stroke(AtlasTheme.blue, lineWidth: AtlasTheme.routeLineWidth)
             }
             }
-            .modifier(LiveMapStyleModifier(style: mapStyle))
+            .mapStyle(
+                .standard(
+                    elevation: .realistic,
+                    emphasis: .muted,
+                    pointsOfInterest: .excludingAll,
+                    showsTraffic: false
+                )
+            )
         .mapControls {
             MapCompass()
             MapScaleView()
@@ -494,26 +500,6 @@ struct FactoryMapMarkerView: View {
         }
         .accessibilityLabel("\(definition.name), \(status.displayName)")
         .accessibilityHint("Tap to open structure details.")
-    }
-}
-
-private struct LiveMapStyleModifier: ViewModifier {
-    let style: LiveMapStyle
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        switch style {
-        case .explorer:
-            content.mapStyle(
-                .standard(elevation: .realistic, pointsOfInterest: .excludingAll, showsTraffic: false)
-            )
-        case .satellite:
-            content.mapStyle(.imagery(elevation: .realistic))
-        case .hybrid:
-            content.mapStyle(
-                .hybrid(elevation: .realistic, pointsOfInterest: .excludingAll, showsTraffic: false)
-            )
-        }
     }
 }
 

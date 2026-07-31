@@ -17,8 +17,8 @@ enum AtlasTheme {
     static let fog = Color.white.opacity(0.55)
 
     /// Fog hex wash under discovered fills (light so basemap labels stay readable).
-    static let fogWashFill = Color.white.opacity(0.26)
-    static let fogWashStroke = Color.white.opacity(0.18)
+    static let fogWashFill = Color.white.opacity(0.32)
+    static let fogWashStroke = Color.white.opacity(0.20)
     static let fogWashStrokeWidth: CGFloat = 0.5
 
     /// Soft gold wash for undiscovered frontier neighbors (fill-only; territory stroke carries the edge).
@@ -192,22 +192,22 @@ extension TileState {
         case .fogged:
             base = 0.55
         case .discovered:
-            base = 0.18
+            base = 0.22
         case .explored:
-            base = 0.30
+            base = 0.34
         case .surveyed:
-            base = 0.36
+            base = 0.40
         case .mastered:
-            base = 0.42
+            base = 0.46
         case .legendary:
-            base = 0.56
+            base = 0.58
         }
         guard isFreshDiscovery else { return base }
         switch self {
         case .discovered:
-            return 0.40
+            return 0.44
         case .explored:
-            return 0.48
+            return 0.52
         default:
             return min(0.72, base + 0.08)
         }

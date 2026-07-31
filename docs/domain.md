@@ -43,7 +43,7 @@ Lifetime discovery + familiarity XP also feeds `ExplorerProgressionEngine`. This
 
 - 50 levels use the cumulative curve `250 × (level - 1)² + 750 × (level - 1)`.
 - Rank titles advance from Wanderer through Atlas Legend.
-- Each level grants Atlas Tokens; milestone levels unlock live-map presentation features, including visit heat, satellite imagery, 3D terrain, and hybrid imagery.
+- Each level grants Atlas Tokens; milestone levels unlock live-map presentation features, including visit heat and 3D terrain.
 - Achievements measure discovery, deep mastery, repeat visits, activity variety, active days, and Frontier expeditions.
 - Atlas Tokens and unlocks are deterministic lifetime rewards, not consumable currency.
 
