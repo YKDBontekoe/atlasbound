@@ -158,6 +158,7 @@ final class RegionLookupEngineTests: XCTestCase {
     }
 }
 
+
 @MainActor
 final class RegionLookupStoreTests: XCTestCase {
     private var tempURL: URL!
@@ -165,11 +166,13 @@ final class RegionLookupStoreTests: XCTestCase {
     override func setUp() {
         super.setUp()
         tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("atlasbound-regions-test-\(UUID().uuidString).json")
+            .appendingPathComponent("atlasbound-regions-test-\(UUID().uuidString).sqlite")
     }
 
     override func tearDown() {
         try? FileManager.default.removeItem(at: tempURL)
+        try? FileManager.default.removeItem(at: URL(fileURLWithPath: tempURL.path + "-wal"))
+        try? FileManager.default.removeItem(at: URL(fileURLWithPath: tempURL.path + "-shm"))
         tempURL = nil
         super.tearDown()
     }
@@ -187,12 +190,10 @@ final class RegionLookupStoreTests: XCTestCase {
             resolvedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(RegionSaveFileStub(cells: [cell]))
-        try data.write(to: tempURL)
+        let database = AtlasDatabase.makeIsolated(fileURL: tempURL)
+        database.upsertRegionCell(cell)
 
-        let reloaded = RegionLookupStore(fileURL: tempURL)
+        let reloaded = RegionLookupStore(database: database)
         XCTAssertEqual(reloaded.resolvedCellCount, 1)
         XCTAssertEqual(reloaded.successfulLabels["51.80:4.66"]?.countryDisplayName, "Netherlands")
         XCTAssertEqual(reloaded.successfulLabels["51.80:4.66"]?.locality, "Dordrecht")
@@ -214,19 +215,16 @@ final class RegionLookupStoreTests: XCTestCase {
             labels: RegionLookupEngine.labels(countryCode: "XX", countryName: "Invalid", administrativeArea: nil, locality: nil),
             resolvedAt: Date()
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        try encoder.encode(RegionSaveFileStub(cells: [first, replacement, invalid])).write(to: tempURL)
 
-        let store = RegionLookupStore(fileURL: tempURL)
+        let database = AtlasDatabase.makeIsolated(fileURL: tempURL)
+        database.replaceRegionCells([first, replacement, invalid])
+
+        let store = RegionLookupStore(database: database)
         XCTAssertEqual(store.cells.count, 1)
         XCTAssertEqual(store.successfulLabels["51.80:4.66"]?.countryDisplayName, "Netherlands")
     }
 
     func testPlacesVisitedUsesCachedLabelsForMatchingCells() {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-
         let engine = TileEngine(tileSizeMeters: 20)
         let center = engine.centerCoordinate(for: TileCoordinate(q: 0, r: 0))
         let key = RegionLookupEngine.cellKey(for: center)
@@ -237,9 +235,11 @@ final class RegionLookupStoreTests: XCTestCase {
             locality: "Dordrecht"
         )
         let cell = PersistedRegionCell(cellKey: key, labels: labels, resolvedAt: Date())
-        try? encoder.encode(RegionSaveFileStub(cells: [cell])).write(to: tempURL)
 
-        let store = RegionLookupStore(fileURL: tempURL)
+        let database = AtlasDatabase.makeIsolated(fileURL: tempURL)
+        database.upsertRegionCell(cell)
+
+        let store = RegionLookupStore(database: database)
         let tile = WorldTile(
             id: TileEngine.makeTileID(q: 0, r: 0, sizeMeters: 20),
             coordinate: TileCoordinate(q: 0, r: 0),
@@ -251,10 +251,4 @@ final class RegionLookupStoreTests: XCTestCase {
         XCTAssertEqual(summary.cities.map(\.name), ["Dordrecht"])
         XCTAssertEqual(summary.countries.first?.tileCount, 1)
     }
-}
-
-/// Mirrors RegionLookupStore.SaveFile for test fixture writes.
-private struct RegionSaveFileStub: Codable {
-    var version = JSONFileStore.currentSchemaVersion
-    var cells: [PersistedRegionCell]
 }

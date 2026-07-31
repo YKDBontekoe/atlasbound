@@ -53,7 +53,7 @@ Best validation for GPS noise, landmark routing, automatic exploration, and scre
 | `ActivityRecorder` | Shared CLLocationManager wrapper; explicit and passive sample filtering |
 | `TileEngine` | Lat/lon → Web Mercator → flat-top axial hex IDs + polygons |
 | `ProgressionEngine` | First visit = discovery XP; revisit = diminishing familiarity XP |
-| `TileStore` | JSON FileManager persistence (`Documents/atlasbound-world.json`) |
+| `TileStore` | SQLite persistence (`Documents/atlasbound.sqlite`) |
 | `WorldController` | Exploration-mode, progression, Frontier, and treasure orchestration |
 | `TreasureEventEngine` / `TreasureStore` | Daily trails, choices, relics, vaults, and persistence |
 | `FactoryController` / `FactoryStore` | Construction, road networks, production simulation, research, and isolated factory persistence |

@@ -133,7 +133,7 @@ final class FactorySnapshotTests: XCTestCase {
 
     private func temporaryURL(_ stem: String) -> URL {
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(stem)-\(UUID().uuidString).json")
+            .appendingPathComponent("\(stem)-\(UUID().uuidString).sqlite")
         URLs.append(url)
         return url
     }

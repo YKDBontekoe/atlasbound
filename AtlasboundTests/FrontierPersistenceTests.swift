@@ -8,11 +8,13 @@ final class FrontierPersistenceTests: XCTestCase {
     override func setUp() {
         super.setUp()
         tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("atlasbound-frontier-\(UUID().uuidString).json")
+            .appendingPathComponent("atlasbound-frontier-\(UUID().uuidString).sqlite")
     }
 
     override func tearDown() {
         try? FileManager.default.removeItem(at: tempURL)
+        try? FileManager.default.removeItem(at: URL(fileURLWithPath: tempURL.path + "-wal"))
+        try? FileManager.default.removeItem(at: URL(fileURLWithPath: tempURL.path + "-shm"))
         tempURL = nil
         super.tearDown()
     }
@@ -47,7 +49,7 @@ final class FrontierPersistenceTests: XCTestCase {
         XCTAssertTrue(store.frontierState.chargedTileIDs.isEmpty)
     }
 
-    func testPersistedPayloadContainsIDsOnly() throws {
+    func testPersistedFrontierPayloadContainsIDsOnly() throws {
         let store = TileStore(fileURL: tempURL, installationID: "payload-test")
         store.updateFrontierState({ state in
             var next = state
@@ -56,10 +58,13 @@ final class FrontierPersistenceTests: XCTestCase {
             return next
         }, playerTile: TileCoordinate(q: 0, r: 0))
 
-        let data = try Data(contentsOf: tempURL)
-        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let record = object?["frontier"] as? [String: Any] ?? [:]
-        let keys = Set(record.keys)
+        let reloaded = TileStore(fileURL: tempURL, installationID: "payload-test")
+        XCTAssertEqual(reloaded.frontierState.weeklyScore, 42)
+
+        let record = PersistedFrontierRecord(from: reloaded.frontierState)
+        let data = try JSONEncoder().encode(record)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        let keys = Set(object.keys)
         let allowed: Set<String> = [
             "weekKey", "offers", "activeOfferID", "completedOfferIDs",
             "weeklyScore", "connectionBonusesAwarded", "chargedTileIDs",

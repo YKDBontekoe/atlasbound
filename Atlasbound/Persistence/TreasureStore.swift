@@ -1,14 +1,6 @@
 import Foundation
 import Combine
 
-private struct TreasureSaveFile: Codable {
-    var version: Int
-    var dailyTrail: TreasureTrail?
-    var weeklyVault: WeeklyVaultState
-    var relics: [RelicRecord]
-    var completedTrailCount: Int
-}
-
 @MainActor
 final class TreasureStore: ObservableObject {
     @Published private(set) var dailyTrail: TreasureTrail?
@@ -18,13 +10,25 @@ final class TreasureStore: ObservableObject {
     @Published var pendingEncounter: TreasureEncounter?
     @Published var latestReward: TreasureReward?
 
-    private let fileURL: URL
+    private let database: AtlasDatabase
     private let engine = TreasureEventEngine()
 
-    init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? JSONFileStore.documentsURL(fileName: "atlasbound-treasures.json")
+    init(fileURL: URL? = nil, database: AtlasDatabase? = nil) {
+        if let database {
+            self.database = database
+        } else if let fileURL {
+            self.database = AtlasDatabase.makeIsolated(fileURL: Self.sqliteURL(from: fileURL))
+        } else {
+            self.database = .shared
+        }
         load()
         refreshCalendarState()
+    }
+
+    private static func sqliteURL(from fileURL: URL) -> URL {
+        fileURL.pathExtension.lowercased() == "json"
+            ? fileURL.deletingPathExtension().appendingPathExtension("sqlite")
+            : fileURL
     }
 
     var currentTarget: LandmarkTarget? {
@@ -196,8 +200,7 @@ final class TreasureStore: ObservableObject {
     }
 
     private func load() {
-        guard let save = JSONFileStore.load(TreasureSaveFile.self, from: fileURL),
-              save.version == JSONFileStore.currentSchemaVersion else { return }
+        guard let save = database.loadTreasure() else { return }
         dailyTrail = save.dailyTrail
         weeklyVault = save.weeklyVault
         relics = save.relics
@@ -205,15 +208,11 @@ final class TreasureStore: ObservableObject {
     }
 
     private func persist() {
-        JSONFileStore.save(
-            TreasureSaveFile(
-                version: JSONFileStore.currentSchemaVersion,
-                dailyTrail: dailyTrail,
-                weeklyVault: weeklyVault,
-                relics: relics,
-                completedTrailCount: completedTrailCount
-            ),
-            to: fileURL
+        database.saveTreasure(
+            dailyTrail: dailyTrail,
+            weeklyVault: weeklyVault,
+            relics: relics,
+            completedTrailCount: completedTrailCount
         )
     }
 }

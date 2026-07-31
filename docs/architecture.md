@@ -53,10 +53,10 @@ AtlasboundApp
 
 - **Persisted:** 20 m tile IDs, axial `q`/`r`, mastery fields, activity stamps, dates, and totals.
 - **Derived at render:** hex polygons, map overlays, fog rings.
-- Save files: `Documents/atlasbound-world.json`, `atlasbound-treasures.json`, `atlasbound-inventory.json`, and the independently versioned `atlasbound-factory.json`.
+- Primary store: `Documents/atlasbound.sqlite` (WAL). Tiles are upserted incrementally; nested Frontier / treasure / inventory / factory / Pinpoint payloads live in the same database.
+- Legacy Documents JSON files are imported once on first SQLite open, then renamed to `*.json.bak`.
 
-Factory saves contain canonical tile IDs and mutable gameplay state only. Deposits,
-road connectivity, routes, power totals, and MapKit geometry are derived at runtime.
+Factory state remains independently versioned inside SQLite so a factory wipe cannot erase the atlas.
 
 ## UI notes
 
@@ -75,7 +75,7 @@ A location-guessing game alongside the tile discovery mode.
 |------|------|-----------|
 | `PinpointScoring` | Pure scoring, area metrics, distance calc | `Sendable` value type |
 | `LookAroundLocationPool` | Worldwide coverage-region sampling + Home Turf targets | `Sendable` value type |
-| `PinpointStore` | Game history + per-mode high scores (JSON) | `@MainActor` |
+| `PinpointStore` | Game history + per-mode high scores (SQLite) | `@MainActor` |
 | `PinpointController` | Game orchestration + tile XP awards | `@MainActor` |
 | `GameCenterManager` | GameKit auth + leaderboard submission | `@MainActor` |
 | `PinpointView` | Lobby, preparing, active game, round result, game over | SwiftUI |
@@ -85,7 +85,7 @@ A location-guessing game alongside the tile discovery mode.
 
 Flow: lobby (Worldwide or Home Turf) → preparing (dynamic Look Around scouting with progress) → 5 rounds (static Look Around gallery around spawn + timer → tap map to guess → score) → game over → submit to Game Center leaderboard. No live `MKLookAroundViewController` during play (avoids place-name spoilers). Worldwide samples random streets inside Look Around coverage regions (not a fixed landmark list).
 
-Persistence: `Documents/atlasbound-pinpoint.json`. Leaderboard ID: `com.atlasbound.geoguessr.highscore`.
+Persistence: Pinpoint tables inside `Documents/atlasbound.sqlite`. Leaderboard ID: `com.atlasbound.geoguessr.highscore`.
 
 ## Treasure trails
 

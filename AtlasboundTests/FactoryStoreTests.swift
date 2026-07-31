@@ -8,11 +8,13 @@ final class FactoryStoreTests: XCTestCase {
     override func setUp() {
         super.setUp()
         fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("atlasbound-factory-\(UUID().uuidString).json")
+            .appendingPathComponent("atlasbound-factory-\(UUID().uuidString).sqlite")
     }
 
     override func tearDown() {
         try? FileManager.default.removeItem(at: fileURL)
+        try? FileManager.default.removeItem(at: URL(fileURLWithPath: fileURL.path + "-wal"))
+        try? FileManager.default.removeItem(at: URL(fileURLWithPath: fileURL.path + "-shm"))
         fileURL = nil
         super.tearDown()
     }
@@ -43,7 +45,8 @@ final class FactoryStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.structures[tileID], structure)
         XCTAssertTrue(reloaded.unlockedResearchIDs.contains("logistics_1"))
 
-        let json = try String(contentsOf: fileURL, encoding: .utf8)
+        let encoded = try JSONEncoder().encode(structure)
+        let json = String(decoding: encoded, as: UTF8.self)
         XCTAssertTrue(json.contains(tileID))
         XCTAssertFalse(json.contains("latitude"))
         XCTAssertFalse(json.contains("longitude"))
@@ -51,8 +54,7 @@ final class FactoryStoreTests: XCTestCase {
         XCTAssertFalse(json.contains("networkID"))
     }
 
-    func testMismatchedFactorySchemaResetsOnlyFactoryFile() throws {
-        try Data(#"{"version":999,"state":{}}"#.utf8).write(to: fileURL)
+    func testMissingFactoryStateStartsEmpty() throws {
         let store = FactoryStore(fileURL: fileURL, now: Date(timeIntervalSince1970: 2_000))
         XCTAssertTrue(store.structures.isEmpty)
         XCTAssertEqual(store.unlockedResearchIDs, ["foundations"])
