@@ -149,9 +149,8 @@ final class ActivityRecorderBackgroundTests: XCTestCase {
     }
 
     func testPauseFlagCouplesToBackgroundGate() {
-        // pausesLocationUpdatesAutomatically is set to !canEnable in applyBackgroundRecordingPreference.
-        // Assert the coupling via the pure gate so CI auth state cannot flake the manager flags.
-        let disabled = ActivityRecorder.shouldAllowBackgroundLocationUpdates(
+        // applyBackgroundRecordingPreference sets pausesLocationUpdatesAutomatically = !canEnable.
+        let whenInUseOnly = ActivityRecorder.shouldAllowBackgroundLocationUpdates(
             prefersBackgroundRecording: false,
             isRecording: false,
             automaticExplorationEnabled: true,
@@ -159,10 +158,9 @@ final class ActivityRecorderBackgroundTests: XCTestCase {
             authorizationStatus: .authorizedWhenInUse,
             isSimulationActive: false
         )
-        XCTAssertFalse(disabled)
-        XCTAssertTrue(!disabled) // pauses stay on when background cannot enable
+        XCTAssertFalse(whenInUseOnly, "Without Always, background delivery stays off and auto-pause stays on")
 
-        let enabled = ActivityRecorder.shouldAllowBackgroundLocationUpdates(
+        let alwaysAuthorized = ActivityRecorder.shouldAllowBackgroundLocationUpdates(
             prefersBackgroundRecording: false,
             isRecording: false,
             automaticExplorationEnabled: true,
@@ -170,7 +168,6 @@ final class ActivityRecorderBackgroundTests: XCTestCase {
             authorizationStatus: .authorizedAlways,
             isSimulationActive: false
         )
-        XCTAssertTrue(enabled)
-        XCTAssertFalse(!enabled) // pauses turn off when background delivery is active
+        XCTAssertTrue(alwaysAuthorized, "With Always + automatic background, delivery enables and auto-pause turns off")
     }
 }
