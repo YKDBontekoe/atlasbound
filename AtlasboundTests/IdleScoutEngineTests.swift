@@ -31,20 +31,29 @@ final class IdleScoutEngineTests: XCTestCase {
             availableQuantity: { _ in 99 }
         )
         if case .denied(let reason) = denied {
-            XCTAssertTrue(reason.contains("Apprentice"))
+            // Locked until the previous scout is hired (unlock gate runs before cost checks).
+            XCTAssertTrue(
+                reason.contains("locked") || reason.contains("Apprentice"),
+                "Unexpected denial: \(reason)"
+            )
         } else {
             XCTFail("Expected pathfinder to stay locked")
         }
 
         engine.applyHire(definition: ScoutCatalog.byID["apprentice_scout"]!, state: &state)
+        XCTAssertTrue(state.isUnlocked("pathfinder_scout"))
+
         let missing = engine.canHire(
             scoutID: "pathfinder_scout",
             state: state,
             explorerLevel: 20,
             availableQuantity: { _ in 0 }
         )
-        if case .denied = missing {
-            // expected
+        if case .denied(let reason) = missing {
+            XCTAssertTrue(
+                reason.contains("Need") || reason.contains("Waystone") || reason.contains("materials"),
+                "Unexpected denial: \(reason)"
+            )
         } else {
             XCTFail("Expected material gate")
         }
