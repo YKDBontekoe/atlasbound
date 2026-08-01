@@ -33,14 +33,14 @@ final class SmokeUITests: XCTestCase {
     func testLaunchShowsTabBar() {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 12), "Tab bar should appear after launch")
-        XCTAssertTrue(tabBar.buttons["Map"].exists || tabBar.buttons["Journal"].exists)
+        XCTAssertTrue(tabBar.buttons["Map"].exists || tabBar.buttons["Workshop"].exists)
     }
 
-    func testJournalShowsTreasureAndOptionalActivityHistory() {
+    func testWorkshopJournalShowsTreasureAndOptionalActivityHistory() {
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 12))
-        let journalTab = app.tabBars.buttons["Journal"]
-        XCTAssertTrue(journalTab.waitForExistence(timeout: 5))
-        journalTab.tap()
+        let workshopTab = app.tabBars.buttons["Workshop"]
+        XCTAssertTrue(workshopTab.waitForExistence(timeout: 5))
+        workshopTab.tap()
 
         XCTAssertTrue(
             app.navigationBars["Journal"].waitForExistence(timeout: 8)
@@ -48,7 +48,7 @@ final class SmokeUITests: XCTestCase {
         )
         XCTAssertTrue(
             app.staticTexts["Inventory"].waitForExistence(timeout: 5)
-                || app.staticTexts["Assemble…"].waitForExistence(timeout: 2)
+                || app.buttons["Recipe book"].waitForExistence(timeout: 2)
         )
         XCTAssertTrue(
             app.staticTexts["Optional Activity History"].waitForExistence(timeout: 5)
@@ -103,15 +103,20 @@ final class SmokeUITests: XCTestCase {
         }
     }
 
-    func testFactoryTabShowsProductionAndResearch() throws {
+    func testWorkshopFactoryShowsProductionAndResearch() throws {
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 12))
-        let factoryTab = app.tabBars.buttons["Factory"]
-        XCTAssertTrue(factoryTab.waitForExistence(timeout: 5))
-        factoryTab.tap()
+        let workshopTab = app.tabBars.buttons["Workshop"]
+        XCTAssertTrue(workshopTab.waitForExistence(timeout: 5))
+        workshopTab.tap()
+
+        let factorySegment = app.buttons["Factory"]
+        if factorySegment.waitForExistence(timeout: 3) {
+            factorySegment.tap()
+        }
 
         guard app.navigationBars["Factory"].waitForExistence(timeout: 8)
             || app.staticTexts["Factory overview"].waitForExistence(timeout: 3) else {
-            throw XCTSkip("Factory tab not available in this simulator session")
+            throw XCTSkip("Workshop Factory pane not available in this simulator session")
         }
         XCTAssertTrue(
             app.staticTexts["Factory overview"].exists

@@ -23,7 +23,7 @@ struct FactoryTutorialView: View {
         (
             "shippingbox.fill",
             "Assemble construction kits",
-            "Open the Recipe Book in Factory. Hand-assemble a road or building kit from materials in your backpack.",
+            "Open Workshop → Factory → Recipe book. Hand-assemble a road or building kit from materials in your backpack.",
             "Every placement consumes one matching kit."
         ),
         (
@@ -174,7 +174,7 @@ struct FactoryHelpSheet: View {
             List {
                 Section("Quick start") {
                     helpRow("1", "Explore and revisit", "Revisit an explored hex to reveal its resource.")
-                    helpRow("2", "Craft a kit", "Use the Recipe Book to hand-assemble roads and starter buildings.")
+                    helpRow("2", "Craft a kit", "In Workshop, open Recipe book (Journal or Factory) to hand-assemble roads and starter buildings.")
                     helpRow("3", "Build nearby", "On the Map, tap the hammer and select your current or an adjacent hex.")
                     helpRow("4", "Connect the network", "Put roads beside buildings. Add a fueled dynamo and a depot.")
                     helpRow("5", "Choose a recipe", "Open Structures, select a production recipe, and check its status.")

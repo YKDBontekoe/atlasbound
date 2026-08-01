@@ -2,6 +2,17 @@ import SwiftUI
 
 struct FactoryTabView: View {
     @ObservedObject var controller: FactoryController
+
+    var body: some View {
+        NavigationStack {
+            FactoryHubView(controller: controller)
+                .navigationTitle("Factory")
+        }
+    }
+}
+
+struct FactoryHubView: View {
+    @ObservedObject var controller: FactoryController
     @ObservedObject private var store: FactoryStore
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(FactoryTutorialPreference.storageKey) private var tutorialVersion = 0
@@ -15,179 +26,174 @@ struct FactoryTabView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AtlasTheme.canvas(for: colorScheme).ignoresSafeArea()
-                List {
-                    Section {
-                        HStack(spacing: 14) {
-                            AtlasArtMark(name: "FactoryMark", size: 72)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Build an outpost")
-                                    .font(.headline)
-                                Text("Link nearby structures into a working network.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+        List {
+            Section {
+                HStack(spacing: 14) {
+                    AtlasArtMark(name: "FactoryMark", size: 72)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Build an outpost")
+                            .font(.headline)
+                        Text("Link nearby structures into a working network.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
+                }
+            }
 
-                    if let message = controller.latestMessage {
-                        Section {
-                            FactoryMessageBanner(message: message) {
-                                controller.latestMessage = nil
+            if let message = controller.latestMessage {
+                Section {
+                    FactoryMessageBanner(message: message) {
+                        controller.latestMessage = nil
+                    }
+                }
+            }
+            Section("Factory overview") {
+                LabeledContent("Structures", value: "\(controller.structures.count)")
+                LabeledContent("Road networks", value: "\(controller.networks.count)")
+                LabeledContent(
+                    "Power",
+                    value: "\(controller.totalPowerDemand) / \(controller.totalPowerSupply)"
+                )
+                LabeledContent(
+                    "Lifetime output",
+                    value: "\(store.lifetimeProduced.values.reduce(0, +)) items"
+                )
+                if controller.totalPowerDemand > controller.totalPowerSupply {
+                    Label("Power demand exceeds supply", systemImage: "bolt.trianglebadge.exclamationmark.fill")
+                        .foregroundStyle(AtlasTheme.gold)
+                }
+                let blocked = controller.structures.filter {
+                    ![FactoryOperationalStatus.running, .idle].contains(controller.status(for: $0))
+                }
+                if !blocked.isEmpty {
+                    LabeledContent("Needs attention", value: "\(blocked.count)")
+                        .foregroundStyle(AtlasTheme.finishRed)
+                }
+            }
+
+            Section("Manage") {
+                Button {
+                    _ = controller.remoteCollectAllDepots()
+                } label: {
+                    Label(
+                        controller.remoteCollectableItemCount > 0
+                            ? "Remote collect (\(controller.remoteCollectableItemCount))"
+                            : "Remote collect",
+                        systemImage: "shippingbox.and.arrow.backward.fill"
+                    )
+                }
+                .disabled(controller.remoteCollectableItemCount == 0)
+                .accessibilityIdentifier("remoteCollectDepotsButton")
+
+                NavigationLink {
+                    FactoryRecipeBookView(controller: controller)
+                } label: {
+                    Label("Recipe book", systemImage: "book.pages.fill")
+                }
+                NavigationLink {
+                    FactoryResearchView(controller: controller)
+                } label: {
+                    Label("Research", systemImage: "lightbulb.max.fill")
+                }
+                NavigationLink {
+                    FactoryStructureListView(controller: controller)
+                } label: {
+                    Label("Structures", systemImage: "building.2.fill")
+                }
+            }
+
+            Section("Networks") {
+                if controller.networks.isEmpty {
+                    ContentUnavailableView(
+                        "No road networks",
+                        systemImage: "road.lanes",
+                        description: Text("Craft road kits in the Recipe book, then place them from the Map while standing nearby.")
+                    )
+                } else {
+                    ForEach(controller.networks) { network in
+                        let metrics = controller.networkMetrics.first { $0.networkID == network.id }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Network \(network.id)")
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                            Text("\(network.roadTileIDs.count) roads · \(network.buildingTileIDs.count) buildings · \(network.totalRoadCapacity) item-units/min")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if let metrics {
+                                Text("Power \(metrics.powerDemand)/\(metrics.powerSupply) · \(metrics.storedItemCount) stored items")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(
+                                        metrics.powerDemand > metrics.powerSupply
+                                            ? AtlasTheme.finishRed
+                                            : AtlasTheme.teal
+                                    )
                             }
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Road network \(network.id)")
+                        .accessibilityValue(networkAccessibilityValue(network, metrics: metrics))
                     }
-                    Section("Factory overview") {
-                        LabeledContent("Structures", value: "\(controller.structures.count)")
-                        LabeledContent("Road networks", value: "\(controller.networks.count)")
+                }
+            }
+
+            if !store.lifetimeProduced.isEmpty {
+                Section("Production ledger") {
+                    ForEach(store.lifetimeProduced.keys.sorted(), id: \.self) { itemID in
                         LabeledContent(
-                            "Power",
-                            value: "\(controller.totalPowerDemand) / \(controller.totalPowerSupply)"
+                            ItemCatalog.definition(for: itemID)?.name ?? itemID,
+                            value: "\(store.lifetimeProduced[itemID] ?? 0)"
                         )
-                        LabeledContent(
-                            "Lifetime output",
-                            value: "\(store.lifetimeProduced.values.reduce(0, +)) items"
-                        )
-                        if controller.totalPowerDemand > controller.totalPowerSupply {
-                            Label("Power demand exceeds supply", systemImage: "bolt.trianglebadge.exclamationmark.fill")
-                                .foregroundStyle(AtlasTheme.gold)
-                        }
-                        let blocked = controller.structures.filter {
-                            ![FactoryOperationalStatus.running, .idle].contains(controller.status(for: $0))
-                        }
-                        if !blocked.isEmpty {
-                            LabeledContent("Needs attention", value: "\(blocked.count)")
-                                .foregroundStyle(AtlasTheme.finishRed)
-                        }
                     }
-
-                    Section("Manage") {
-                        Button {
-                            _ = controller.remoteCollectAllDepots()
-                        } label: {
-                            Label(
-                                controller.remoteCollectableItemCount > 0
-                                    ? "Remote collect (\(controller.remoteCollectableItemCount))"
-                                    : "Remote collect",
-                                systemImage: "shippingbox.and.arrow.backward.fill"
-                            )
-                        }
-                        .disabled(controller.remoteCollectableItemCount == 0)
-                        .accessibilityIdentifier("remoteCollectDepotsButton")
-
-                        NavigationLink {
-                            FactoryRecipeBookView(controller: controller)
-                        } label: {
-                            Label("Recipe book", systemImage: "book.pages.fill")
-                        }
-                        NavigationLink {
-                            FactoryResearchView(controller: controller)
-                        } label: {
-                            Label("Research", systemImage: "lightbulb.max.fill")
-                        }
-                        NavigationLink {
-                            FactoryStructureListView(controller: controller)
-                        } label: {
-                            Label("Structures", systemImage: "building.2.fill")
-                        }
-                    }
-
-                    Section("Networks") {
-                        if controller.networks.isEmpty {
-                            ContentUnavailableView(
-                                "No road networks",
-                                systemImage: "road.lanes",
-                                description: Text("Craft road kits, then place them from the Map while standing nearby.")
-                            )
-                        } else {
-                            ForEach(controller.networks) { network in
-                                let metrics = controller.networkMetrics.first { $0.networkID == network.id }
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Network \(network.id)")
-                                        .font(.subheadline.weight(.semibold))
-                                        .lineLimit(1)
-                                    Text("\(network.roadTileIDs.count) roads · \(network.buildingTileIDs.count) buildings · \(network.totalRoadCapacity) item-units/min")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    if let metrics {
-                                        Text("Power \(metrics.powerDemand)/\(metrics.powerSupply) · \(metrics.storedItemCount) stored items")
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(
-                                                metrics.powerDemand > metrics.powerSupply
-                                                    ? AtlasTheme.finishRed
-                                                    : AtlasTheme.teal
-                                            )
-                                    }
-                                }
-                                .accessibilityElement(children: .combine)
-                                .accessibilityLabel("Road network \(network.id)")
-                                .accessibilityValue(networkAccessibilityValue(network, metrics: metrics))
-                            }
-                        }
-                    }
-
-                    if !store.lifetimeProduced.isEmpty {
-                        Section("Production ledger") {
-                            ForEach(store.lifetimeProduced.keys.sorted(), id: \.self) { itemID in
-                                LabeledContent(
-                                    ItemCatalog.definition(for: itemID)?.name ?? itemID,
-                                    value: "\(store.lifetimeProduced[itemID] ?? 0)"
-                                )
-                            }
-                        }
-                    }
-                }
-                .scrollContentBackground(.hidden)
-            }
-            .navigationTitle("Factory")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showsHelp = true
-                    } label: {
-                        Image(systemName: "questionmark.circle")
-                    }
-                    .accessibilityLabel("Factory help")
-                    .accessibilityHint("Opens the quick start guide and status explanations.")
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        controller.advance()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .accessibilityLabel("Refresh factory")
-                    .accessibilityHint("Advances production to the current time and refreshes all factory statuses.")
                 }
             }
-            .sheet(isPresented: $showsHelp, onDismiss: {
-                if replaysTutorialAfterHelp {
-                    replaysTutorialAfterHelp = false
-                    showsTutorial = true
+        }
+        .scrollContentBackground(.hidden)
+        .background(AtlasTheme.canvas(for: colorScheme))
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    showsHelp = true
+                } label: {
+                    Image(systemName: "questionmark.circle")
                 }
-            }) {
-                FactoryHelpSheet {
-                    replaysTutorialAfterHelp = true
-                }
-                .presentationDetents([.medium, .large])
+                .accessibilityLabel("Factory help")
+                .accessibilityHint("Opens the quick start guide and status explanations.")
             }
-            .fullScreenCover(isPresented: $showsTutorial) {
-                FactoryTutorialView {
-                    tutorialVersion = FactoryTutorialPreference.currentVersion
-                    showsTutorial = false
-                }
-            }
-            .task {
-                if tutorialVersion < FactoryTutorialPreference.currentVersion {
-                    showsTutorial = true
-                }
-                controller.advance()
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(30))
+            ToolbarItem(placement: .primaryAction) {
+                Button {
                     controller.advance()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
                 }
+                .accessibilityLabel("Refresh factory")
+                .accessibilityHint("Advances production to the current time and refreshes all factory statuses.")
+            }
+        }
+        .sheet(isPresented: $showsHelp, onDismiss: {
+            if replaysTutorialAfterHelp {
+                replaysTutorialAfterHelp = false
+                showsTutorial = true
+            }
+        }) {
+            FactoryHelpSheet {
+                replaysTutorialAfterHelp = true
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .fullScreenCover(isPresented: $showsTutorial) {
+            FactoryTutorialView {
+                tutorialVersion = FactoryTutorialPreference.currentVersion
+                showsTutorial = false
+            }
+        }
+        .task {
+            if tutorialVersion < FactoryTutorialPreference.currentVersion {
+                showsTutorial = true
+            }
+            controller.advance()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                controller.advance()
             }
         }
     }

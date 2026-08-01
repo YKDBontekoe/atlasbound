@@ -70,7 +70,7 @@ Atlasbound/
     IdleStore.swift            # Scout roster + Home drip / circuit-claim counters
   Models/                      # WorldTile, activity types, FrontierModels, TerritoryModels, TreasureModels, ItemModels, IdlePackModels, PinpointModels
   Map/                         # DiscoveryMapView, AtlasStatsMapView, GuessMapView (MapKit)
-  Views/                       # MainMapScreen, summary, tabs, Pinpoint + inventory + idle scout views
+  Views/                       # MainMapScreen, summary, Workshop (Journal+Factory), Pinpoint + inventory + idle scout views
   Theme/                       # AtlasTheme
 AtlasboundTests/               # Unit + chrome snapshot tests
 AtlasboundUITests/             # UI smoke tests
