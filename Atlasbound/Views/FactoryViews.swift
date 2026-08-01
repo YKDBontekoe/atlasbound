@@ -64,6 +64,19 @@ struct FactoryTabView: View {
                     }
 
                     Section("Manage") {
+                        Button {
+                            _ = controller.remoteCollectAllDepots()
+                        } label: {
+                            Label(
+                                controller.remoteCollectableItemCount > 0
+                                    ? "Remote collect (\(controller.remoteCollectableItemCount))"
+                                    : "Remote collect",
+                                systemImage: "shippingbox.and.arrow.backward.fill"
+                            )
+                        }
+                        .disabled(controller.remoteCollectableItemCount == 0)
+                        .accessibilityIdentifier("remoteCollectDepotsButton")
+
                         NavigationLink {
                             FactoryRecipeBookView(controller: controller)
                         } label: {

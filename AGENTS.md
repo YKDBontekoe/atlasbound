@@ -49,6 +49,7 @@ Atlasbound/
     GeocodeLimiter.swift       # Shared throttled CLGeocoder
     FrontierEngine.swift       # Weekly expeditions + frontier scoring
     TerritoryEngine.swift      # Home Base + sector claim eligibility / buffs
+    IdleScoutEngine.swift      # Hireable scouts, Home drip, capped AFK discoveries
     TreasureEventEngine.swift  # Daily trails, weekly vaults, and relic rewards
     FieldFindEngine.swift      # Field-find rolls, loot tables, craft/salvage
     PinpointController.swift   # Pinpoint game orchestration
@@ -66,9 +67,10 @@ Atlasbound/
     TreasureStore.swift        # Trail, vault, relic persistence
     InventoryStore.swift       # Field finds + stackable inventory
     FactoryStore.swift         # Factory structures + research
-  Models/                      # WorldTile, activity types, FrontierModels, TerritoryModels, TreasureModels, ItemModels, PinpointModels
+    IdleStore.swift            # Scout roster + Home drip / circuit-claim counters
+  Models/                      # WorldTile, activity types, FrontierModels, TerritoryModels, TreasureModels, ItemModels, IdlePackModels, PinpointModels
   Map/                         # DiscoveryMapView, AtlasStatsMapView, GuessMapView (MapKit)
-  Views/                       # MainMapScreen, summary, tabs, Pinpoint + inventory views
+  Views/                       # MainMapScreen, summary, tabs, Pinpoint + inventory + idle scout views
   Theme/                       # AtlasTheme
 AtlasboundTests/               # Unit + chrome snapshot tests
 AtlasboundUITests/             # UI smoke tests

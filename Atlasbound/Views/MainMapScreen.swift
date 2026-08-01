@@ -20,6 +20,7 @@ struct MainMapScreen: View {
     @State private var showTreasureSheet = false
     @State private var showDailyChallenge = false
     @State private var showTerritorySheet = false
+    @State private var showIdleScoutsSheet = false
     @State private var showFactoryBuildSheet = false
     @State private var factoryPreviewTileID: String?
     @State private var presentedSummary: ActivitySummary?
@@ -209,7 +210,11 @@ struct MainMapScreen: View {
                 .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showDailyChallenge) {
-            DailyChallengeSheet(snapshot: dailyChallenge)
+            DailyChallengeSheet(controller: controller, snapshot: dailyChallenge)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showIdleScoutsSheet) {
+            IdleScoutsSheet(controller: controller)
                 .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showFactoryBuildSheet) {
@@ -267,6 +272,7 @@ struct MainMapScreen: View {
             #endif
         }
         .onAppear {
+            controller.advanceIdle()
             factoryController.updatePlayerLocation(recorder.lastLocation)
             factoryController.advance()
             #if DEBUG
@@ -346,6 +352,10 @@ struct MainMapScreen: View {
                         TerritoryClaimCard(controller: controller) {
                             showTerritorySheet = true
                         }
+                    }
+
+                    IdleScoutsCard(controller: controller) {
+                        showIdleScoutsSheet = true
                     }
 
                     idleBottomSheet

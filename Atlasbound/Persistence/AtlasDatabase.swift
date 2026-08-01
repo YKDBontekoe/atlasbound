@@ -6,7 +6,7 @@ import os
 /// Geometry is never stored — tiles keep IDs + mastery fields only.
 @MainActor
 final class AtlasDatabase {
-    static let schemaVersion = 2
+    static let schemaVersion = 3
     static let fileName = "atlasbound.sqlite"
 
     private static let logger = Logger(subsystem: "com.atlasbound.app", category: "database")
@@ -150,6 +150,11 @@ final class AtlasDatabase {
                   id INTEGER PRIMARY KEY CHECK (id = 1),
                   payload TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS idle_state (
+                  id INTEGER PRIMARY KEY CHECK (id = 1),
+                  payload TEXT NOT NULL
+                );
                 """
             )
             setMetaValue("1", for: "schema_version")
@@ -160,6 +165,19 @@ final class AtlasDatabase {
             try db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS territory_state (
+                  id INTEGER PRIMARY KEY CHECK (id = 1),
+                  payload TEXT NOT NULL
+                );
+                """
+            )
+            setMetaValue("2", for: "schema_version")
+        }
+
+        let afterV2 = Int(metaValue(for: "schema_version") ?? "0") ?? 0
+        if afterV2 < 3 {
+            try db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS idle_state (
                   id INTEGER PRIMARY KEY CHECK (id = 1),
                   payload TEXT NOT NULL
                 );
@@ -884,6 +902,21 @@ final class AtlasDatabase {
         )
     }
 
+    func loadIdleState() -> IdleState? {
+        guard let save = loadBlob(table: "idle_state", as: LegacyIdleSave.self),
+              save.version == IdleStore.schemaVersion else {
+            return nil
+        }
+        return save.state
+    }
+
+    func saveIdleState(_ state: IdleState) {
+        saveBlob(
+            table: "idle_state",
+            value: LegacyIdleSave(version: IdleStore.schemaVersion, state: state)
+        )
+    }
+
     private func loadBlob<T: Decodable>(table: String, as type: T.Type) -> T? {
         guard let statement = try? db.prepare("SELECT payload FROM \(table) WHERE id = 1;") else {
             return nil
@@ -957,4 +990,9 @@ struct LegacyInventorySave: Codable {
 struct LegacyFactorySave: Codable {
     let version: Int
     let state: FactoryState
+}
+
+struct LegacyIdleSave: Codable {
+    let version: Int
+    let state: IdleState
 }

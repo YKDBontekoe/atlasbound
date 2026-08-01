@@ -24,10 +24,14 @@ final class WorldController: ObservableObject {
     let gameCenterManager: GameCenterManager
     let treasureStore: TreasureStore
     let inventoryStore: InventoryStore
+    let idleStore: IdleStore
     private let progression = ProgressionEngine()
     private let frontierEngine = FrontierEngine()
     private let sectorEngine = HexSectorEngine()
     private let territoryEngine = TerritoryEngine()
+    private let idleScoutEngine = IdleScoutEngine()
+    private let explorerProgression = ExplorerProgressionEngine()
+    private let dailyChallengeEngine = DailyChallengeEngine()
     private let landmarkResolver: any LandmarkResolving
 
     /// Tiles mutated during the active session (merged into store on stop).
@@ -49,6 +53,7 @@ final class WorldController: ObservableObject {
         gameCenterManager: GameCenterManager? = nil,
         treasureStore: TreasureStore? = nil,
         inventoryStore: InventoryStore? = nil,
+        idleStore: IdleStore? = nil,
         recorder: ActivityRecorder? = nil,
         landmarkResolver: any LandmarkResolving = LandmarkResolver()
     ) {
@@ -58,6 +63,7 @@ final class WorldController: ObservableObject {
         self.gameCenterManager = gameCenterManager ?? GameCenterManager()
         self.treasureStore = treasureStore ?? TreasureStore()
         self.inventoryStore = inventoryStore ?? InventoryStore()
+        self.idleStore = idleStore ?? IdleStore()
         self.recorder = recorder ?? ActivityRecorder()
         self.landmarkResolver = landmarkResolver
         restoreSelectedActivityType()
@@ -474,6 +480,95 @@ final class WorldController: ObservableObject {
     func setHomeBaseToCurrentSector() -> Bool {
         guard let sectorID = territoryPresence.playerSectorID else { return false }
         return setHomeBase(sectorID: sectorID)
+    }
+
+    // MARK: - Idle pack (Home drip, scouts, Scout Circuit chest)
+
+    var idleState: IdleState { idleStore.state }
+
+    var explorerLevel: Int {
+        explorerProgression.level(
+            forTotalXP: store.discoveryXPTotal + store.familiarityXPTotal
+        )
+    }
+
+    var dailyChallengeSnapshot: DailyChallengeSnapshot {
+        dailyChallengeEngine.snapshot(tiles: store.discoveredTiles)
+    }
+
+    var canClaimCircuitReward: Bool {
+        if case .claimed = idleScoutEngine.canClaimCircuitReward(
+            snapshot: dailyChallengeSnapshot,
+            state: idleStore.state
+        ) {
+            return true
+        }
+        return false
+    }
+
+    /// Catch up Home drip and capped scout discoveries since last simulation.
+    @discardableResult
+    func advanceIdle(to date: Date = .now) -> IdleAdvanceReport {
+        var report = IdleAdvanceReport.empty
+        idleStore.update { state in
+            report = idleScoutEngine.advance(
+                state: &state,
+                to: date,
+                territory: store.territoryState,
+                discoveredTileIDs: store.discoveredTileIDs,
+                tileEngine: tileEngine
+            )
+        }
+        if !report.homeDripItems.isEmpty {
+            inventoryStore.deposit(report.homeDripItems)
+        }
+        if !report.scoutTileIDs.isEmpty {
+            applyIdleVisits(report.scoutTileIDs, at: date)
+        }
+        objectWillChange.send()
+        return report
+    }
+
+    @discardableResult
+    func hireScout(_ scoutID: String, at date: Date = .now) -> ScoutHireResult {
+        advanceIdle(to: date)
+        var hireResult = idleScoutEngine.canHire(
+            scoutID: scoutID,
+            state: idleStore.state,
+            explorerLevel: explorerLevel,
+            availableQuantity: { inventoryStore.quantity(of: $0) }
+        )
+        guard case .hired(let definition) = hireResult else { return hireResult }
+        guard inventoryStore.consume(definition.hireCost) else {
+            return .denied("Not enough materials.")
+        }
+        idleStore.update { state in
+            idleScoutEngine.applyHire(definition: definition, state: &state, at: date)
+        }
+        AtlasHaptics.success()
+        objectWillChange.send()
+        return hireResult
+    }
+
+    @discardableResult
+    func claimCircuitReward() -> CircuitRewardClaimResult {
+        let snapshot = dailyChallengeSnapshot
+        var claimResult: CircuitRewardClaimResult = .denied("Unable to claim.")
+        idleStore.update { state in
+            claimResult = idleScoutEngine.claimCircuitReward(snapshot: snapshot, state: &state)
+        }
+        if case .claimed(let rewards) = claimResult {
+            inventoryStore.deposit(rewards)
+            AtlasHaptics.success()
+        }
+        objectWillChange.send()
+        return claimResult
+    }
+
+    /// Applies scout AFK discoveries through the same progression path as Automatic Explore.
+    func applyIdleVisits(_ ids: [String], at date: Date = .now) {
+        guard !ids.isEmpty else { return }
+        processAutomaticTileIDs(ids, at: date)
     }
 
     func territoryDisplayName(forSectorID sectorID: String) -> String {

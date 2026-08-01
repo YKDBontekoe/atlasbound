@@ -65,7 +65,11 @@ struct ProgressTabView: View {
                 VStack(spacing: 14) {
                     ExplorerProgressionView(snapshot: explorerProgression)
                         .staggeredAppear(index: 0)
-                    DailyChallengeProgressCard(snapshot: dailyChallenge)
+                    DailyChallengeProgressCard(
+                        snapshot: dailyChallenge,
+                        canClaimReward: controller.canClaimCircuitReward,
+                        onClaimReward: { _ = controller.claimCircuitReward() }
+                    )
                         .staggeredAppear(index: 1)
                     territoryCard
                         .staggeredAppear(index: 2)

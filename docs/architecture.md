@@ -16,12 +16,15 @@ AtlasboundApp
   │    placed structures + factory production + research persistence
   ├─ FactoryController (@MainActor ObservableObject)
   │    nearby construction + simulation + inventory transactions
+  ├─ IdleStore (@MainActor ObservableObject)
+  │    scout roster + Home drip / circuit-claim counters
   └─ WorldController (@MainActor ObservableObject)
        ├─ ActivityRecorder     — shared explicit/passive GPS samples
        ├─ TileEngine           — via store.tileEngine
        ├─ LandmarkResolver     — MapKit public-landmark targets
        ├─ TreasureEventEngine — pure trail/choice/reward rules
        ├─ FieldFindEngine     — pure find rolls + craft/salvage
+       ├─ IdleScoutEngine     — hire chain, Home drip, capped AFK discoveries
        └─ ProgressionEngine    — discovery / familiarity
             └─ Views (RootTabView → MainMapScreen → DiscoveryMapView)
 ```
@@ -35,8 +38,10 @@ AtlasboundApp
 | `ProgressionEngine` | Visit → XP + state | `Sendable` value type |
 | `ExplorerProgressionEngine` | Lifetime XP → level, title, reward track, achievements | `Sendable` value type |
 | `DailyChallengeEngine` | Today’s tile timestamps → Scout Circuit goals | `Sendable` value type |
+| `IdleScoutEngine` | Scout hire/unlock, Home drip, capped AFK tile picks | `Sendable` value type |
+| `IdleStore` | Persist idle roster + daily caps (`idle_state` blob) | `@MainActor` |
 | `WorldTile` / models | Domain records | `Sendable` where pure |
-| `FactoryController` | Construction, lifecycle simulation, research, transfers | `@MainActor` |
+| `FactoryController` | Construction, lifecycle simulation, research, transfers, remote collect | `@MainActor` |
 | `FactoryStore` | Load/save factory state in its independent schema | `@MainActor` |
 | `ConstructionEngine` | Deposit derivation and placement/demolition rules | `Sendable` |
 | `FactoryNetworkEngine` | Derived road components and deterministic routes | `Sendable` |
@@ -124,6 +129,18 @@ Find IDs are `find:{dayKey}:{tileID}` — claim once per local day. Atlas Tokens
 | `DiscoveryMapView` | Claimed-sector wash + Home Base marker | SwiftUI |
 
 Claim unit is `sector:{size}:{q}:{r}`. Unlock at ≥25% sector discovery while the player is inside or adjacent. First claim auto-sets Home Base; moving Home Base has a 24 h cooldown.
+
+## Idle pack (scouts + Home Camp + circuit chest)
+
+| Type | Role | Threading |
+|------|------|-----------|
+| `IdleScoutEngine` | Hire/unlock chain, Home drip math, fogged tile picks | `Sendable` |
+| `IdleStore` | Roster + accumulators + claimed circuit day key | `@MainActor` |
+| `WorldController.advanceIdle` | Deposit drip + apply scout visits via Automatic Explore path | `@MainActor` |
+| `FactoryController.remoteCollectAllDepots` | Drain depot outputs to backpack remotely | `@MainActor` |
+| `IdleScoutsCard` / `IdleScoutsSheet` | Adventures stack hire UI | SwiftUI |
+
+AFK discoveries are permanent atlas visits but hard-capped (18/day, 8 h offline catch-up). Geometry is never stored — candidates are derived from claimed sector IDs + `TileEngine.ring`.
 
 ## Extension points
 
