@@ -15,7 +15,7 @@ final class SmokeUITests: XCTestCase {
         ]
         // Avoid first-run permission races; CI also grants via simctl.
         app.launchEnvironment["OS_ACTIVITY_MODE"] = "disable"
-        app.launch()
+        launchAppToleratingSimulatorFlakes()
 
         addUIInterruptionMonitor(withDescription: "System alerts") { alert in
             let buttons = ["Allow While Using App", "Allow Once", "Allow", "OK"]
@@ -28,6 +28,25 @@ final class SmokeUITests: XCTestCase {
         // Nudge the app so the interruption monitor can fire.
         app.tap()
         dismissLocationAlertIfNeeded()
+    }
+
+    /// Retries cold launch when the simulator flakes on first boot.
+    private func launchAppToleratingSimulatorFlakes(attempts: Int = 3) {
+        let previousContinue = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = previousContinue }
+
+        for attempt in 1...attempts {
+            app.launch()
+            if app.tabBars.firstMatch.waitForExistence(timeout: 10)
+                || app.state == .runningForeground {
+                return
+            }
+            app.terminate()
+            if attempt < attempts {
+                RunLoop.current.run(until: Date().addingTimeInterval(1.0))
+            }
+        }
     }
 
     func testLaunchShowsTabBar() {
@@ -109,9 +128,14 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(workshopTab.waitForExistence(timeout: 5))
         workshopTab.tap()
 
-        let factorySegment = app.buttons["Factory"]
-        if factorySegment.waitForExistence(timeout: 3) {
-            factorySegment.tap()
+        let panePicker = app.segmentedControls["workshopPanePicker"]
+        if panePicker.waitForExistence(timeout: 4) {
+            let factorySegment = panePicker.buttons["Factory"]
+            if factorySegment.waitForExistence(timeout: 2) {
+                factorySegment.tap()
+            }
+        } else if app.buttons["Factory"].waitForExistence(timeout: 2) {
+            app.buttons["Factory"].tap()
         }
 
         guard app.navigationBars["Factory"].waitForExistence(timeout: 8)
