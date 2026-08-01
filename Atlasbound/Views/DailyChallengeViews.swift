@@ -2,6 +2,8 @@ import SwiftUI
 
 struct DailyChallengeProgressCard: View {
     let snapshot: DailyChallengeSnapshot
+    var canClaimReward: Bool = false
+    var onClaimReward: (() -> Void)?
 
     var body: some View {
         StatSectionCard {
@@ -17,11 +19,24 @@ struct DailyChallengeProgressCard: View {
 
                 Text(
                     snapshot.isComplete
-                        ? "Compass charged — today’s circuit is complete."
+                        ? (canClaimReward
+                            ? "Circuit complete — claim today’s scout chest."
+                            : "Compass charged — today’s circuit chest is secured.")
                         : "Complete all three before your local day resets."
                 )
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(snapshot.isComplete ? AtlasTheme.teal : .secondary)
+
+                if canClaimReward, let onClaimReward {
+                    Button(action: onClaimReward) {
+                        Label("Claim circuit chest", systemImage: "shippingbox.fill")
+                            .font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AtlasTheme.teal)
+                    .accessibilityIdentifier("claimCircuitRewardButton")
+                }
             }
         }
         .accessibilityIdentifier("dailyChallengeCard")
@@ -69,10 +84,17 @@ struct DailyChallengeCompactTracker: View {
 }
 
 struct DailyChallengeSheet: View {
+    @ObservedObject var controller: WorldController
+    /// Seed snapshot from the presenter; live values come from the controller.
     let snapshot: DailyChallengeSnapshot
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+
+    private var liveSnapshot: DailyChallengeSnapshot {
+        let live = controller.dailyChallengeSnapshot
+        return live.dayKey == snapshot.dayKey ? live : snapshot
+    }
 
     var body: some View {
         NavigationStack {
@@ -89,16 +111,16 @@ struct DailyChallengeSheet: View {
                             )
                         AtlasArtMark(name: "ScoutCircuitMark", size: 120)
                             .opacity(0.20)
-                        DailyChallengeRing(snapshot: snapshot, size: 104)
+                        DailyChallengeRing(snapshot: liveSnapshot, size: 104)
                     }
                     .frame(width: 132, height: 132)
                     .padding(.top, 8)
 
                     VStack(spacing: 5) {
-                        Text(snapshot.isComplete ? "Circuit complete" : "Today’s Scout Circuit")
+                        Text(liveSnapshot.isComplete ? "Circuit complete" : "Today’s Scout Circuit")
                             .font(.title2.weight(.bold))
                         Text(
-                            snapshot.isComplete
+                            liveSnapshot.isComplete
                                 ? "You explored wide, returned to familiar ground, and kept moving."
                                 : "Three small goals that reward a balanced day of exploration."
                         )
@@ -107,7 +129,25 @@ struct DailyChallengeSheet: View {
                         .multilineTextAlignment(.center)
                     }
 
-                    DailyChallengeProgressCard(snapshot: snapshot)
+                    DailyChallengeProgressCard(
+                        snapshot: liveSnapshot,
+                        canClaimReward: controller.canClaimCircuitReward,
+                        onClaimReward: { _ = controller.claimCircuitReward() }
+                    )
+
+                    if liveSnapshot.isComplete {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Chest contents")
+                                .font(.caption.weight(.semibold))
+                            Text(IdleConstants.circuitReward.map { amount in
+                                let name = ItemCatalog.definition(for: amount.itemID)?.name ?? amount.itemID
+                                return "\(amount.quantity)× \(name)"
+                            }.joined(separator: " · "))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
                 .padding(20)
             }

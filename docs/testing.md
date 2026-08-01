@@ -81,9 +81,12 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | Live map options | Map → layers button | Style picker, mastery/heat lens, fog, places, and Frontier toggles update independently |
 | 3D live map | Reach level 4 → Map → cube button | Camera pitches smoothly, preserves center/heading, and returns flat without moving the atlas |
 | Level rewards | Progress after earning XP | Level progress, nearby rewards, tokens, and achievement progress reflect lifetime atlas stats |
-| Scout Circuit | Discover 5 new tiles, return to 3 older tiles, visit 12 unique tiles in one local day | Map mission, active tracker, and Progress card stay in sync; circuit reaches 3/3 without changing XP |
+| Scout Circuit | Discover 5 new tiles, return to 3 older tiles, visit 12 unique tiles in one local day | Map mission, active tracker, and Progress card stay in sync; claim circuit chest once when 3/3 |
+| Idle Scouts | Set Home Base, hire Apprentice, advance clock / reopen app | Adventures → Idle Scouts; capped fog discoveries near Home; hiring unlocks Pathfinder |
+| Home Camp drip | Leave app with Home Base set, reopen after ≥30 min | Camp materials appear in inventory without walking |
 | Territory claim | Explore a sector to ≥25% while inside/adjacent | Adventures → Claim sector; claimed wash + Home Base marker appear; Progress shows claims |
 | Home Base move | Claim a second sector; wait 24 h or advance clock in tests | Set Home Base moves after cooldown; familiarity/find buffs follow the new home |
+| Factory remote collect | Produce into a depot, open Factory away from site | Remote collect ships depot stock to backpack |
 | Automatic foreground | Open Map and move with app open | Tiles reveal without an explicit session or fitness record |
 | Automatic background | Enable screen-locked exploration and grant Always | Discovery continues with the iOS location indicator |
 | Daily treasure trail | Reach marker with Sim GPS and choose routes | Each target advances once; final target grants relic + key |

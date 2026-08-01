@@ -354,6 +354,45 @@ final class FactoryController: ObservableObject {
         return true
     }
 
+    /// Pulls all depot output buffers into the backpack without requiring proximity.
+    @discardableResult
+    func remoteCollectAllDepots() -> Int {
+        advance()
+        var collected = 0
+        var shipped: [ItemAmount] = []
+        store.update { state in
+            for (tileID, structure) in state.structures {
+                guard let definition = FactoryCatalog.byID[structure.definitionID],
+                      definition.kind == .depot,
+                      !structure.outputBuffer.isEmpty else { continue }
+                var next = structure
+                for (itemID, quantity) in structure.outputBuffer where quantity > 0 {
+                    shipped.append(ItemAmount(itemID: itemID, quantity: quantity))
+                    collected += quantity
+                }
+                next.outputBuffer = [:]
+                state.structures[tileID] = next
+            }
+        }
+        if !shipped.isEmpty {
+            inventoryStore.deposit(shipped)
+            latestMessage = collected == 1
+                ? "Collected 1 item from remote depots."
+                : "Collected \(collected) items from remote depots."
+        } else {
+            latestMessage = "No depot stock ready to collect."
+        }
+        return collected
+    }
+
+    var remoteCollectableItemCount: Int {
+        store.structures.values.reduce(0) { partial, structure in
+            guard let definition = FactoryCatalog.byID[structure.definitionID],
+                  definition.kind == .depot else { return partial }
+            return partial + structure.outputBuffer.values.reduce(0, +)
+        }
+    }
+
     func deposit(
         itemID: String,
         quantity: Int,

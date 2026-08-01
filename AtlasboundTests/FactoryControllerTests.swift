@@ -112,6 +112,24 @@ final class FactoryControllerTests: XCTestCase {
         XCTAssertEqual(context.factoryStore.structures[tileID]?.inputBuffer["amber_resin"], 1)
     }
 
+    func testRemoteCollectDrainsDepotOutputWithoutProximity() {
+        let context = makeContext()
+        var depot = factoryStructure(q: 4, r: -2, definitionID: "trailhead_depot")
+        depot.outputBuffer = [
+            "cobble_chip": 3,
+            "stone_block": 2,
+        ]
+        context.factoryStore.update { $0.structures[depot.tileID] = depot }
+
+        XCTAssertEqual(context.controller.remoteCollectableItemCount, 5)
+        XCTAssertEqual(context.controller.remoteCollectAllDepots(), 5)
+        XCTAssertEqual(context.inventory.quantity(of: "cobble_chip"), 3)
+        XCTAssertEqual(context.inventory.quantity(of: "stone_block"), 2)
+        XCTAssertEqual(context.factoryStore.structures[depot.tileID]?.outputBuffer.isEmpty, true)
+        XCTAssertEqual(context.controller.remoteCollectableItemCount, 0)
+        XCTAssertEqual(context.controller.remoteCollectAllDepots(), 0)
+    }
+
     func testDisconnectedNetworkCannotBorrowRemotePower() {
         let context = makeContext()
         let roadA = factoryStructure(q: 0, r: 0, definitionID: "trail_road")

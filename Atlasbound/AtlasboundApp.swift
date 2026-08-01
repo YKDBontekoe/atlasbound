@@ -9,6 +9,7 @@ struct AtlasboundApp: App {
     @StateObject private var treasureStore = TreasureStore()
     @StateObject private var inventoryStore = InventoryStore()
     @StateObject private var factoryStore = FactoryStore()
+    @StateObject private var idleStore = IdleStore()
     @StateObject private var controllerHolder = ControllerHolder()
     @StateObject private var factoryHolder = FactoryHolder()
     @StateObject private var pinpointHolder = PinpointHolder()
@@ -43,7 +44,8 @@ struct AtlasboundApp: App {
                     regionLookup: regionLookup,
                     gameCenterManager: gameCenterManager,
                     treasureStore: treasureStore,
-                    inventoryStore: inventoryStore
+                    inventoryStore: inventoryStore,
+                    idleStore: idleStore
                 )
                 factoryHolder.bootstrap(
                     store: factoryStore,
@@ -85,7 +87,8 @@ final class ControllerHolder: ObservableObject {
         regionLookup: RegionLookupStore,
         gameCenterManager: GameCenterManager,
         treasureStore: TreasureStore,
-        inventoryStore: InventoryStore
+        inventoryStore: InventoryStore,
+        idleStore: IdleStore
     ) {
         guard controller == nil else { return }
         controller = WorldController(
@@ -94,7 +97,8 @@ final class ControllerHolder: ObservableObject {
             regionLookup: regionLookup,
             gameCenterManager: gameCenterManager,
             treasureStore: treasureStore,
-            inventoryStore: inventoryStore
+            inventoryStore: inventoryStore,
+            idleStore: idleStore
         )
     }
 }
