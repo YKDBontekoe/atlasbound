@@ -16,131 +16,35 @@ struct FactoryTabView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                AtlasTheme.canvas(for: colorScheme).ignoresSafeArea()
-                List {
-                    Section {
-                        HStack(spacing: 14) {
-                            AtlasArtMark(name: "FactoryMark", size: 72)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Build an outpost")
-                                    .font(.headline)
-                                Text("Link nearby structures into a working network.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
+            ScrollView {
+                VStack(spacing: AtlasTheme.Space.lg) {
+                    heroCard
+                        .staggeredAppear(index: 0)
 
                     if let message = controller.latestMessage {
-                        Section {
+                        StatSectionCard {
                             FactoryMessageBanner(message: message) {
                                 controller.latestMessage = nil
                             }
                         }
-                    }
-                    Section("Factory overview") {
-                        LabeledContent("Structures", value: "\(controller.structures.count)")
-                        LabeledContent("Road networks", value: "\(controller.networks.count)")
-                        LabeledContent(
-                            "Power",
-                            value: "\(controller.totalPowerDemand) / \(controller.totalPowerSupply)"
-                        )
-                        LabeledContent(
-                            "Lifetime output",
-                            value: "\(store.lifetimeProduced.values.reduce(0, +)) items"
-                        )
-                        if controller.totalPowerDemand > controller.totalPowerSupply {
-                            Label("Power demand exceeds supply", systemImage: "bolt.trianglebadge.exclamationmark.fill")
-                                .foregroundStyle(AtlasTheme.gold)
-                        }
-                        let blocked = controller.structures.filter {
-                            ![FactoryOperationalStatus.running, .idle].contains(controller.status(for: $0))
-                        }
-                        if !blocked.isEmpty {
-                            LabeledContent("Needs attention", value: "\(blocked.count)")
-                                .foregroundStyle(AtlasTheme.finishRed)
-                        }
+                        .staggeredAppear(index: 1)
                     }
 
-                    Section("Manage") {
-                        Button {
-                            _ = controller.remoteCollectAllDepots()
-                        } label: {
-                            Label(
-                                controller.remoteCollectableItemCount > 0
-                                    ? "Remote collect (\(controller.remoteCollectableItemCount))"
-                                    : "Remote collect",
-                                systemImage: "shippingbox.and.arrow.backward.fill"
-                            )
-                        }
-                        .disabled(controller.remoteCollectableItemCount == 0)
-                        .accessibilityIdentifier("remoteCollectDepotsButton")
-
-                        NavigationLink {
-                            FactoryRecipeBookView(controller: controller)
-                        } label: {
-                            Label("Recipe book", systemImage: "book.pages.fill")
-                        }
-                        NavigationLink {
-                            FactoryResearchView(controller: controller)
-                        } label: {
-                            Label("Research", systemImage: "lightbulb.max.fill")
-                        }
-                        NavigationLink {
-                            FactoryStructureListView(controller: controller)
-                        } label: {
-                            Label("Structures", systemImage: "building.2.fill")
-                        }
-                    }
-
-                    Section("Networks") {
-                        if controller.networks.isEmpty {
-                            ContentUnavailableView(
-                                "No road networks",
-                                systemImage: "road.lanes",
-                                description: Text("Craft road kits, then place them from the Map while standing nearby.")
-                            )
-                        } else {
-                            ForEach(controller.networks) { network in
-                                let metrics = controller.networkMetrics.first { $0.networkID == network.id }
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Network \(network.id)")
-                                        .font(.subheadline.weight(.semibold))
-                                        .lineLimit(1)
-                                    Text("\(network.roadTileIDs.count) roads · \(network.buildingTileIDs.count) buildings · \(network.totalRoadCapacity) item-units/min")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    if let metrics {
-                                        Text("Power \(metrics.powerDemand)/\(metrics.powerSupply) · \(metrics.storedItemCount) stored items")
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(
-                                                metrics.powerDemand > metrics.powerSupply
-                                                    ? AtlasTheme.finishRed
-                                                    : AtlasTheme.teal
-                                            )
-                                    }
-                                }
-                                .accessibilityElement(children: .combine)
-                                .accessibilityLabel("Road network \(network.id)")
-                                .accessibilityValue(networkAccessibilityValue(network, metrics: metrics))
-                            }
-                        }
-                    }
+                    overviewCard
+                        .staggeredAppear(index: 2)
+                    manageCard
+                        .staggeredAppear(index: 3)
+                    networksCard
+                        .staggeredAppear(index: 4)
 
                     if !store.lifetimeProduced.isEmpty {
-                        Section("Production ledger") {
-                            ForEach(store.lifetimeProduced.keys.sorted(), id: \.self) { itemID in
-                                LabeledContent(
-                                    ItemCatalog.definition(for: itemID)?.name ?? itemID,
-                                    value: "\(store.lifetimeProduced[itemID] ?? 0)"
-                                )
-                            }
-                        }
+                        ledgerCard
+                            .staggeredAppear(index: 5)
                     }
                 }
-                .scrollContentBackground(.hidden)
+                .padding(AtlasTheme.Space.xl)
             }
+            .background(AtlasTheme.canvas(for: colorScheme).ignoresSafeArea())
             .navigationTitle("Factory")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -187,6 +91,222 @@ struct FactoryTabView: View {
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(30))
                     controller.advance()
+                }
+            }
+        }
+    }
+
+    private var heroCard: some View {
+        StatSectionCard {
+            HStack(spacing: AtlasTheme.Space.lg) {
+                AtlasArtMark(name: "FactoryMark", size: 72)
+                VStack(alignment: .leading, spacing: AtlasTheme.Space.xs) {
+                    Text("Build an outpost")
+                        .font(.headline)
+                    Text("Link nearby structures into a working network.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var overviewCard: some View {
+        StatSectionCard {
+            VStack(alignment: .leading, spacing: AtlasTheme.Space.md) {
+                AtlasSectionHeader(
+                    title: "Factory overview",
+                    subtitle: "Structures, power, and lifetime production.",
+                    systemImage: "building.2.fill",
+                    accent: AtlasTheme.blue
+                )
+
+                AtlasMetricRow(
+                    label: "Structures",
+                    value: "\(controller.structures.count)",
+                    systemImage: "cube.fill"
+                )
+                AtlasMetricRow(
+                    label: "Road networks",
+                    value: "\(controller.networks.count)",
+                    systemImage: "road.lanes"
+                )
+                AtlasMetricRow(
+                    label: "Power",
+                    value: "\(controller.totalPowerDemand) / \(controller.totalPowerSupply)",
+                    valueColor: controller.totalPowerDemand > controller.totalPowerSupply
+                        ? AtlasTheme.finishRed
+                        : .primary,
+                    systemImage: "bolt.fill"
+                )
+                AtlasMetricRow(
+                    label: "Lifetime output",
+                    value: "\(store.lifetimeProduced.values.reduce(0, +)) items",
+                    systemImage: "chart.bar.fill"
+                )
+
+                if controller.totalPowerDemand > controller.totalPowerSupply {
+                    Label("Power demand exceeds supply", systemImage: "bolt.trianglebadge.exclamationmark.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AtlasTheme.gold)
+                }
+
+                let blocked = controller.structures.filter {
+                    ![FactoryOperationalStatus.running, .idle].contains(controller.status(for: $0))
+                }
+                if !blocked.isEmpty {
+                    AtlasMetricRow(
+                        label: "Needs attention",
+                        value: "\(blocked.count)",
+                        valueColor: AtlasTheme.finishRed,
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                }
+            }
+        }
+    }
+
+    private var manageCard: some View {
+        StatSectionCard {
+            VStack(alignment: .leading, spacing: AtlasTheme.Space.md) {
+                AtlasSectionHeader(
+                    title: "Manage",
+                    subtitle: "Collect output, research, and inspect structures.",
+                    systemImage: "slider.horizontal.3",
+                    accent: AtlasTheme.teal
+                )
+
+                Button {
+                    _ = controller.remoteCollectAllDepots()
+                } label: {
+                    AtlasChromeLinkRow(
+                        title: controller.remoteCollectableItemCount > 0
+                            ? "Remote collect (\(controller.remoteCollectableItemCount))"
+                            : "Remote collect",
+                        systemImage: "shippingbox.and.arrow.backward.fill",
+                        subtitle: controller.remoteCollectableItemCount > 0
+                            ? "Pull depot output into your pack."
+                            : "No depot goods ready to collect.",
+                        accent: AtlasTheme.teal,
+                        showsChevron: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(controller.remoteCollectableItemCount == 0)
+                .opacity(controller.remoteCollectableItemCount == 0 ? 0.45 : 1)
+                .accessibilityIdentifier("remoteCollectDepotsButton")
+
+                Divider().overlay(AtlasTheme.divider(for: colorScheme))
+
+                NavigationLink {
+                    FactoryRecipeBookView(controller: controller)
+                } label: {
+                    AtlasChromeLinkRow(
+                        title: "Recipe book",
+                        systemImage: "book.pages.fill",
+                        subtitle: "Hand assembly and machine recipes.",
+                        accent: AtlasTheme.blue
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    FactoryResearchView(controller: controller)
+                } label: {
+                    AtlasChromeLinkRow(
+                        title: "Research",
+                        systemImage: "lightbulb.max.fill",
+                        subtitle: "Spend atlas insight to unlock machines.",
+                        accent: AtlasTheme.gold
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    FactoryStructureListView(controller: controller)
+                } label: {
+                    AtlasChromeLinkRow(
+                        title: "Structures",
+                        systemImage: "building.2.fill",
+                        subtitle: "Inspect buffers and production status.",
+                        accent: AtlasTheme.blue
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var networksCard: some View {
+        StatSectionCard {
+            VStack(alignment: .leading, spacing: AtlasTheme.Space.md) {
+                AtlasSectionHeader(
+                    title: "Networks",
+                    subtitle: "Road-linked clusters that share power and logistics.",
+                    systemImage: "point.3.connected.trianglepath.dotted",
+                    accent: AtlasTheme.teal
+                )
+
+                if controller.networks.isEmpty {
+                    AtlasEmptyState(
+                        title: "No road networks",
+                        message: "Craft road kits, then place them from the Map while standing nearby.",
+                        systemImage: "road.lanes",
+                        artName: "FactoryMark",
+                        accent: AtlasTheme.teal
+                    )
+                } else {
+                    ForEach(Array(controller.networks.enumerated()), id: \.element.id) { index, network in
+                        if index > 0 {
+                            Divider().overlay(AtlasTheme.divider(for: colorScheme))
+                        }
+                        let metrics = controller.networkMetrics.first { $0.networkID == network.id }
+                        VStack(alignment: .leading, spacing: AtlasTheme.Space.xs) {
+                            Text("Network \(network.id)")
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                            Text("\(network.roadTileIDs.count) roads · \(network.buildingTileIDs.count) buildings · \(network.totalRoadCapacity) item-units/min")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if let metrics {
+                                Text("Power \(metrics.powerDemand)/\(metrics.powerSupply) · \(metrics.storedItemCount) stored items")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(
+                                        metrics.powerDemand > metrics.powerSupply
+                                            ? AtlasTheme.finishRed
+                                            : AtlasTheme.teal
+                                    )
+                            }
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Road network \(network.id)")
+                        .accessibilityValue(networkAccessibilityValue(network, metrics: metrics))
+                    }
+                }
+            }
+        }
+    }
+
+    private var ledgerCard: some View {
+        StatSectionCard {
+            VStack(alignment: .leading, spacing: AtlasTheme.Space.md) {
+                AtlasSectionHeader(
+                    title: "Production ledger",
+                    subtitle: "Lifetime items produced across all machines.",
+                    systemImage: "list.bullet.rectangle",
+                    accent: AtlasTheme.slate
+                )
+
+                ForEach(Array(store.lifetimeProduced.keys.sorted().enumerated()), id: \.element) { index, itemID in
+                    if index > 0 {
+                        Divider().overlay(AtlasTheme.divider(for: colorScheme))
+                    }
+                    AtlasMetricRow(
+                        label: ItemCatalog.definition(for: itemID)?.name ?? itemID,
+                        value: "\(store.lifetimeProduced[itemID] ?? 0)"
+                    )
                 }
             }
         }
