@@ -1,5 +1,5 @@
 name: iOS test suite
-description: Boot simulator, bootstrap snapshots if needed, and run xcodebuild test.
+description: Boot simulator and run xcodebuild test-without-building from shared test products.
 
 inputs:
   result-bundle:
@@ -22,17 +22,57 @@ inputs:
     description: Extra arguments passed to xcodebuild test
     required: false
     default: ""
+  mode:
+    description: CI_TEST_MODE value — test (default in CI), all, or build
+    required: false
+    default: test
+  test-products-path:
+    description: Path to .xctestproducts used when mode=test
+    required: false
+    default: dist/Atlasbound.xctestproducts
+  test-products-artifact:
+    description: Name of the uploaded test-products artifact to download; empty skips download
+    required: false
+    default: atlasbound-test-products
 
 runs:
   using: composite
   steps:
-    - name: Restore Xcode build cache
-      uses: actions/cache@v4
+    - name: Download test products
+      if: inputs.mode == 'test' && inputs.test-products-artifact != ''
+      uses: actions/download-artifact@v4
       with:
-        path: ~/Library/Developer/Xcode/DerivedData
-        key: atlasbound-xcode-${{ runner.os }}-${{ runner.arch }}-${{ env.ATLASBOUND_XCODE_CACHE_VERSION }}-${{ hashFiles('Atlasbound.xcodeproj/project.pbxproj', 'Atlasbound.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Atlasbound/**/*.swift', 'AtlasboundTests/**/*.swift', 'AtlasboundUITests/**/*.swift') }}
-        restore-keys: |
-          atlasbound-xcode-${{ runner.os }}-${{ runner.arch }}-${{ env.ATLASBOUND_XCODE_CACHE_VERSION }}-
+        name: ${{ inputs.test-products-artifact }}
+        path: dist
+
+    - name: Unpack test products
+      if: inputs.mode == 'test' && inputs.test-products-artifact != ''
+      shell: bash
+      env:
+        TEST_PRODUCTS_PATH: ${{ inputs.test-products-path }}
+      run: |
+        set -euo pipefail
+        mkdir -p dist
+        ARCHIVE=""
+        if [[ -f dist/Atlasbound.testproducts.tgz ]]; then
+          ARCHIVE=dist/Atlasbound.testproducts.tgz
+        elif [[ -f dist/Atlasbound.xctestproducts.tgz ]]; then
+          ARCHIVE=dist/Atlasbound.xctestproducts.tgz
+        else
+          echo "Packed test products not found under dist/" >&2
+          find dist -maxdepth 3 -print >&2 || true
+          exit 1
+        fi
+        tar -C dist -xzf "$ARCHIVE"
+        if [[ -e "$TEST_PRODUCTS_PATH" ]]; then
+          echo "Using test products at ${TEST_PRODUCTS_PATH}"
+        elif [[ -d dist/TestProducts ]]; then
+          echo "Using xctestrun fallback under dist/TestProducts"
+        else
+          echo "Missing products after unpack" >&2
+          find dist -maxdepth 3 -print >&2 || true
+          exit 1
+        fi
 
     - name: Run tests
       shell: bash
@@ -40,6 +80,8 @@ runs:
         RESULT_BUNDLE: ${{ inputs.result-bundle }}
         ONLY_TESTING: ${{ inputs.only-testing }}
         EXTRA_XCODEBUILD_ARGS: ${{ inputs.extra-xcodebuild-args }}
+        CI_TEST_MODE: ${{ inputs.mode }}
+        TEST_PRODUCTS_PATH: ${{ inputs.test-products-path }}
       run: |
         set -euo pipefail
         chmod +x scripts/ci-run-tests.sh

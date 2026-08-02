@@ -59,10 +59,10 @@ https://ykdbontekoe.github.io/atlasbound/apps.json
 
 | Trigger | Workflow | Jobs | Publishes? |
 |---------|----------|------|------------|
-| PR | `build.yml` | `validate` · 1 unit/visual job · 3 UI shards · `build` | IPA artifact only |
-| Push `main` / dispatch | `release.yml` | latest-only test matrix + validation + IPA run in one macOS wave → publish gate | Yes |
+| PR | `build.yml` | `validate` · `build-tests` · 1 unit/visual · 1 UI · `build` | IPA artifact only |
+| Push `main` / dispatch | `release.yml` | same two-wave matrix + IPA → publish gate | Yes |
 
-Test jobs use [`.github/actions/ios-test`](../../.github/actions/ios-test) and [`scripts/ci-run-tests.sh`](../../scripts/ci-run-tests.sh).
+Compile once via [`.github/actions/ios-build-tests`](../../.github/actions/ios-build-tests); test jobs use [`.github/actions/ios-test`](../../.github/actions/ios-test) and [`scripts/ci-run-tests.sh`](../../scripts/ci-run-tests.sh).
 
 ```bash
 ./scripts/validate-pr.sh   # privacy alignment, apps.json, script unit tests

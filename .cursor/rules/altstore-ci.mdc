@@ -10,5 +10,5 @@ alwaysApply: false
 - Version via `scripts/auto-version.py` + conventional commits
 - Prepend versions in `altstore/apps.json` (newest first); unique `buildVersion`
 - Align AltStore permission text with `Atlasbound/Info.plist` (`scripts/check-privacy-alignment.py`)
-- PR CI: `validate` + `test` + IPA; release gates on validate/test before publish
+- PR CI: `validate` + `build-tests` + unit/UI `test-without-building` + IPA; release gates on validate/test before publish
 - See skill `altstore-release` and `docs/release.md`
