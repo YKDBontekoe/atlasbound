@@ -80,18 +80,25 @@ final class LookAroundSnapshotEngineTests: XCTestCase {
         XCTAssertEqual(LookAroundSnapshotEngine.maxGalleryImages, 4)
     }
 
-    func testGallerySnapshotSizePassesThroughWhenUnderBudget() {
-        let size = CGSize(width: 390, height: 844)
-        let rendered = LookAroundSnapshotEngine.gallerySnapshotSize(for: size)
-        XCTAssertEqual(rendered.width, 390, accuracy: 0.001)
-        XCTAssertEqual(rendered.height, 844, accuracy: 0.001)
+    func testAdditionalProbeBudgetIsBounded() {
+        XCTAssertEqual(LookAroundSnapshotEngine.additionalProbeBudget, .milliseconds(2_500))
     }
 
-    func testGallerySnapshotSizeCapsLongestEdge() {
-        let size = CGSize(width: 1290, height: 2796)
-        let rendered = LookAroundSnapshotEngine.gallerySnapshotSize(for: size)
-        XCTAssertEqual(rendered.height, LookAroundSnapshotEngine.maxSnapshotPixelDimension, accuracy: 0.001)
-        XCTAssertLessThan(rendered.width, size.width)
+    func testGallerySnapshotSizePassesThroughWhenUnderPixelBudget() {
+        let size = CGSize(width: 300, height: 300)
+        let rendered = LookAroundSnapshotEngine.gallerySnapshotSize(for: size, scale: 2)
+        XCTAssertEqual(rendered.width, 300, accuracy: 0.001)
+        XCTAssertEqual(rendered.height, 300, accuracy: 0.001)
+    }
+
+    func testGallerySnapshotSizeAccountsForScreenScale() {
+        // 1290×2796 pt would be enormous; even 430×932 @3x exceeds the 1024px budget.
+        let size = CGSize(width: 430, height: 932)
+        let rendered = LookAroundSnapshotEngine.gallerySnapshotSize(for: size, scale: 3)
+        let longestPixels = max(rendered.width, rendered.height) * 3
+        XCTAssertLessThanOrEqual(longestPixels, LookAroundSnapshotEngine.maxSnapshotPixelDimension + 1)
+        XCTAssertLessThan(rendered.height, size.height)
+
         let expectedAspect = size.width / size.height
         let renderedAspect = rendered.width / rendered.height
         XCTAssertEqual(renderedAspect, expectedAspect, accuracy: 0.01)
