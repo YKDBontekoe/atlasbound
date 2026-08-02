@@ -43,6 +43,7 @@ struct TreasureAdventureCard: View {
             }
         }
         .accessibilityIdentifier("treasureAdventureCard")
+        .accessibilityHint("Opens today’s treasure trail details and progress.")
     }
 }
 

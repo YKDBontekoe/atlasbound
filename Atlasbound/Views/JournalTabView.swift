@@ -31,6 +31,7 @@ struct JournalHubView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedSession: PersistedActivityRecord?
+    @State private var showTreasureSheet = false
 
     init(
         controller: WorldController,
@@ -75,6 +76,9 @@ struct JournalHubView: View {
                 selectedSession = nil
             }
         }
+        .sheet(isPresented: $showTreasureSheet) {
+            TreasureDetailSheet(controller: controller, store: treasureStore)
+        }
     }
 
     // MARK: - Today’s Trail
@@ -93,7 +97,9 @@ struct JournalHubView: View {
                     store: treasureStore,
                     usesGlassChrome: false,
                     isPreparing: controller.isPreparingTreasureTrail
-                ) {}
+                ) {
+                    showTreasureSheet = true
+                }
 
                 Divider().overlay(AtlasTheme.divider(for: colorScheme))
 
