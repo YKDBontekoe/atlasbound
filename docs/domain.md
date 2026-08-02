@@ -92,5 +92,5 @@ Discovered tile centers are quantized into ~2 km cache cells and reverse-geocode
 - Factory research consumes Atlas Insight and is also gated by the existing Explorer level.
 - Research bootstraps with a slower field-material Insight recipe; Mechanics unlocks the faster mechanism-based recipe.
 - Nearby players can manually load or unload machine buffers, while connected depots automate transfers.
-- Depot stock can be **remote-collected** into the backpack from the Factory tab without standing nearby.
+- Depot stock can be **remote-collected** into the backpack from Workshop → Factory without standing nearby.
 - The factory has its own schema version inside SQLite so a factory reset or incompatibility cannot erase the canonical atlas.

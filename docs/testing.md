@@ -72,7 +72,7 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | Places visited | Progress tab after discovering tiles (network) | Countries / provinces / cities appear as MapKit reverse-geocode resolves |
 | Session history | Activity tab → Recent activities | Past sessions listed; tap for detail sheet |
 | Background recording | Settings → Record while screen is off; grant Always; Drive sim with screen locked | Recording continues; tiles still discovered |
-| Activity switch | Map idle sheet / Journal | Walk → Cycle etc.; activity metadata changes, atlas stays 20 m |
+| Activity switch | Map idle sheet / Workshop | Walk → Cycle etc.; activity metadata changes, atlas stays 20 m |
 | Activity mid-record | Try change while recording | Blocked until finish |
 | Activity persistence | Pick Run, relaunch app | Still Run; Start button says Start Run |
 | Clear progress | Clear atlas | All atlas tiles, exploration totals, Frontier, and territory claims are wiped |
@@ -92,10 +92,10 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | Daily treasure trail | Reach marker with Sim GPS and choose routes | Each target advances once; final target grants relic + key |
 | Weekly vault | Complete three daily trails | Vault target appears and awards rare-or-better relic once |
 | Landmark fallback | Disable network before generating trail | Procedural cache remains playable and can be rerolled once |
-| Field find pickup | Explore new tiles via Sim GPS | Occasional pickup sheet; item appears in Journal → Inventory |
-| Inventory use / activate | Journal → long-press item | Boosts start effects; charges apply trail reroll / fog lantern / survey pulse |
-| Assemble | Journal → Assemble | Recipes craft when materials are sufficient |
-| Salvage | Journal → long-press uncommon+ item | Breaks into 1–2 materials |
+| Field find pickup | Explore new tiles via Sim GPS | Occasional pickup sheet; item appears in Workshop → Journal → Inventory |
+| Inventory use / activate | Workshop → Journal → long-press item | Boosts start effects; charges apply trail reroll / fog lantern / survey pulse |
+| Assemble | Workshop → Recipe book | Recipes craft when materials are sufficient |
+| Salvage | Workshop → Journal → long-press uncommon+ item | Breaks into 1–2 materials |
 | Clear atlas finds | Settings → Clear discovered tiles | Claimed find IDs reset so tiles can yield again; owned stacks kept |
 
 ## Agent checklist after behavioral changes

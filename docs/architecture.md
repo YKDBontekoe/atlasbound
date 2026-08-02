@@ -102,7 +102,8 @@ Serverless daily exploration loop using nearby MapKit landmarks.
 | `LandmarkResolver` | Named-landmark search and pedestrian validation | async value type |
 | `TreasureStore` | Trail, vault, encounter, and relic persistence | `@MainActor` |
 | `DiscoveryMapView` | Tappable treasure destination marker | SwiftUI |
-| `JournalTabView` | Trail, relics, discoveries, optional activity history | SwiftUI |
+| `WorkshopTabView` | Combined Journal + Factory tab (adventure log, inventory, production) | SwiftUI |
+| `JournalHubView` | Trail, relics, discoveries, optional activity history | SwiftUI |
 
 Each local day produces a three-stage trail. Three daily keys unlock the ISO-week vault.
 
@@ -115,7 +116,8 @@ Deterministic pickups while exploring tiles; stackable pack separate from Treasu
 | `FieldFindEngine` | Spawn rolls, loot tables, assemble/salvage, XP effect math | `Sendable` |
 | `InventoryStore` | Stacks, claimed find IDs, active effects, cartographer pins | `@MainActor` |
 | `DiscoveryMapView` | Nearby unclaimed find preview markers | SwiftUI |
-| `JournalTabView` | Inventory use / activate / assemble / salvage | SwiftUI |
+| `JournalHubView` | Inventory use / activate / salvage; links to shared Recipe book | SwiftUI |
+| `FactoryHubView` | Factory overview, research, structures, recipe book (sole craft UI) | SwiftUI |
 
 Find IDs are `find:{dayKey}:{tileID}` — claim once per local day. Atlas Tokens remain non-consumable; field items grant temporary modifiers and charges only.
 
