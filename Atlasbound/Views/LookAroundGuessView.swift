@@ -188,15 +188,18 @@ struct LookAroundGuessView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AtlasTheme.Space.lg) {
             ProgressView()
-                .scaleEffect(1.3)
+                .controlSize(.large)
+                .tint(AtlasTheme.blue)
             Text("Loading Look Around…")
-                .font(.subheadline)
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Loading Look Around")
     }
 
     private var unavailableView: some View {

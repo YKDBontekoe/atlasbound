@@ -5,6 +5,7 @@ import UIKit
 @MainActor
 final class GameCenterManager: ObservableObject {
     @Published private(set) var isAuthenticated = false
+    @Published private(set) var isAuthenticating = false
     @Published private(set) var localPlayerName: String = ""
     @Published private(set) var authError: String?
 
@@ -14,13 +15,16 @@ final class GameCenterManager: ObservableObject {
 
     func authenticate() {
         authError = nil
+        isAuthenticating = true
         GKLocalPlayer.local.authenticateHandler = { [weak self] viewController, error in
             Task { @MainActor in
                 guard let self else { return }
                 if let viewController {
+                    // Keep `isAuthenticating` until GameKit finishes (or dismisses) auth UI.
                     self.present(viewController)
                     return
                 }
+                self.isAuthenticating = false
                 if let error {
                     if Self.isExpectedUnauthenticatedError(error) {
                         self.isAuthenticated = false

@@ -335,7 +335,10 @@ struct MainMapScreen: View {
         Group {
             if isIdleAdventureExpanded {
                 VStack(spacing: 12) {
-                    TreasureAdventureCard(store: treasureStore) {
+                    TreasureAdventureCard(
+                        store: treasureStore,
+                        isPreparing: controller.isPreparingTreasureTrail
+                    ) {
                         showTreasureSheet = true
                     }
                     .padding(.horizontal, 12)
@@ -519,7 +522,10 @@ struct MainMapScreen: View {
             .animation(AtlasMotion.number, value: controller.sessionDiscoveredCount)
             .animation(AtlasMotion.number, value: distanceValue)
 
-            if let target = treasureStore.currentTarget {
+            if controller.isPreparingTreasureTrail {
+                AtlasInlineBusyLabel(text: "Scouting landmarks…", tint: AtlasTheme.gold)
+                    .padding(.horizontal, 12)
+            } else if let target = treasureStore.currentTarget {
                 HStack(spacing: 8) {
                     Image(systemName: "sparkles")
                         .foregroundStyle(AtlasTheme.gold)

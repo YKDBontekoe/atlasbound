@@ -4,6 +4,8 @@ struct TreasureAdventureCard: View {
     @ObservedObject var store: TreasureStore
     /// When false, renders as an inline row for card interiors (Journal) without nested glass.
     var usesGlassChrome: Bool = true
+    /// Landmark search refining today’s trail destinations.
+    var isPreparing: Bool = false
     let onTap: () -> Void
 
     var body: some View {
@@ -13,10 +15,14 @@ struct TreasureAdventureCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(store.weeklyVault.isUnlocked ? "Weekly vault revealed" : "Today’s treasure trail")
                         .font(.subheadline.weight(.semibold))
-                    Text(store.currentTarget.map { "\($0.name) · \(store.trailProgressLabel)" } ?? "Move to prepare nearby clues")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    if isPreparing {
+                        AtlasInlineBusyLabel(text: "Scouting nearby landmarks…", tint: AtlasTheme.gold)
+                    } else {
+                        Text(store.currentTarget.map { "\($0.name) · \(store.trailProgressLabel)" } ?? "Move to prepare nearby clues")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
@@ -25,6 +31,7 @@ struct TreasureAdventureCard: View {
             }
             .padding(usesGlassChrome ? AtlasTheme.Space.md : 0)
             .contentShape(Rectangle())
+            .animation(AtlasMotion.fade, value: isPreparing)
         }
         .buttonStyle(.plain)
         .background {
@@ -62,6 +69,12 @@ struct TreasureDetailSheet: View {
                     } header: {
                         Text(store.weeklyVault.isUnlocked ? "Weekly Vault" : "Current Clue")
                     }
+                } else if controller.isPreparingTreasureTrail {
+                    Section {
+                        AtlasInlineBusyLabel(text: "Scouting nearby landmarks…", tint: AtlasTheme.gold)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, AtlasTheme.Space.sm)
+                    }
                 } else {
                     ContentUnavailableView(
                         "Trail complete",
@@ -71,7 +84,15 @@ struct TreasureDetailSheet: View {
                 }
 
                 Section("Progress") {
-                    LabeledContent("Daily trail", value: store.trailProgressLabel)
+                    if controller.isPreparingTreasureTrail {
+                        HStack {
+                            Text("Daily trail")
+                            Spacer()
+                            AtlasInlineBusyLabel(text: "Preparing…", tint: AtlasTheme.gold)
+                        }
+                    } else {
+                        LabeledContent("Daily trail", value: store.trailProgressLabel)
+                    }
                     LabeledContent(
                         "Vault keys",
                         value: "\(store.weeklyVault.keys)/\(TreasureConstants.keysRequiredForVault)"
@@ -83,6 +104,7 @@ struct TreasureDetailSheet: View {
                             controller.rerollTreasureTrail()
                             AtlasHaptics.select()
                         }
+                        .disabled(controller.isPreparingTreasureTrail)
                     }
                 }
 

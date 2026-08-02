@@ -194,10 +194,9 @@ struct ProgressTabView: View {
                 }
 
                 if regionLookup.isResolving {
-                    Text("Updating places…")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
+                    AtlasInlineBusyLabel(text: "Updating places…")
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("placesResolvingIndicator")
                 }
 
                 placeList(title: "Countries", entries: places.countries)

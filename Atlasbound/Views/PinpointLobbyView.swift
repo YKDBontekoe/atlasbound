@@ -218,15 +218,25 @@ struct PinpointLobbyView: View {
             Button {
                 controller.gameCenterManager.authenticate()
             } label: {
-                HStack {
-                    Image(systemName: "person.badge.plus")
-                    Text("Sign in to Game Center")
-                        .font(.subheadline.weight(.semibold))
+                HStack(spacing: 8) {
+                    if controller.gameCenterManager.isAuthenticating {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Signing in…")
+                            .font(.subheadline.weight(.semibold))
+                    } else {
+                        Image(systemName: "person.badge.plus")
+                        Text("Sign in to Game Center")
+                            .font(.subheadline.weight(.semibold))
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
             }
             .buttonStyle(GlassButtonStyle(shape: .capsule))
+            .disabled(controller.gameCenterManager.isAuthenticating)
+            .animation(AtlasMotion.fade, value: controller.gameCenterManager.isAuthenticating)
+            .accessibilityIdentifier("gameCenterSignInButton")
         }
     }
 

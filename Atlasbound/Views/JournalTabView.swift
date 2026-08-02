@@ -89,15 +89,33 @@ struct JournalHubView: View {
                     accent: AtlasTheme.gold
                 )
 
-                TreasureAdventureCard(store: treasureStore, usesGlassChrome: false) {}
+                TreasureAdventureCard(
+                    store: treasureStore,
+                    usesGlassChrome: false,
+                    isPreparing: controller.isPreparingTreasureTrail
+                ) {}
 
                 Divider().overlay(AtlasTheme.divider(for: colorScheme))
 
-                AtlasMetricRow(
-                    label: "Progress",
-                    value: treasureStore.trailProgressLabel,
-                    systemImage: "flag.checkered"
-                )
+                if controller.isPreparingTreasureTrail {
+                    HStack(spacing: AtlasTheme.Space.md) {
+                        Image(systemName: "flag.checkered")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 18)
+                        Text("Progress")
+                            .font(.subheadline)
+                        Spacer(minLength: AtlasTheme.Space.sm)
+                        AtlasInlineBusyLabel(text: "Preparing…", tint: AtlasTheme.gold)
+                    }
+                    .accessibilityElement(children: .combine)
+                } else {
+                    AtlasMetricRow(
+                        label: "Progress",
+                        value: treasureStore.trailProgressLabel,
+                        systemImage: "flag.checkered"
+                    )
+                }
                 AtlasMetricRow(
                     label: "Vault keys",
                     value: "\(treasureStore.weeklyVault.keys)/\(TreasureConstants.keysRequiredForVault)",
