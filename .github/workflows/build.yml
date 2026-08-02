@@ -1,9 +1,9 @@
 name: Build IPA
 
-# PR validation: static checks, one shared build-for-testing, unit/UI
-# test-without-building jobs, and the unsigned IPA artifact. Releases
-# (with automatic versioning) are handled by "Build IPA & AltStore Source"
-# on pushes to main.
+# PR validation: static checks, one shared build-for-testing, unit +
+# sharded UI test-without-building jobs, and the unsigned IPA artifact.
+# Releases (with automatic versioning) are handled by
+# "Build IPA & AltStore Source" on pushes to main.
 
 on:
   pull_request:
@@ -40,7 +40,7 @@ jobs:
           UI_MATRIX="$(python3 scripts/ci_test_matrix.py \
             --path AtlasboundUITests \
             --target AtlasboundUITests \
-            --shards 1 \
+            --shards 3 \
             --granularity method \
             --label ui)"
           echo "unit=$UNIT_MATRIX" >> "$GITHUB_OUTPUT"

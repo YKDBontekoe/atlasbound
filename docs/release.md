@@ -24,7 +24,7 @@ Workflow: `.github/workflows/release.yml`
 6. Deploy `apps.json` + `icon.png` to GitHub Pages
 
 PR workflow (`.github/workflows/build.yml`) compiles once (`build-tests`), then
-runs unit/visual and UI smoke via `test-without-building` on separate runners.
+runs unit/visual plus three UI smoke shards via `test-without-building`.
 The unsigned IPA job stays parallel with the compile wave — no publish. Shared
 steps live in [`.github/actions/ios-build-tests`](../.github/actions/ios-build-tests),
 [`.github/actions/ios-test`](../.github/actions/ios-test), and

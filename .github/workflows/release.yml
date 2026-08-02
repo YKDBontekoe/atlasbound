@@ -64,7 +64,7 @@ jobs:
           UI_MATRIX="$(python3 scripts/ci_test_matrix.py \
             --path AtlasboundUITests \
             --target AtlasboundUITests \
-            --shards 1 \
+            --shards 3 \
             --granularity method \
             --label ui)"
           echo "unit=$UNIT_MATRIX" >> "$GITHUB_OUTPUT"

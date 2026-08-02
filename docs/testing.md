@@ -2,10 +2,10 @@
 
 CI discovers the XCTest suite on every run, compiles once via
 `build-for-testing` into a portable `.xctestproducts` artifact, then runs
-unit/visual and UI smoke as separate `test-without-building` jobs. The unsigned
-IPA job stays parallel with the compile wave. Static validation runs alongside
-them. Releases gate publishing on the complete matrix plus validation and
-packaging.
+unit/visual on one runner and balances UI smoke methods across three
+`test-without-building` runners. The unsigned IPA job stays parallel with the
+compile wave. Static validation runs alongside them. Releases gate publishing
+on the complete matrix plus validation and packaging.
 
 Shared steps live in [`scripts/ci-run-tests.sh`](../scripts/ci-run-tests.sh),
 [`.github/actions/ios-build-tests`](../.github/actions/ios-build-tests) (compile

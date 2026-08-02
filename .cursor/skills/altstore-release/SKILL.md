@@ -59,7 +59,7 @@ https://ykdbontekoe.github.io/atlasbound/apps.json
 
 | Trigger | Workflow | Jobs | Publishes? |
 |---------|----------|------|------------|
-| PR | `build.yml` | `validate` · `build-tests` · 1 unit/visual · 1 UI · `build` | IPA artifact only |
+| PR | `build.yml` | `validate` · `build-tests` · 1 unit/visual · 3 UI shards · `build` | IPA artifact only |
 | Push `main` / dispatch | `release.yml` | same two-wave matrix + IPA → publish gate | Yes |
 
 Compile once via [`.github/actions/ios-build-tests`](../../.github/actions/ios-build-tests); test jobs use [`.github/actions/ios-test`](../../.github/actions/ios-test) and [`scripts/ci-run-tests.sh`](../../scripts/ci-run-tests.sh).
