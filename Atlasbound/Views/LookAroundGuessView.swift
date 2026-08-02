@@ -336,17 +336,36 @@ struct LookAroundGuessView: View {
                 height: max(screen.height, 1)
             )
         }
-        let images = await snapshotEngine.gallerySnapshots(around: target, size: size)
+
+        // Reveal the first frame immediately so the timer can start while
+        // remaining probes finish sequentially in the background.
+        let images = await snapshotEngine.gallerySnapshots(
+            around: target,
+            size: size,
+            onImage: { image in
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    galleryImages.append(image)
+                    sceneUnavailable = false
+                    if isLoadingScene {
+                        isLoadingScene = false
+                    }
+                }
+            }
+        )
+
         guard !Task.isCancelled else { return }
         await MainActor.run {
             if images.isEmpty {
                 galleryImages = []
                 sceneUnavailable = true
-            } else {
+                isLoadingScene = false
+            } else if galleryImages.count != images.count {
+                // Keep the streamed gallery authoritative if a late append raced.
                 galleryImages = images
                 sceneUnavailable = false
+                isLoadingScene = false
             }
-            isLoadingScene = false
         }
     }
 

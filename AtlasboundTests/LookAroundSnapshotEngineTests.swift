@@ -3,17 +3,16 @@ import XCTest
 @testable import Atlasbound
 
 final class LookAroundSnapshotEngineTests: XCTestCase {
-    func testDefaultProbesIncludeSpawnCardinalsDiagonalsAndFarRing() {
+    func testDefaultProbesIncludeSpawnAndCardinalsOnly() {
         let probes = LookAroundGalleryProbe.defaultProbes
-        XCTAssertEqual(probes.count, 13)
+        XCTAssertEqual(probes.count, 5)
         XCTAssertEqual(probes[0], LookAroundGalleryProbe(latitudeOffsetMeters: 0, longitudeOffsetMeters: 0))
         XCTAssertEqual(probes[1], .north)
         XCTAssertEqual(probes[2], .east)
         XCTAssertEqual(probes[3], .south)
         XCTAssertEqual(probes[4], .west)
-        XCTAssertTrue(probes.contains(.northEast))
-        XCTAssertTrue(probes.contains(.farNorth))
-        XCTAssertTrue(probes.contains(.farWest))
+        XCTAssertFalse(probes.contains(.northEast))
+        XCTAssertFalse(probes.contains(.farNorth))
     }
 
     func testProbeEquality() {
@@ -78,6 +77,23 @@ final class LookAroundSnapshotEngineTests: XCTestCase {
     }
 
     func testMaxGalleryImagesCap() {
-        XCTAssertEqual(LookAroundSnapshotEngine.maxGalleryImages, 1)
+        XCTAssertEqual(LookAroundSnapshotEngine.maxGalleryImages, 4)
+    }
+
+    func testGallerySnapshotSizePassesThroughWhenUnderBudget() {
+        let size = CGSize(width: 390, height: 844)
+        let rendered = LookAroundSnapshotEngine.gallerySnapshotSize(for: size)
+        XCTAssertEqual(rendered.width, 390, accuracy: 0.001)
+        XCTAssertEqual(rendered.height, 844, accuracy: 0.001)
+    }
+
+    func testGallerySnapshotSizeCapsLongestEdge() {
+        let size = CGSize(width: 1290, height: 2796)
+        let rendered = LookAroundSnapshotEngine.gallerySnapshotSize(for: size)
+        XCTAssertEqual(rendered.height, LookAroundSnapshotEngine.maxSnapshotPixelDimension, accuracy: 0.001)
+        XCTAssertLessThan(rendered.width, size.width)
+        let expectedAspect = size.width / size.height
+        let renderedAspect = rendered.width / rendered.height
+        XCTAssertEqual(renderedAspect, expectedAspect, accuracy: 0.01)
     }
 }
