@@ -6,7 +6,7 @@ Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily l
 
 ## Current capabilities
 
-- SwiftUI app with five tabs: **Map**, **Pinpoint**, **Journal**, **Progress (Atlas Stats)**, and **Factory**
+- SwiftUI app with four tabs: **Map**, **Pinpoint**, **Workshop** (Journal + Factory), and **Progress (Atlas Stats)**
 - Automatic foreground exploration plus opt-in screen-locked exploration
 - Optional walk/run/cycle/hike/drive/transit tracking and activity history
 - One canonical **20 m** hex atlas

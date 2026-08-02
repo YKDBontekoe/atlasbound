@@ -2,6 +2,17 @@ import SwiftUI
 
 struct FactoryTabView: View {
     @ObservedObject var controller: FactoryController
+
+    var body: some View {
+        NavigationStack {
+            FactoryHubView(controller: controller)
+                .navigationTitle("Factory")
+        }
+    }
+}
+
+struct FactoryHubView: View {
+    @ObservedObject var controller: FactoryController
     @ObservedObject private var store: FactoryStore
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(FactoryTutorialPreference.storageKey) private var tutorialVersion = 0
@@ -15,83 +26,80 @@ struct FactoryTabView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: AtlasTheme.Space.lg) {
-                    heroCard
-                        .staggeredAppear(index: 0)
+        ScrollView {
+            VStack(spacing: AtlasTheme.Space.lg) {
+                heroCard
+                    .staggeredAppear(index: 0)
 
-                    if let message = controller.latestMessage {
-                        StatSectionCard {
-                            FactoryMessageBanner(message: message) {
-                                controller.latestMessage = nil
-                            }
+                if let message = controller.latestMessage {
+                    StatSectionCard {
+                        FactoryMessageBanner(message: message) {
+                            controller.latestMessage = nil
                         }
-                        .staggeredAppear(index: 1)
                     }
+                    .staggeredAppear(index: 1)
+                }
 
-                    overviewCard
-                        .staggeredAppear(index: 2)
-                    manageCard
-                        .staggeredAppear(index: 3)
-                    networksCard
-                        .staggeredAppear(index: 4)
+                overviewCard
+                    .staggeredAppear(index: 2)
+                manageCard
+                    .staggeredAppear(index: 3)
+                networksCard
+                    .staggeredAppear(index: 4)
 
-                    if !store.lifetimeProduced.isEmpty {
-                        ledgerCard
-                            .staggeredAppear(index: 5)
-                    }
-                }
-                .padding(AtlasTheme.Space.xl)
-            }
-            .background(AtlasTheme.canvas(for: colorScheme).ignoresSafeArea())
-            .navigationTitle("Factory")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showsHelp = true
-                    } label: {
-                        Image(systemName: "questionmark.circle")
-                    }
-                    .accessibilityLabel("Factory help")
-                    .accessibilityHint("Opens the quick start guide and status explanations.")
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        controller.advance()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .accessibilityLabel("Refresh factory")
-                    .accessibilityHint("Advances production to the current time and refreshes all factory statuses.")
+                if !store.lifetimeProduced.isEmpty {
+                    ledgerCard
+                        .staggeredAppear(index: 5)
                 }
             }
-            .sheet(isPresented: $showsHelp, onDismiss: {
-                if replaysTutorialAfterHelp {
-                    replaysTutorialAfterHelp = false
-                    showsTutorial = true
+            .padding(AtlasTheme.Space.xl)
+        }
+        .background(AtlasTheme.canvas(for: colorScheme))
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    showsHelp = true
+                } label: {
+                    Image(systemName: "questionmark.circle")
                 }
-            }) {
-                FactoryHelpSheet {
-                    replaysTutorialAfterHelp = true
-                }
-                .presentationDetents([.medium, .large])
+                .accessibilityLabel("Factory help")
+                .accessibilityHint("Opens the quick start guide and status explanations.")
             }
-            .fullScreenCover(isPresented: $showsTutorial) {
-                FactoryTutorialView {
-                    tutorialVersion = FactoryTutorialPreference.currentVersion
-                    showsTutorial = false
-                }
-            }
-            .task {
-                if tutorialVersion < FactoryTutorialPreference.currentVersion {
-                    showsTutorial = true
-                }
-                controller.advance()
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(30))
+            ToolbarItem(placement: .primaryAction) {
+                Button {
                     controller.advance()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
                 }
+                .accessibilityLabel("Refresh factory")
+                .accessibilityHint("Advances production to the current time and refreshes all factory statuses.")
+            }
+        }
+        .sheet(isPresented: $showsHelp, onDismiss: {
+            if replaysTutorialAfterHelp {
+                replaysTutorialAfterHelp = false
+                showsTutorial = true
+            }
+        }) {
+            FactoryHelpSheet {
+                replaysTutorialAfterHelp = true
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .fullScreenCover(isPresented: $showsTutorial) {
+            FactoryTutorialView {
+                tutorialVersion = FactoryTutorialPreference.currentVersion
+                showsTutorial = false
+            }
+        }
+        .task {
+            if tutorialVersion < FactoryTutorialPreference.currentVersion {
+                showsTutorial = true
+            }
+            controller.advance()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                controller.advance()
             }
         }
     }
@@ -252,7 +260,7 @@ struct FactoryTabView: View {
                 if controller.networks.isEmpty {
                     AtlasEmptyState(
                         title: "No road networks",
-                        message: "Craft road kits, then place them from the Map while standing nearby.",
+                        message: "Craft road kits in the Recipe book, then place them from the Map while standing nearby.",
                         systemImage: "road.lanes",
                         artName: "FactoryMark",
                         accent: AtlasTheme.teal

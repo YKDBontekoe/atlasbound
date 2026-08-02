@@ -5,58 +5,74 @@ struct JournalTabView: View {
     @ObservedObject var store: TileStore
     @ObservedObject var activityHistory: ActivityHistoryStore
     @ObservedObject var treasureStore: TreasureStore
+    @ObservedObject var factoryController: FactoryController
+
+    var body: some View {
+        NavigationStack {
+            JournalHubView(
+                controller: controller,
+                store: store,
+                activityHistory: activityHistory,
+                treasureStore: treasureStore,
+                factoryController: factoryController
+            )
+            .navigationTitle("Journal")
+        }
+    }
+}
+
+struct JournalHubView: View {
+    @ObservedObject var controller: WorldController
+    @ObservedObject var store: TileStore
+    @ObservedObject var activityHistory: ActivityHistoryStore
+    @ObservedObject var treasureStore: TreasureStore
+    @ObservedObject var factoryController: FactoryController
     @ObservedObject private var inventoryStore: InventoryStore
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedSession: PersistedActivityRecord?
-    @State private var showAssembleSheet = false
 
     init(
         controller: WorldController,
         store: TileStore,
         activityHistory: ActivityHistoryStore,
-        treasureStore: TreasureStore
+        treasureStore: TreasureStore,
+        factoryController: FactoryController
     ) {
         self.controller = controller
         self.store = store
         self.activityHistory = activityHistory
         self.treasureStore = treasureStore
+        self.factoryController = factoryController
         self._inventoryStore = ObservedObject(wrappedValue: controller.inventoryStore)
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: AtlasTheme.Space.lg) {
-                    trailCard
-                        .staggeredAppear(index: 0)
-                    inventoryCard
-                        .staggeredAppear(index: 1)
-                    if !inventoryStore.cartographerPins.isEmpty {
-                        pinsCard
-                            .staggeredAppear(index: 2)
-                    }
-                    activityHistoryCard
-                        .staggeredAppear(index: 3)
-                    relicsCard
-                        .staggeredAppear(index: 4)
-                    if !store.discoveredTiles.isEmpty {
-                        recentDiscoveriesCard
-                            .staggeredAppear(index: 5)
-                    }
+        ScrollView {
+            VStack(spacing: AtlasTheme.Space.lg) {
+                trailCard
+                    .staggeredAppear(index: 0)
+                inventoryCard
+                    .staggeredAppear(index: 1)
+                if !inventoryStore.cartographerPins.isEmpty {
+                    pinsCard
+                        .staggeredAppear(index: 2)
                 }
-                .padding(AtlasTheme.Space.xl)
-            }
-            .background(AtlasTheme.canvas(for: colorScheme).ignoresSafeArea())
-            .navigationTitle("Journal")
-            .sheet(item: $selectedSession) { session in
-                ActivitySessionDetailView(session: session) {
-                    selectedSession = nil
+                activityHistoryCard
+                    .staggeredAppear(index: 3)
+                relicsCard
+                    .staggeredAppear(index: 4)
+                if !store.discoveredTiles.isEmpty {
+                    recentDiscoveriesCard
+                        .staggeredAppear(index: 5)
                 }
             }
-            .sheet(isPresented: $showAssembleSheet) {
-                AssembleSheet(controller: controller)
-                    .presentationDetents([.medium, .large])
+            .padding(AtlasTheme.Space.xl)
+        }
+        .background(AtlasTheme.canvas(for: colorScheme))
+        .sheet(item: $selectedSession) { session in
+            ActivitySessionDetailView(session: session) {
+                selectedSession = nil
             }
         }
     }
@@ -110,9 +126,7 @@ struct JournalTabView: View {
                         message: "Explore tiles to gather field finds — materials, boosts, and charges.",
                         systemImage: "shippingbox",
                         artName: "FieldKitMark",
-                        accent: AtlasTheme.teal,
-                        actionTitle: "Assemble…",
-                        action: { showAssembleSheet = true }
+                        accent: AtlasTheme.teal
                     )
                 } else {
                     ForEach(Array(inventoryStore.sortedStacks.enumerated()), id: \.element.id) { index, stack in
@@ -135,20 +149,21 @@ struct JournalTabView: View {
                             }
                         )
                     }
-
-                    Button {
-                        showAssembleSheet = true
-                    } label: {
-                        AtlasChromeLinkRow(
-                            title: "Assemble…",
-                            systemImage: "hammer.fill",
-                            subtitle: "Craft kits from materials in your pack.",
-                            accent: AtlasTheme.blue,
-                            showsChevron: false
-                        )
-                    }
-                    .buttonStyle(.plain)
                 }
+
+                NavigationLink {
+                    FactoryRecipeBookView(controller: factoryController)
+                } label: {
+                    AtlasChromeLinkRow(
+                        title: "Recipe book",
+                        systemImage: "book.pages.fill",
+                        subtitle: "Assemble kits and charms from materials in your pack.",
+                        accent: AtlasTheme.blue
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("journalRecipeBookLink")
+                .accessibilityHint("Opens hand assembly and automated factory recipes.")
 
                 Divider().overlay(AtlasTheme.divider(for: colorScheme))
 
@@ -167,7 +182,7 @@ struct JournalTabView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text("Long-press an item to Use, Activate, Salvage, or Discard.")
+                Text("Long-press an item to Use, Activate, Salvage, or Discard. Assemble kits and charms from the Recipe book.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }

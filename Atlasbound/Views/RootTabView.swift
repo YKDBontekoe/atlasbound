@@ -32,16 +32,17 @@ struct RootTabView: View {
                 .accessibilityIdentifier("pinpointTab")
                 .tag(1)
 
-            JournalTabView(
+            WorkshopTabView(
                 controller: controller,
                 store: store,
                 activityHistory: activityHistory,
-                treasureStore: controller.treasureStore
+                treasureStore: controller.treasureStore,
+                factoryController: factoryController
             )
                 .tabItem {
-                    Label("Journal", systemImage: "book.closed.fill")
+                    Label("Workshop", systemImage: "hammer.fill")
                 }
-                .accessibilityIdentifier("journalTab")
+                .accessibilityIdentifier("workshopTab")
                 .tag(2)
 
             ProgressTabView(
@@ -56,13 +57,6 @@ struct RootTabView: View {
                 }
                 .accessibilityIdentifier("progressTab")
                 .tag(3)
-
-            FactoryTabView(controller: factoryController)
-                .tabItem {
-                    Label("Factory", systemImage: "gearshape.2.fill")
-                }
-                .accessibilityIdentifier("factoryTab")
-                .tag(4)
         }
         .tint(AtlasTheme.blue)
         .toolbar(pinpointController.isGameInProgress ? .hidden : .visible, for: .tabBar)

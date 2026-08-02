@@ -17,12 +17,16 @@ final class JournalSnapshotTests: XCTestCase {
     func testJournalEmptyChromeSnapshot() throws {
         let harness = makeHarness(populate: false)
         try SnapshotSupport.assertSnapshot(
-            of: JournalTabView(
-                controller: harness.controller,
-                store: harness.store,
-                activityHistory: harness.history,
-                treasureStore: harness.treasure
-            ),
+            of: NavigationStack {
+                JournalHubView(
+                    controller: harness.controller,
+                    store: harness.store,
+                    activityHistory: harness.history,
+                    treasureStore: harness.treasure,
+                    factoryController: harness.factory
+                )
+                .navigationTitle("Journal")
+            },
             named: "JournalEmpty"
         )
     }
@@ -30,12 +34,16 @@ final class JournalSnapshotTests: XCTestCase {
     func testJournalPopulatedChromeSnapshot() throws {
         let harness = makeHarness(populate: true)
         try SnapshotSupport.assertSnapshot(
-            of: JournalTabView(
-                controller: harness.controller,
-                store: harness.store,
-                activityHistory: harness.history,
-                treasureStore: harness.treasure
-            ),
+            of: NavigationStack {
+                JournalHubView(
+                    controller: harness.controller,
+                    store: harness.store,
+                    activityHistory: harness.history,
+                    treasureStore: harness.treasure,
+                    factoryController: harness.factory
+                )
+                .navigationTitle("Journal")
+            },
             named: "JournalPopulated"
         )
     }
@@ -43,12 +51,16 @@ final class JournalSnapshotTests: XCTestCase {
     func testJournalRendersAtLargeText() throws {
         let harness = makeHarness(populate: true)
         try SnapshotSupport.assertRenders(
-            JournalTabView(
-                controller: harness.controller,
-                store: harness.store,
-                activityHistory: harness.history,
-                treasureStore: harness.treasure
-            )
+            NavigationStack {
+                JournalHubView(
+                    controller: harness.controller,
+                    store: harness.store,
+                    activityHistory: harness.history,
+                    treasureStore: harness.treasure,
+                    factoryController: harness.factory
+                )
+                .navigationTitle("Journal")
+            }
             .environment(\.sizeCategory, .accessibilityLarge),
             size: SnapshotSupport.canvasSize
         )
@@ -61,7 +73,7 @@ final class JournalSnapshotTests: XCTestCase {
                 message: "Explore tiles to gather field finds — materials, boosts, and charges.",
                 systemImage: "shippingbox",
                 accent: AtlasTheme.teal,
-                actionTitle: "Assemble…",
+                actionTitle: "Recipe book",
                 action: {}
             )
         }
@@ -107,6 +119,7 @@ final class JournalSnapshotTests: XCTestCase {
         let store: TileStore
         let history: ActivityHistoryStore
         let treasure: TreasureStore
+        let factory: FactoryController
     }
 
     private func makeHarness(populate: Bool) -> Harness {
@@ -117,6 +130,7 @@ final class JournalSnapshotTests: XCTestCase {
         let history = ActivityHistoryStore(fileURL: temporaryURL("journal-snapshot-history"))
         let treasure = TreasureStore(fileURL: temporaryURL("journal-snapshot-treasure"))
         let inventory = InventoryStore(fileURL: temporaryURL("journal-snapshot-inventory"))
+        let factoryStore = FactoryStore(fileURL: temporaryURL("journal-snapshot-factory"))
 
         if populate {
             inventory.deposit([
@@ -168,7 +182,18 @@ final class JournalSnapshotTests: XCTestCase {
             treasureStore: treasure,
             inventoryStore: inventory
         )
-        return Harness(controller: controller, store: store, history: history, treasure: treasure)
+        let factory = FactoryController(
+            store: factoryStore,
+            tileStore: store,
+            inventoryStore: inventory
+        )
+        return Harness(
+            controller: controller,
+            store: store,
+            history: history,
+            treasure: treasure,
+            factory: factory
+        )
     }
 
     private func temporaryURL(_ label: String) -> URL {
