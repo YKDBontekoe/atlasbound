@@ -329,24 +329,47 @@ struct LookAroundGuessView: View {
     }
 
     private func loadGallery() async {
-        let size = await MainActor.run { () -> CGSize in
+        let (size, scale) = await MainActor.run { () -> (CGSize, CGFloat) in
             let screen = UIScreen.main.bounds.size
-            return CGSize(
-                width: max(screen.width, 1),
-                height: max(screen.height, 1)
+            return (
+                CGSize(width: max(screen.width, 1), height: max(screen.height, 1)),
+                UIScreen.main.scale
             )
         }
-        let images = await snapshotEngine.gallerySnapshots(around: target, size: size)
+
+        // Reveal the first frame immediately so the timer can start while
+        // remaining probes finish sequentially under a short GeoServices budget.
+        let images = await snapshotEngine.gallerySnapshots(
+            around: target,
+            size: size,
+            scale: scale,
+            shouldContinue: {
+                await MainActor.run { !showGuessMap }
+            },
+            onImage: { image in
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    galleryImages.append(image)
+                    sceneUnavailable = false
+                    if isLoadingScene {
+                        isLoadingScene = false
+                    }
+                }
+            }
+        )
+
         guard !Task.isCancelled else { return }
         await MainActor.run {
             if images.isEmpty {
                 galleryImages = []
                 sceneUnavailable = true
-            } else {
+                isLoadingScene = false
+            } else if galleryImages.count != images.count {
+                // Keep the streamed gallery authoritative if a late append raced.
                 galleryImages = images
                 sceneUnavailable = false
+                isLoadingScene = false
             }
-            isLoadingScene = false
         }
     }
 

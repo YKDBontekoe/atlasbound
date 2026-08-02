@@ -90,6 +90,8 @@ A location-guessing game alongside the tile discovery mode.
 
 Flow: lobby (Worldwide or Home Turf) → preparing (dynamic Look Around scouting with progress) → 5 rounds (static Look Around gallery around spawn + timer → tap map to guess → score) → game over → submit to Game Center leaderboard. No live `MKLookAroundViewController` during play (avoids place-name spoilers). Worldwide samples random streets inside Look Around coverage regions (not a fixed landmark list).
 
+Gallery performance: up to four frames from spawn + cardinal probes, captured **sequentially**, decoded under a 1024px long-edge budget, with a short post-first-frame probe budget so GeoServices stays available for Worldwide scouting.
+
 Persistence: Pinpoint tables inside `Documents/atlasbound.sqlite`. Leaderboard ID: `com.atlasbound.geoguessr.highscore`.
 
 ## Treasure trails

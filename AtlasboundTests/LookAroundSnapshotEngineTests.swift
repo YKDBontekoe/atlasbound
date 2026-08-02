@@ -3,17 +3,16 @@ import XCTest
 @testable import Atlasbound
 
 final class LookAroundSnapshotEngineTests: XCTestCase {
-    func testDefaultProbesIncludeSpawnCardinalsDiagonalsAndFarRing() {
+    func testDefaultProbesIncludeSpawnAndCardinalsOnly() {
         let probes = LookAroundGalleryProbe.defaultProbes
-        XCTAssertEqual(probes.count, 13)
+        XCTAssertEqual(probes.count, 5)
         XCTAssertEqual(probes[0], LookAroundGalleryProbe(latitudeOffsetMeters: 0, longitudeOffsetMeters: 0))
         XCTAssertEqual(probes[1], .north)
         XCTAssertEqual(probes[2], .east)
         XCTAssertEqual(probes[3], .south)
         XCTAssertEqual(probes[4], .west)
-        XCTAssertTrue(probes.contains(.northEast))
-        XCTAssertTrue(probes.contains(.farNorth))
-        XCTAssertTrue(probes.contains(.farWest))
+        XCTAssertFalse(probes.contains(.northEast))
+        XCTAssertFalse(probes.contains(.farNorth))
     }
 
     func testProbeEquality() {
@@ -78,6 +77,30 @@ final class LookAroundSnapshotEngineTests: XCTestCase {
     }
 
     func testMaxGalleryImagesCap() {
-        XCTAssertEqual(LookAroundSnapshotEngine.maxGalleryImages, 1)
+        XCTAssertEqual(LookAroundSnapshotEngine.maxGalleryImages, 4)
+    }
+
+    func testAdditionalProbeBudgetIsBounded() {
+        XCTAssertEqual(LookAroundSnapshotEngine.additionalProbeBudget, .milliseconds(2_500))
+    }
+
+    func testGallerySnapshotSizePassesThroughWhenUnderPixelBudget() {
+        let size = CGSize(width: 300, height: 300)
+        let rendered = LookAroundSnapshotEngine.gallerySnapshotSize(for: size, scale: 2)
+        XCTAssertEqual(rendered.width, 300, accuracy: 0.001)
+        XCTAssertEqual(rendered.height, 300, accuracy: 0.001)
+    }
+
+    func testGallerySnapshotSizeAccountsForScreenScale() {
+        // 1290×2796 pt would be enormous; even 430×932 @3x exceeds the 1024px budget.
+        let size = CGSize(width: 430, height: 932)
+        let rendered = LookAroundSnapshotEngine.gallerySnapshotSize(for: size, scale: 3)
+        let longestPixels = max(rendered.width, rendered.height) * 3
+        XCTAssertLessThanOrEqual(longestPixels, LookAroundSnapshotEngine.maxSnapshotPixelDimension + 1)
+        XCTAssertLessThan(rendered.height, size.height)
+
+        let expectedAspect = size.width / size.height
+        let renderedAspect = rendered.width / rendered.height
+        XCTAssertEqual(renderedAspect, expectedAspect, accuracy: 0.01)
     }
 }
