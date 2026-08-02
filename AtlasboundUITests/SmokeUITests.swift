@@ -65,6 +65,22 @@ final class SmokeUITests: XCTestCase {
             app.navigationBars["Journal"].waitForExistence(timeout: 8)
                 || app.staticTexts["Today’s Trail"].waitForExistence(timeout: 2)
         )
+
+        let trailCard = app.descendants(matching: .any)["treasureAdventureCard"].firstMatch
+        if trailCard.waitForExistence(timeout: 5) {
+            trailCard.tap()
+            XCTAssertTrue(
+                app.navigationBars["Treasure Hunt"].waitForExistence(timeout: 5),
+                "Tapping Today’s treasure trail should open Treasure Hunt details"
+            )
+            let done = app.buttons["Done"].firstMatch
+            if done.waitForExistence(timeout: 2) {
+                done.tap()
+            } else {
+                app.swipeDown()
+            }
+        }
+
         XCTAssertTrue(
             app.staticTexts["Inventory"].waitForExistence(timeout: 5)
                 || app.buttons["Recipe book"].waitForExistence(timeout: 2)
