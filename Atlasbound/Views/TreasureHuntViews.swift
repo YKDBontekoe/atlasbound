@@ -2,12 +2,14 @@ import SwiftUI
 
 struct TreasureAdventureCard: View {
     @ObservedObject var store: TreasureStore
+    /// When false, renders as an inline row for card interiors (Journal) without nested glass.
+    var usesGlassChrome: Bool = true
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                AtlasArtMark(name: "TreasureCacheMark", size: 42)
+            HStack(spacing: AtlasTheme.Space.md) {
+                AtlasArtMark(name: "TreasureCacheMark", size: usesGlassChrome ? 42 : 36)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(store.weeklyVault.isUnlocked ? "Weekly vault revealed" : "Today’s treasure trail")
                         .font(.subheadline.weight(.semibold))
@@ -16,20 +18,22 @@ struct TreasureAdventureCard: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                Spacer()
+                Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.secondary)
             }
-            .padding(12)
+            .padding(usesGlassChrome ? AtlasTheme.Space.md : 0)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .background {
-            GlassChrome(
-                shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
-                weight: .regular
-            )
+            if usesGlassChrome {
+                GlassChrome(
+                    shape: RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous),
+                    weight: .regular
+                )
+            }
         }
         .accessibilityIdentifier("treasureAdventureCard")
     }

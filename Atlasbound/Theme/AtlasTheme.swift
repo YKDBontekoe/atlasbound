@@ -63,6 +63,16 @@ enum AtlasTheme {
     static let cardRadius: CGFloat = 20
     static let pillRadius: CGFloat = 22
 
+    /// Compact spacing scale for shared chrome (section stacks, empty states, metric rows).
+    enum Space {
+        static let xs: CGFloat = 4
+        static let sm: CGFloat = 8
+        static let md: CGFloat = 12
+        static let lg: CGFloat = 16
+        static let xl: CGFloat = 20
+        static let xxl: CGFloat = 24
+    }
+
     /// Map camera meters when following the user during a recording.
     static let mapSpanRecordingMeters: Double = 650
     /// Map camera meters when idle / recentering outside a session.

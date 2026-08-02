@@ -48,25 +48,91 @@ struct JournalHubView: View {
     }
 
     var body: some View {
-        List {
-            Section("Today’s Trail") {
-                TreasureAdventureCard(store: treasureStore) {}
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                LabeledContent("Progress", value: treasureStore.trailProgressLabel)
-                LabeledContent(
-                    "Vault keys",
-                    value: "\(treasureStore.weeklyVault.keys)/\(TreasureConstants.keysRequiredForVault)"
+        ScrollView {
+            VStack(spacing: AtlasTheme.Space.lg) {
+                trailCard
+                    .staggeredAppear(index: 0)
+                inventoryCard
+                    .staggeredAppear(index: 1)
+                if !inventoryStore.cartographerPins.isEmpty {
+                    pinsCard
+                        .staggeredAppear(index: 2)
+                }
+                activityHistoryCard
+                    .staggeredAppear(index: 3)
+                relicsCard
+                    .staggeredAppear(index: 4)
+                if !store.discoveredTiles.isEmpty {
+                    recentDiscoveriesCard
+                        .staggeredAppear(index: 5)
+                }
+            }
+            .padding(AtlasTheme.Space.xl)
+        }
+        .background(AtlasTheme.canvas(for: colorScheme))
+        .sheet(item: $selectedSession) { session in
+            ActivitySessionDetailView(session: session) {
+                selectedSession = nil
+            }
+        }
+    }
+
+    // MARK: - Today’s Trail
+
+    private var trailCard: some View {
+        StatSectionCard {
+            VStack(alignment: .leading, spacing: AtlasTheme.Space.md) {
+                AtlasSectionHeader(
+                    title: "Today’s Trail",
+                    subtitle: "Follow clues to recover relics and vault keys.",
+                    systemImage: "map.fill",
+                    accent: AtlasTheme.gold
+                )
+
+                TreasureAdventureCard(store: treasureStore, usesGlassChrome: false) {}
+
+                Divider().overlay(AtlasTheme.divider(for: colorScheme))
+
+                AtlasMetricRow(
+                    label: "Progress",
+                    value: treasureStore.trailProgressLabel,
+                    systemImage: "flag.checkered"
+                )
+                AtlasMetricRow(
+                    label: "Vault keys",
+                    value: "\(treasureStore.weeklyVault.keys)/\(TreasureConstants.keysRequiredForVault)",
+                    valueColor: treasureStore.weeklyVault.keys > 0 ? AtlasTheme.gold : .primary,
+                    systemImage: "key.fill"
                 )
             }
+        }
+    }
 
-            Section {
+    // MARK: - Inventory
+
+    private var inventoryCard: some View {
+        StatSectionCard {
+            VStack(alignment: .leading, spacing: AtlasTheme.Space.md) {
+                AtlasSectionHeader(
+                    title: "Inventory",
+                    subtitle: "Field finds, materials, and charges from the trail.",
+                    systemImage: "shippingbox.fill",
+                    accent: AtlasTheme.teal
+                )
+
                 if inventoryStore.sortedStacks.isEmpty {
-                    Text("Explore tiles to gather field finds — materials, boosts, and charges.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    AtlasEmptyState(
+                        title: "Pack is empty",
+                        message: "Explore tiles to gather field finds — materials, boosts, and charges.",
+                        systemImage: "shippingbox",
+                        artName: "FieldKitMark",
+                        accent: AtlasTheme.teal
+                    )
                 } else {
-                    ForEach(inventoryStore.sortedStacks) { stack in
+                    ForEach(Array(inventoryStore.sortedStacks.enumerated()), id: \.element.id) { index, stack in
+                        if index > 0 {
+                            Divider().overlay(AtlasTheme.divider(for: colorScheme))
+                        }
                         InventoryItemRow(
                             stack: stack,
                             onUse: {
@@ -88,43 +154,91 @@ struct JournalHubView: View {
                 NavigationLink {
                     FactoryRecipeBookView(controller: factoryController)
                 } label: {
-                    Label("Recipe book", systemImage: "book.pages.fill")
+                    AtlasChromeLinkRow(
+                        title: "Recipe book",
+                        systemImage: "book.pages.fill",
+                        subtitle: "Assemble kits and charms from materials in your pack.",
+                        accent: AtlasTheme.blue
+                    )
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("journalRecipeBookLink")
                 .accessibilityHint("Opens hand assembly and automated factory recipes.")
 
-                LabeledContent("Finds today", value: "\(inventoryStore.findsClaimedToday)/\(FieldFindConstants.maxFindsPerDay)")
-                LabeledContent("Lifetime finds", value: "\(inventoryStore.lifetimeFindsCollected)")
+                Divider().overlay(AtlasTheme.divider(for: colorScheme))
+
+                AtlasMetricRow(
+                    label: "Finds today",
+                    value: "\(inventoryStore.findsClaimedToday)/\(FieldFindConstants.maxFindsPerDay)"
+                )
+                AtlasMetricRow(
+                    label: "Lifetime finds",
+                    value: "\(inventoryStore.lifetimeFindsCollected)"
+                )
 
                 if let message = inventoryStore.latestActionMessage {
                     Text(message)
-                        .font(.footnote)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-            } header: {
-                Text("Inventory")
-            } footer: {
+
                 Text("Long-press an item to Use, Activate, Salvage, or Discard. Assemble kits and charms from the Recipe book.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
+        }
+    }
 
-            if !inventoryStore.cartographerPins.isEmpty {
-                Section("Pinned tiles") {
-                    ForEach(inventoryStore.cartographerPins.suffix(12).reversed()) { pin in
-                        LabeledContent(
-                            pin.note,
-                            value: pin.pinnedAt.formatted(date: .abbreviated, time: .shortened)
-                        )
+    // MARK: - Pins
+
+    private var pinsCard: some View {
+        StatSectionCard {
+            VStack(alignment: .leading, spacing: AtlasTheme.Space.md) {
+                AtlasSectionHeader(
+                    title: "Pinned tiles",
+                    subtitle: "Cartographer markers saved from the field.",
+                    systemImage: "mappin.circle.fill",
+                    accent: AtlasTheme.blue
+                )
+
+                ForEach(Array(inventoryStore.cartographerPins.suffix(12).reversed().enumerated()), id: \.element.id) { index, pin in
+                    if index > 0 {
+                        Divider().overlay(AtlasTheme.divider(for: colorScheme))
                     }
+                    AtlasMetricRow(
+                        label: pin.note,
+                        value: pin.pinnedAt.formatted(date: .abbreviated, time: .shortened),
+                        systemImage: "mappin"
+                    )
                 }
             }
+        }
+    }
 
-            Section("Optional Activity History") {
+    // MARK: - Activity history
+
+    private var activityHistoryCard: some View {
+        StatSectionCard {
+            VStack(alignment: .leading, spacing: AtlasTheme.Space.md) {
+                AtlasSectionHeader(
+                    title: "Optional Activity History",
+                    subtitle: "Fitness details when you track a session from the Map.",
+                    systemImage: "figure.walk",
+                    accent: AtlasTheme.blue
+                )
+
                 if activityHistory.sessions.isEmpty {
-                    Text("Track a walk, ride, or other activity from the Map when you want fitness details.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    AtlasEmptyState(
+                        title: "No tracked sessions",
+                        message: "Track a walk, ride, or other activity from the Map when you want fitness details.",
+                        systemImage: "figure.walk.motion",
+                        accent: AtlasTheme.blue
+                    )
                 } else {
-                    ForEach(Array(activityHistory.sessions.suffix(3).reversed())) { session in
+                    ForEach(Array(activityHistory.sessions.suffix(3).reversed().enumerated()), id: \.element.id) { index, session in
+                        if index > 0 {
+                            Divider().overlay(AtlasTheme.divider(for: colorScheme))
+                        }
                         Button {
                             selectedSession = session
                         } label: {
@@ -132,23 +246,48 @@ struct JournalHubView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    NavigationLink("See all tracked activities") {
+
+                    NavigationLink {
                         ActivityHistoryView(activityHistory: activityHistory)
+                    } label: {
+                        AtlasChromeLinkRow(
+                            title: "See all tracked activities",
+                            systemImage: "list.bullet.rectangle",
+                            accent: AtlasTheme.blue
+                        )
                     }
+                    .buttonStyle(.plain)
                 }
             }
+        }
+    }
 
-            Section("Relic Collection") {
+    // MARK: - Relics
+
+    private var relicsCard: some View {
+        StatSectionCard {
+            VStack(alignment: .leading, spacing: AtlasTheme.Space.md) {
+                AtlasSectionHeader(
+                    title: "Relic Collection",
+                    subtitle: "Landmarks recovered from treasure trails and vaults.",
+                    systemImage: "sparkles",
+                    accent: AtlasTheme.gold
+                )
+
                 if treasureStore.relics.isEmpty {
-                    ContentUnavailableView {
-                        Label("No relics yet", systemImage: "sparkles")
-                    } description: {
-                        Text("Complete today’s treasure trail to recover your first relic.")
-                    }
-                    .listRowBackground(Color.clear)
+                    AtlasEmptyState(
+                        title: "No relics yet",
+                        message: "Complete today’s treasure trail to recover your first relic.",
+                        systemImage: "sparkles",
+                        artName: "TreasureCacheMark",
+                        accent: AtlasTheme.gold
+                    )
                 } else {
-                    ForEach(Array(treasureStore.relics.suffix(12).reversed())) { relic in
-                        HStack(spacing: 12) {
+                    ForEach(Array(treasureStore.relics.suffix(12).reversed().enumerated()), id: \.element.id) { index, relic in
+                        if index > 0 {
+                            Divider().overlay(AtlasTheme.divider(for: colorScheme))
+                        }
+                        HStack(spacing: AtlasTheme.Space.md) {
                             Image(systemName: relic.theme.symbolName)
                                 .foregroundStyle(AtlasTheme.gold)
                                 .frame(width: 34, height: 34)
@@ -160,7 +299,7 @@ struct JournalHubView: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
-                            Spacer()
+                            Spacer(minLength: 0)
                             Text(relic.rarity.displayName)
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(relic.rarity >= .rare ? AtlasTheme.gold : .secondary)
@@ -168,21 +307,30 @@ struct JournalHubView: View {
                     }
                 }
             }
+        }
+    }
 
-            Section("Recent Discoveries") {
-                ForEach(Array(store.discoveredTiles.suffix(5).reversed())) { tile in
-                    LabeledContent(
-                        tile.state.displayName,
+    // MARK: - Recent discoveries
+
+    private var recentDiscoveriesCard: some View {
+        StatSectionCard {
+            VStack(alignment: .leading, spacing: AtlasTheme.Space.md) {
+                AtlasSectionHeader(
+                    title: "Recent Discoveries",
+                    subtitle: "Latest hexes added to your atlas.",
+                    systemImage: "hexagon.fill",
+                    accent: AtlasTheme.teal
+                )
+
+                ForEach(Array(store.discoveredTiles.suffix(5).reversed().enumerated()), id: \.element.id) { index, tile in
+                    if index > 0 {
+                        Divider().overlay(AtlasTheme.divider(for: colorScheme))
+                    }
+                    AtlasMetricRow(
+                        label: tile.state.displayName,
                         value: tile.firstVisitedAt?.formatted(date: .abbreviated, time: .omitted) ?? "Today"
                     )
                 }
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background(AtlasTheme.canvas(for: colorScheme))
-        .sheet(item: $selectedSession) { session in
-            ActivitySessionDetailView(session: session) {
-                selectedSession = nil
             }
         }
     }
