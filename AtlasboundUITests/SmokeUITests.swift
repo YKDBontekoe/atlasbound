@@ -86,37 +86,62 @@ final class SmokeUITests: XCTestCase {
         progressTab.tap()
 
         // Simulator MapKit sessions can terminate the process here (also flakes on main).
-        // Poll `.exists` only while the app is alive — `waitForExistence` throws on a dead process.
-        let deadline = Date().addingTimeInterval(12)
+        // Checking `app.state` before `.exists` still races: a mid-query disconnect hard-fails
+        // XCTest ("Failed to get matching snapshots: Lost connection…"). Expect that failure
+        // and convert it to the same XCTSkip path used when the process is already dead.
         var sawChrome = false
-        while Date() < deadline {
-            let state = app.state
-            guard state == .runningForeground || state == .runningBackground else {
-                throw XCTSkip("App terminated before Progress tab could load in this simulator session")
+        var appDied = false
+        let connectionLossOptions = Self.lostAppConnectionFailureOptions()
+
+        XCTExpectFailure(
+            "Progress tab MapKit sessions can terminate the simulator process",
+            options: connectionLossOptions
+        ) {
+            let deadline = Date().addingTimeInterval(12)
+            while Date() < deadline {
+                guard self.isAppProcessAlive else {
+                    appDied = true
+                    return
+                }
+                if app.navigationBars["Atlas Stats"].exists
+                    || app.staticTexts["Atlas Stats"].exists
+                    || app.staticTexts["Territory conquered"].exists
+                    || app.staticTexts["Lifetime XP"].exists {
+                    sawChrome = true
+                    return
+                }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.35))
             }
-            if app.navigationBars["Atlas Stats"].exists
-                || app.staticTexts["Atlas Stats"].exists
-                || app.staticTexts["Territory conquered"].exists
-                || app.staticTexts["Lifetime XP"].exists {
-                sawChrome = true
-                break
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+        }
+
+        if appDied || !isAppProcessAlive {
+            throw XCTSkip("App terminated before Progress tab could load in this simulator session")
         }
         guard sawChrome else {
             throw XCTSkip("Progress tab chrome not available in this simulator session")
         }
 
-        guard app.state == .runningForeground || app.state == .runningBackground else {
+        var hasExplorerContent = false
+        XCTExpectFailure(
+            "Progress tab MapKit sessions can terminate the simulator process",
+            options: connectionLossOptions
+        ) {
+            guard self.isAppProcessAlive else {
+                appDied = true
+                return
+            }
+            hasExplorerContent =
+                app.staticTexts["Territory conquered"].exists
+                || app.staticTexts["Lifetime XP"].exists
+                || app.staticTexts["Mastery ladder"].exists
+                || app.staticTexts["Frontier"].exists
+                || revealStaticText("Territory conquered")
+                || revealStaticText("Lifetime XP")
+        }
+
+        if appDied || !isAppProcessAlive {
             throw XCTSkip("App terminated while Progress tab was visible")
         }
-        let hasExplorerContent =
-            app.staticTexts["Territory conquered"].exists
-            || app.staticTexts["Lifetime XP"].exists
-            || app.staticTexts["Mastery ladder"].exists
-            || app.staticTexts["Frontier"].exists
-            || revealStaticText("Territory conquered")
-            || revealStaticText("Lifetime XP")
         guard hasExplorerContent else {
             throw XCTSkip("Progress explorer sections not available in this simulator session")
         }
@@ -234,6 +259,24 @@ final class SmokeUITests: XCTestCase {
 
     private func firstExisting(_ elements: XCUIElement...) -> XCUIElement {
         elements.first ?? app.buttons.firstMatch
+    }
+
+    private var isAppProcessAlive: Bool {
+        let state = app.state
+        return state == .runningForeground || state == .runningBackground
+    }
+
+    /// Matches XCTest issues raised when the app process dies mid element query.
+    private static func lostAppConnectionFailureOptions() -> XCTExpectedFailure.Options {
+        let options = XCTExpectedFailure.Options()
+        options.isStrict = false
+        options.issueMatcher = { issue in
+            let text = issue.compactDescription
+            return text.contains("Lost connection")
+                || text.contains("Failed to get matching snapshots")
+                || text.contains("communicate with a helper application")
+        }
+        return options
     }
 
     /// Scrolls the frontmost scroll view a few times to materialize lazy list content.
