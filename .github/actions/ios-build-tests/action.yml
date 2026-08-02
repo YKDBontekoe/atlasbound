@@ -1,0 +1,71 @@
+name: iOS build-for-testing
+description: Compile the scheme once and upload portable test products for later test-without-building jobs.
+
+inputs:
+  test-products-path:
+    description: Path where build-for-testing writes the .xctestproducts archive
+    required: false
+    default: dist/Atlasbound.xctestproducts
+  upload-artifact-name:
+    description: Artifact name for the test products; empty skips upload
+    required: false
+    default: atlasbound-test-products
+  artifact-retention-days:
+    description: Artifact retention in days
+    required: false
+    default: "7"
+
+runs:
+  using: composite
+  steps:
+    - name: Restore Xcode build cache
+      uses: actions/cache@v4
+      with:
+        path: build/TestDerivedData
+        key: atlasbound-xcode-${{ runner.os }}-${{ runner.arch }}-${{ env.ATLASBOUND_XCODE_CACHE_VERSION }}-${{ hashFiles('Atlasbound.xcodeproj/project.pbxproj', 'Atlasbound.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Atlasbound/**/*.swift', 'AtlasboundTests/**/*.swift', 'AtlasboundUITests/**/*.swift') }}
+        restore-keys: |
+          atlasbound-xcode-${{ runner.os }}-${{ runner.arch }}-${{ env.ATLASBOUND_XCODE_CACHE_VERSION }}-
+
+    - name: Build for testing
+      shell: bash
+      env:
+        CI_TEST_MODE: build
+        TEST_PRODUCTS_PATH: ${{ inputs.test-products-path }}
+        DERIVED_DATA_PATH: build/TestDerivedData
+      run: |
+        set -euo pipefail
+        chmod +x scripts/ci-run-tests.sh
+        ./scripts/ci-run-tests.sh
+
+    - name: Pack test products
+      if: inputs.upload-artifact-name != ''
+      shell: bash
+      env:
+        TEST_PRODUCTS_PATH: ${{ inputs.test-products-path }}
+      run: |
+        set -euo pipefail
+        mkdir -p dist
+        # Prefer .xctestproducts; otherwise pack the xctestrun + Products fallback.
+        if [[ -e "$TEST_PRODUCTS_PATH" ]]; then
+          tar -C "$(dirname "$TEST_PRODUCTS_PATH")" \
+            -czf dist/Atlasbound.testproducts.tgz \
+            "$(basename "$TEST_PRODUCTS_PATH")"
+        elif [[ -d dist/TestProducts ]]; then
+          tar -C dist \
+            -czf dist/Atlasbound.testproducts.tgz \
+            TestProducts
+        else
+          echo "No test products to pack" >&2
+          ls -la dist >&2 || true
+          exit 1
+        fi
+        ls -lh dist/Atlasbound.testproducts.tgz
+
+    - name: Upload test products
+      if: inputs.upload-artifact-name != ''
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.upload-artifact-name }}
+        path: dist/Atlasbound.testproducts.tgz
+        if-no-files-found: error
+        retention-days: ${{ inputs.artifact-retention-days }}

@@ -1,9 +1,9 @@
 name: Build IPA
 
-# PR validation: static checks, unit/snapshot tests, UI tests, and the unsigned
-# IPA artifact all run independently so the slowest shard defines elapsed time.
-# Releases (with automatic versioning) are handled by "Build IPA & AltStore Source"
-# on pushes to main.
+# PR validation: static checks, one shared build-for-testing, unit +
+# sharded UI test-without-building jobs, and the unsigned IPA artifact.
+# Releases (with automatic versioning) are handled by
+# "Build IPA & AltStore Source" on pushes to main.
 
 on:
   pull_request:
@@ -58,9 +58,27 @@ jobs:
           chmod +x scripts/validate-pr.sh scripts/check-privacy-alignment.py
           ./scripts/validate-pr.sh
 
+  build-tests:
+    name: Build for testing
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: ./.github/actions/xcode-select
+
+      - name: Build test products
+        uses: ./.github/actions/ios-build-tests
+        with:
+          upload-artifact-name: atlasbound-test-products
+          artifact-retention-days: "7"
+
   test-unit:
     name: Unit + visual (${{ matrix.name }})
-    needs: test-plan
+    needs: [test-plan, build-tests]
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.test-plan.outputs.unit) }}
@@ -75,6 +93,8 @@ jobs:
       - name: Run iOS tests
         uses: ./.github/actions/ios-test
         with:
+          mode: test
+          test-products-artifact: atlasbound-test-products
           result-bundle: UnitTestResults-${{ matrix.name }}.xcresult
           only-testing: ${{ matrix.only_testing }}
           upload-artifact-name: atlasbound-unit-test-results-${{ matrix.name }}
@@ -82,7 +102,8 @@ jobs:
 
   test-ui:
     name: UI smoke (${{ matrix.name }})
-    needs: test-plan
+    needs: [test-plan, build-tests]
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.test-plan.outputs.ui) }}
@@ -97,6 +118,8 @@ jobs:
       - name: Run UI tests
         uses: ./.github/actions/ios-test
         with:
+          mode: test
+          test-products-artifact: atlasbound-test-products
           result-bundle: UITestResults-${{ matrix.name }}.xcresult
           only-testing: ${{ matrix.only_testing }}
           upload-artifact-name: atlasbound-ui-test-results-${{ matrix.name }}
@@ -105,6 +128,7 @@ jobs:
   build:
     name: Build unsigned IPA
     runs-on: macos-15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4

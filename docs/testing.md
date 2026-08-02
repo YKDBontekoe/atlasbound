@@ -1,19 +1,21 @@
 # Testing
 
-CI discovers the XCTest suite on every run, runs unit/visual tests on one
-macOS runner, and balances UI test methods across three more. Together with the
-unsigned IPA job, this fills the five available macOS runner slots without
-creating a second queued wave. Static validation runs alongside them.
-Releases gate publishing on the complete matrix plus validation and packaging.
+CI discovers the XCTest suite on every run, compiles once via
+`build-for-testing` into a portable `.xctestproducts` artifact, then runs
+unit/visual on one runner and balances UI smoke methods across three
+`test-without-building` runners. The unsigned IPA job stays parallel with the
+compile wave. Static validation runs alongside them. Releases gate publishing
+on the complete matrix plus validation and packaging.
 
-Shared macOS test steps live in [`scripts/ci-run-tests.sh`](../scripts/ci-run-tests.sh) and [`.github/actions/ios-test`](../.github/actions/ios-test) (simulator boot, snapshot bootstrap, `xcodebuild test`).
-The shared action restores a versioned Xcode DerivedData cache so later commits
-can compile incrementally; unit/visual and UI targets use separate runners but
-the same cache lineage.
+Shared steps live in [`scripts/ci-run-tests.sh`](../scripts/ci-run-tests.sh),
+[`.github/actions/ios-build-tests`](../.github/actions/ios-build-tests) (compile
++ DerivedData cache + product upload), and
+[`.github/actions/ios-test`](../.github/actions/ios-test) (download products,
+simulator boot, snapshot bootstrap, `test-without-building`).
 
-The simulator starts before `xcodebuild build-for-testing`, so its cold boot
-overlaps compilation. Tests then use `test-without-building` after the simulator
-is ready.
+Locally, `CI_TEST_MODE=all` (default) still builds then tests in one process.
+In Actions, `CI_TEST_MODE=build` and `CI_TEST_MODE=test` split that work so
+each runner does not recompile.
 
 ## Automated suite
 
@@ -31,8 +33,12 @@ is ready.
 # Static checks (no Xcode)
 ./scripts/validate-pr.sh
 
-# Unit + visual + UI tests (simulator; same entry point as CI)
+# Unit + visual + UI tests (simulator; local build+test parity)
 ./scripts/ci-run-tests.sh
+
+# Optional: match CI split locally
+CI_TEST_MODE=build ./scripts/ci-run-tests.sh
+CI_TEST_MODE=test ./scripts/ci-run-tests.sh
 
 # Or invoke xcodebuild directly
 xcodebuild test \
