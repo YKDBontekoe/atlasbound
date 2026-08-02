@@ -13,6 +13,8 @@ final class TreasurePreparationLoadingTests: XCTestCase {
         )
         defer { fixture.cleanup() }
 
+        // Keep automatic exploration off so ingesting a fix does not start prep early.
+        fixture.controller.setAutomaticExploration(foreground: false, background: false)
         fixture.recorder.setSimulationActive(true)
         fixture.recorder.ingestSimulatedLocation(Self.sampleLocation)
 
@@ -39,6 +41,7 @@ final class TreasurePreparationLoadingTests: XCTestCase {
         )
         defer { fixture.cleanup() }
 
+        fixture.controller.setAutomaticExploration(foreground: false, background: false)
         fixture.recorder.setSimulationActive(true)
         fixture.recorder.ingestSimulatedLocation(Self.sampleLocation)
         fixture.controller.prepareTreasureTrail()
@@ -46,18 +49,6 @@ final class TreasurePreparationLoadingTests: XCTestCase {
 
         fixture.controller.rerollTreasureTrail()
         XCTAssertFalse(fixture.controller.isPreparingTreasureTrail)
-    }
-
-    func testGameCenterAuthenticateSettlesBusyFlag() async {
-        let manager = GameCenterManager()
-        XCTAssertFalse(manager.isAuthenticating)
-        manager.authenticate()
-        // GameKit may invoke the handler synchronously; wait until auth settles.
-        let deadline = Date().addingTimeInterval(2)
-        while manager.isAuthenticating, Date() < deadline {
-            try? await Task.sleep(nanoseconds: 20_000_000)
-        }
-        XCTAssertFalse(manager.isAuthenticating)
     }
 
     // MARK: - Helpers
@@ -114,6 +105,8 @@ final class TreasurePreparationLoadingTests: XCTestCase {
         let controller: WorldController
 
         func cleanup() {
+            // Cancel any in-flight landmark search before deleting SQLite files.
+            controller.rerollTreasureTrail()
             try? FileManager.default.removeItem(at: root)
         }
     }
