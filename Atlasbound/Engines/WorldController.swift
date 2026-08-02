@@ -16,6 +16,8 @@ final class WorldController: ObservableObject {
     @Published private(set) var sessionFeedback: [SessionFeedbackEvent] = []
     @Published private(set) var lastSummary: ActivitySummary?
     @Published private(set) var explorationMode: ExplorationMode = .idle
+    /// True while landmark search is refining today’s treasure trail destinations.
+    @Published private(set) var isPreparingTreasureTrail = false
 
     let recorder: ActivityRecorder
     let store: TileStore
@@ -712,8 +714,7 @@ final class WorldController: ObservableObject {
 
     func rerollTreasureTrail() {
         guard let playerTileCoordinate else { return }
-        treasurePreparationTask?.cancel()
-        treasurePreparationTask = nil
+        cancelTreasurePreparation()
         treasureStore.reroll(anchor: playerTileCoordinate, tileEngine: tileEngine)
     }
 
@@ -728,6 +729,7 @@ final class WorldController: ObservableObject {
         treasurePreparationDayKey = dayKey
         let engine = tileEngine
         let resolver = landmarkResolver
+        isPreparingTreasureTrail = true
         treasurePreparationTask = Task { [weak self] in
             let targets = await resolver.targets(
                 near: location.coordinate,
@@ -735,9 +737,16 @@ final class WorldController: ObservableObject {
             )
             guard let self else { return }
             self.treasurePreparationTask = nil
+            self.isPreparingTreasureTrail = false
             guard !Task.isCancelled, !targets.isEmpty else { return }
             self.treasureStore.replaceTrailTargets(targets)
         }
+    }
+
+    private func cancelTreasurePreparation() {
+        treasurePreparationTask?.cancel()
+        treasurePreparationTask = nil
+        isPreparingTreasureTrail = false
     }
 
     func showMatchingFrontierLeaderboard() {

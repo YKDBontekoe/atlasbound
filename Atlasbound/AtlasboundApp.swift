@@ -30,7 +30,7 @@ struct AtlasboundApp: App {
                         factoryController: factoryController
                     )
                 } else {
-                    ProgressView("Loading world…")
+                    LoadingWorldView()
                 }
             }
             .preferredColorScheme(
