@@ -71,6 +71,7 @@ struct RootTabView: View {
                 store.flushToDiskIfNeeded()
             }
             if phase == .active {
+                controller.catchUpIdleOnForeground()
                 factoryController.advance()
                 factoryController.updatePlayerLocation(controller.recorder.lastLocation)
             }

@@ -67,8 +67,20 @@ struct IdleScoutsCard: View {
         if !controller.territoryState.hasHomeBase {
             return "Claim a Home Base sector to send scouts into nearby fog."
         }
-        if let report = state.lastReport, report.scoutDiscoveriesGranted > 0 {
-            return "Last watch uncovered \(report.scoutDiscoveriesGranted) tile\(report.scoutDiscoveriesGranted == 1 ? "" : "s"). Daily cap \(state.scoutDiscoveriesToday)/\(IdleConstants.dailyScoutDiscoveryCap)."
+        if let report = state.lastReport, report.hasGatheredRewards {
+            var parts: [String] = []
+            if report.scoutDiscoveriesGranted > 0 {
+                parts.append(
+                    "uncovered \(report.scoutDiscoveriesGranted) tile\(report.scoutDiscoveriesGranted == 1 ? "" : "s")"
+                )
+            }
+            let campGoods = report.homeDripItems.reduce(0) { $0 + $1.quantity }
+            if campGoods > 0 {
+                parts.append(
+                    "gathered \(campGoods) camp good\(campGoods == 1 ? "" : "s")"
+                )
+            }
+            return "Last watch \(parts.joined(separator: " · ")). Daily cap \(state.scoutDiscoveriesToday)/\(IdleConstants.dailyScoutDiscoveryCap)."
         }
         return "AFK discoveries near claims, capped at \(IdleConstants.dailyScoutDiscoveryCap)/day. Home Camp drips materials while you’re away."
     }
@@ -133,12 +145,15 @@ struct IdleScoutsSheet: View {
     }
 
     private func lastWatchCard(_ report: IdleAdvanceReport) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Last watch")
                 .font(.subheadline.weight(.semibold))
-            Text("\(report.simulatedMinutes) min simulated · \(report.scoutDiscoveriesGranted) tiles · \(report.homeDripItems.reduce(0) { $0 + $1.quantity }) camp goods")
+            Text(IdleWatchCopy.summaryLine(for: report))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if !report.homeDripItems.isEmpty {
+                IdleWatchItemList(items: report.homeDripItems)
+            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -248,6 +263,101 @@ struct IdleScoutsSheet: View {
                         Capsule(style: .continuous)
                             .fill(owned >= amount.quantity ? AtlasTheme.teal.opacity(0.14) : AtlasTheme.finishRed.opacity(0.12))
                     )
+            }
+        }
+    }
+}
+
+/// Reopen callout when Home Camp / scouts gathered something while away.
+struct IdleWatchReportSheet: View {
+    let summary: IdleWatchSummary
+    let onDismiss: () -> Void
+
+    private var report: IdleAdvanceReport { summary.report }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Spacer(minLength: 8)
+            Image(systemName: "person.3.fill")
+                .font(.system(size: 36, weight: .semibold))
+                .foregroundStyle(AtlasTheme.teal)
+                .frame(width: 72, height: 72)
+                .background(AtlasTheme.teal.opacity(0.14), in: Circle())
+
+            Text("While you were away")
+                .font(.title2.weight(.bold))
+                .accessibilityIdentifier("idleWatchReportTitle")
+
+            Text(IdleWatchCopy.summaryLine(for: report))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            if report.scoutDiscoveriesGranted > 0 {
+                Label(
+                    "\(report.scoutDiscoveriesGranted) scout tile\(report.scoutDiscoveriesGranted == 1 ? "" : "s") uncovered",
+                    systemImage: "sparkles"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AtlasTheme.teal)
+            }
+
+            if !report.homeDripItems.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Camp goods")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    IdleWatchItemList(items: report.homeDripItems)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+            }
+
+            Text(
+                "AFK discoveries today \(summary.scoutDiscoveriesToday)/\(IdleConstants.dailyScoutDiscoveryCap)"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            Spacer(minLength: 8)
+
+            Button("Got it", action: onDismiss)
+                .buttonStyle(.borderedProminent)
+                .tint(AtlasTheme.teal)
+                .padding(.bottom, 24)
+                .accessibilityIdentifier("idleWatchReportDismiss")
+        }
+        .padding()
+        .accessibilityIdentifier("idleWatchReportSheet")
+    }
+}
+
+enum IdleWatchCopy {
+    static func summaryLine(for report: IdleAdvanceReport) -> String {
+        let campGoods = report.homeDripItems.reduce(0) { $0 + $1.quantity }
+        return "\(report.simulatedMinutes) min simulated · \(report.scoutDiscoveriesGranted) tiles · \(campGoods) camp goods"
+    }
+}
+
+struct IdleWatchItemList: View {
+    let items: [ItemAmount]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(items) { amount in
+                let definition = ItemCatalog.definition(for: amount.itemID)
+                HStack(spacing: 8) {
+                    Image(systemName: definition?.symbolName ?? "shippingbox")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AtlasTheme.teal)
+                        .frame(width: 18)
+                    Text(definition?.name ?? amount.itemID)
+                        .font(.subheadline)
+                    Spacer(minLength: 0)
+                    Text("×\(amount.quantity)")
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }

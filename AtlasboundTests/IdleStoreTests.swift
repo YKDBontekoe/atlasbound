@@ -36,13 +36,46 @@ final class IdleStoreTests: XCTestCase {
     }
 
     func testWorldControllerAdvanceIdleDepositsHomeDrip() {
-        let worldURL = temporaryURL("world")
-        let inventoryURL = temporaryURL("inventory")
-        let idleURL = temporaryURL("idle-world")
         let start = Date(timeIntervalSince1970: 5_000_000)
-        let tileStore = TileStore(fileURL: worldURL, installationID: "idle-controller-tests")
-        let inventory = InventoryStore(fileURL: inventoryURL)
-        let idleStore = IdleStore(fileURL: idleURL, now: start)
+        let (controller, inventory) = makeIdleController(at: start)
+        let report = controller.advanceIdle(to: start.addingTimeInterval(60 * 60))
+        XCTAssertEqual(report.simulatedMinutes, 60)
+        XCTAssertEqual(inventory.quantity(of: "cobble_chip"), 2)
+        XCTAssertEqual(inventory.quantity(of: "moss_scrap"), 2)
+        XCTAssertNil(controller.latestIdleWatch)
+    }
+
+    func testCatchUpIdleOnForegroundPresentsWatchReport() throws {
+        let start = Date(timeIntervalSince1970: 5_100_000)
+        let (controller, inventory) = makeIdleController(at: start)
+
+        let report = controller.catchUpIdleOnForeground(to: start.addingTimeInterval(60 * 60))
+        XCTAssertTrue(report.hasGatheredRewards)
+        XCTAssertEqual(inventory.quantity(of: "cobble_chip"), 2)
+
+        let watch = try XCTUnwrap(controller.latestIdleWatch)
+        XCTAssertEqual(watch.report.simulatedMinutes, 60)
+        XCTAssertFalse(watch.report.homeDripItems.isEmpty)
+        XCTAssertEqual(watch.scoutDiscoveriesToday, controller.idleState.scoutDiscoveriesToday)
+
+        controller.dismissIdleWatch()
+        XCTAssertNil(controller.latestIdleWatch)
+    }
+
+    func testCatchUpIdleOnForegroundSkipsEmptyTick() {
+        let start = Date(timeIntervalSince1970: 5_200_000)
+        let (controller, _) = makeIdleController(at: start)
+
+        let report = controller.catchUpIdleOnForeground(to: start)
+        XCTAssertEqual(report.simulatedMinutes, 0)
+        XCTAssertFalse(report.hasGatheredRewards)
+        XCTAssertNil(controller.latestIdleWatch)
+    }
+
+    private func makeIdleController(at start: Date) -> (WorldController, InventoryStore) {
+        let tileStore = TileStore(fileURL: temporaryURL("world"), installationID: "idle-controller-tests")
+        let inventory = InventoryStore(fileURL: temporaryURL("inventory"))
+        let idleStore = IdleStore(fileURL: temporaryURL("idle-world"), now: start)
         idleStore.update { $0.lastSimulatedAt = start }
 
         let homeSector = HexSectorEngine.makeSectorID(q: 0, r: 0, sizeMeters: 20)
@@ -59,10 +92,7 @@ final class IdleStoreTests: XCTestCase {
             inventoryStore: inventory,
             idleStore: idleStore
         )
-        let report = controller.advanceIdle(to: start.addingTimeInterval(60 * 60))
-        XCTAssertEqual(report.simulatedMinutes, 60)
-        XCTAssertEqual(inventory.quantity(of: "cobble_chip"), 2)
-        XCTAssertEqual(inventory.quantity(of: "moss_scrap"), 2)
+        return (controller, inventory)
     }
 
     private func temporaryURL(_ stem: String) -> URL {

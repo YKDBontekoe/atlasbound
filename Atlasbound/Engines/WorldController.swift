@@ -18,6 +18,8 @@ final class WorldController: ObservableObject {
     @Published private(set) var explorationMode: ExplorationMode = .idle
     /// True while landmark search is refining today’s treasure trail destinations.
     @Published private(set) var isPreparingTreasureTrail = false
+    /// Fresh offline watch gains awaiting a reopen sheet (cleared on dismiss).
+    @Published var latestIdleWatch: IdleWatchSummary?
 
     let recorder: ActivityRecorder
     let store: TileStore
@@ -529,6 +531,23 @@ final class WorldController: ObservableObject {
         }
         objectWillChange.send()
         return report
+    }
+
+    /// Foreground/reopen catch-up that presents a watch report when something was gathered.
+    @discardableResult
+    func catchUpIdleOnForeground(to date: Date = .now) -> IdleAdvanceReport {
+        let report = advanceIdle(to: date)
+        if report.hasGatheredRewards {
+            latestIdleWatch = IdleWatchSummary(
+                report: report,
+                scoutDiscoveriesToday: idleStore.state.scoutDiscoveriesToday
+            )
+        }
+        return report
+    }
+
+    func dismissIdleWatch() {
+        latestIdleWatch = nil
     }
 
     @discardableResult

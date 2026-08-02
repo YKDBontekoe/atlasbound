@@ -182,6 +182,11 @@ struct IdleAdvanceReport: Codable, Hashable, Sendable {
     var scoutDiscoveriesGranted: Int
     var at: Date
 
+    /// True when the tick deposited camp goods or granted scout discoveries.
+    var hasGatheredRewards: Bool {
+        scoutDiscoveriesGranted > 0 || !homeDripItems.isEmpty
+    }
+
     static let empty = IdleAdvanceReport(
         simulatedMinutes: 0,
         homeDripItems: [],
@@ -189,6 +194,24 @@ struct IdleAdvanceReport: Codable, Hashable, Sendable {
         scoutDiscoveriesGranted: 0,
         at: .distantPast
     )
+}
+
+/// Ephemeral reopen presentation for a fresh idle catch-up (not persisted).
+struct IdleWatchSummary: Identifiable, Sendable, Equatable {
+    let id: UUID
+    let report: IdleAdvanceReport
+    /// Daily AFK discovery count after the tick that produced `report`.
+    let scoutDiscoveriesToday: Int
+
+    init(
+        id: UUID = UUID(),
+        report: IdleAdvanceReport,
+        scoutDiscoveriesToday: Int
+    ) {
+        self.id = id
+        self.report = report
+        self.scoutDiscoveriesToday = scoutDiscoveriesToday
+    }
 }
 
 enum ScoutHireResult: Equatable, Sendable {

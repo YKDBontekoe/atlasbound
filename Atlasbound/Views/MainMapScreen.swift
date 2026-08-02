@@ -254,6 +254,12 @@ struct MainMapScreen: View {
             }
             .presentationDetents([.medium])
         }
+        .sheet(item: $controller.latestIdleWatch) { watch in
+            IdleWatchReportSheet(summary: watch) {
+                controller.dismissIdleWatch()
+            }
+            .presentationDetents([.medium])
+        }
         .sheet(isPresented: $showExpeditionSheet) {
             ExpeditionSheet(controller: controller, store: store)
                 .presentationDetents([.medium, .large])
@@ -272,7 +278,7 @@ struct MainMapScreen: View {
             #endif
         }
         .onAppear {
-            controller.advanceIdle()
+            controller.catchUpIdleOnForeground()
             factoryController.updatePlayerLocation(recorder.lastLocation)
             factoryController.advance()
             #if DEBUG
