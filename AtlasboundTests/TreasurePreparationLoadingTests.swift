@@ -97,6 +97,7 @@ final class TreasurePreparationLoadingTests: XCTestCase {
         }
     }
 
+    @MainActor
     private struct Fixture {
         let root: URL
         let store: TileStore
