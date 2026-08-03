@@ -60,9 +60,9 @@ Automatic Explore discovers without fitness history while the app is open. Scree
 - **Scout Circuit:** a local-day, derived challenge for discovering 5 new tiles, revisiting 3 known tiles, and visiting 12 unique tiles. It reads canonical visit timestamps and resets with the local day. Completing all three goals unlocks a once-per-day claimable material chest (no XP change from the goals themselves).
 - **Idle Scouts / Home Camp:** with a Home Base set, a capped offline tick (max 8 h) drips camp materials and lets hired scouts permanently discover a tiny number of fogged tiles inside claimed sectors (Home first). Hiring each scout unlocks the next roster tier. Daily AFK discoveries hard-cap at 18. Persist roster + counters only — never geometry.
 - **Frontier combo:** during an active expedition, consecutive qualifying frontier tiles within **20 minutes** build a combo multiplier on frontier scoring (see `FrontierEngine`).
-- **Treasure trails:** three local-day landmark targets with direct/detour choices. Completion grants a relic and weekly key.
-- **Weekly vault:** three keys reveal a once-per-ISO-week destination with rare-or-better loot.
-- **Field finds:** deterministic tile pickups (`FieldFindEngine`) into `InventoryStore` — materials, boosts, charges; assemble / salvage / use / activate. Soft daily claim cap; claimed find IDs only (no geometry).
+- **Treasure trails:** three local-day landmark targets spanning hundreds of meters to multiple kilometers, with direct/detour choices. Farther destinations yield better relic rarity and completion XP. Completion grants a relic and weekly key.
+- **Weekly vault:** three keys reveal a once-per-ISO-week destination several kilometers out with rare-or-better loot (further boosted by distance band).
+- **Field finds:** deterministic tile pickups (`FieldFindEngine`) into `InventoryStore` — materials, boosts, charges; assemble / salvage / use / activate. Soft daily claim cap; claimed find IDs only (no geometry). Drop **rate** is boosted near Home/claims; drop **quality** improves with distance from Home Base (local → expedition bands).
 - **Home Base / territory claims:** claim neighborhood sectors (`HexSectorEngine` IDs) once discovery completion reaches 25% and you are inside or adjacent. First claim becomes Home Base; additional claims expand territory. Soft familiarity XP and field-find rate buffs apply inside claimed sectors (stronger at Home Base). Persist sector IDs only.
 - **Nearby fog / undiscovered counts:** rings around user via `TileEngine.ring`.
 

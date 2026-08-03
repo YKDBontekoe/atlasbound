@@ -117,18 +117,20 @@ final class TreasureStore: ObservableObject {
         if encounter.isVault {
             guard weeklyVault.isUnlocked, !weeklyVault.isCompleted else { return nil }
             weeklyVault.isCompleted = true
+            let distance = encounter.target.distanceMeters
             let relic = engine.relic(
                 seed: "\(weeklyVault.weekKey):vault",
                 landmarkName: encounter.target.name,
                 choice: choice,
                 isVault: true,
+                distanceMeters: distance,
                 date: date
             )
             relics.append(relic)
             let reward = TreasureReward(
                 id: UUID(),
                 relic: relic,
-                familiarityXP: TreasureConstants.vaultCompletionXP,
+                familiarityXP: engine.completionFamiliarityXP(isVault: true, distanceMeters: distance),
                 grantedVaultKey: false
             )
             latestReward = reward
@@ -152,18 +154,20 @@ final class TreasureStore: ObservableObject {
         dailyTrail = trail
         completedTrailCount += 1
         weeklyVault.keys = min(TreasureConstants.keysRequiredForVault, weeklyVault.keys + 1)
+        let distance = encounter.target.distanceMeters
         let relic = engine.relic(
             seed: "\(trail.dayKey):\(choice.rawValue)",
             landmarkName: encounter.target.name,
             choice: choice,
             isVault: false,
+            distanceMeters: distance,
             date: date
         )
         relics.append(relic)
         let reward = TreasureReward(
             id: UUID(),
             relic: relic,
-            familiarityXP: TreasureConstants.trailCompletionXP,
+            familiarityXP: engine.completionFamiliarityXP(isVault: false, distanceMeters: distance),
             grantedVaultKey: true
         )
         latestReward = reward

@@ -220,11 +220,16 @@ final class WorldController: ObservableObject {
     }
 
     var homeBaseCoordinate: CLLocationCoordinate2D? {
+        guard let center = homeBaseTileCoordinate else { return nil }
+        return tileEngine.centerCoordinate(for: center)
+    }
+
+    private var homeBaseTileCoordinate: TileCoordinate? {
         guard let homeID = store.territoryState.homeSectorID,
               let center = territoryEngine.centerCoordinate(forSectorID: homeID, tileEngine: tileEngine) else {
             return nil
         }
-        return tileEngine.centerCoordinate(for: TileCoordinate(q: center.q, r: center.r))
+        return TileCoordinate(q: center.q, r: center.r)
     }
 
     var placeMapPins: [PlaceMapPin] {
@@ -286,7 +291,8 @@ final class WorldController: ObservableObject {
         inventoryStore.previewFinds(
             around: playerTileCoordinate,
             tileEngine: tileEngine,
-            discoveredTileIDs: store.discoveredTileIDs
+            discoveredTileIDs: store.discoveredTileIDs,
+            homeCenter: homeBaseTileCoordinate
         )
     }
 
@@ -855,6 +861,7 @@ final class WorldController: ObservableObject {
         treasureStore.processVisitedTileIDs(newIDs)
         let territoryForFinds = store.territoryState
         let findTileEngine = tileEngine
+        let homeCenter = homeBaseTileCoordinate
         inventoryStore.processVisitedTileIDs(
             newIDs,
             discoveryTileIDs: discoveryCandidates,
@@ -864,6 +871,14 @@ final class WorldController: ObservableObject {
                     forTileID: tileID,
                     state: territoryForFinds,
                     tileEngine: findTileEngine
+                )
+            },
+            metersFromHome: { tileID in
+                guard let homeCenter,
+                      let tile = findTileEngine.parseTileID(tileID) else { return nil }
+                return DistanceLootEngine.meters(
+                    hexDistance: TileEngine.hexDistance(homeCenter, tile),
+                    tileSizeMeters: findTileEngine.tileSizeMeters
                 )
             }
         )
@@ -941,6 +956,7 @@ final class WorldController: ObservableObject {
         treasureStore.processVisitedTileIDs(newIDs)
         let territoryForFinds = store.territoryState
         let findTileEngine = tileEngine
+        let homeCenter = homeBaseTileCoordinate
         inventoryStore.processVisitedTileIDs(
             newIDs,
             discoveryTileIDs: discoveryCandidates,
@@ -950,6 +966,14 @@ final class WorldController: ObservableObject {
                     forTileID: tileID,
                     state: territoryForFinds,
                     tileEngine: findTileEngine
+                )
+            },
+            metersFromHome: { tileID in
+                guard let homeCenter,
+                      let tile = findTileEngine.parseTileID(tileID) else { return nil }
+                return DistanceLootEngine.meters(
+                    hexDistance: TileEngine.hexDistance(homeCenter, tile),
+                    tileSizeMeters: findTileEngine.tileSizeMeters
                 )
             }
         )

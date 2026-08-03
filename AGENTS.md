@@ -48,6 +48,7 @@ Atlasbound/
     RegionLookupEngine.swift   # Coarse-cell place labels + places-visited aggregate
     GeocodeLimiter.swift       # Shared throttled CLGeocoder
     FrontierEngine.swift       # Weekly expeditions + frontier scoring
+    DistanceLootEngine.swift   # Shared distance bands for treasure + field-find loot
     TerritoryEngine.swift      # Home Base + sector claim eligibility / buffs
     IdleScoutEngine.swift      # Hireable scouts, Home drip, capped AFK discoveries
     TreasureEventEngine.swift  # Daily trails, weekly vaults, and relic rewards

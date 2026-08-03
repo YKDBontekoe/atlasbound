@@ -95,10 +95,10 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | Factory remote collect | Produce into a depot, open Factory away from site | Remote collect ships depot stock to backpack |
 | Automatic foreground | Open Map and move with app open | Tiles reveal without an explicit session or fitness record |
 | Automatic background | Enable screen-locked exploration and grant Always | Discovery continues with the iOS location indicator |
-| Daily treasure trail | Reach marker with Sim GPS and choose routes | Each target advances once; final target grants relic + key |
-| Weekly vault | Complete three daily trails | Vault target appears and awards rare-or-better relic once |
-| Landmark fallback | Disable network before generating trail | Procedural cache remains playable and can be rerolled once |
-| Field find pickup | Explore new tiles via Sim GPS | Occasional pickup sheet; item appears in Workshop → Journal → Inventory |
+| Daily treasure trail | Reach multi-km marker with Sim GPS and choose routes | Each target advances once; final target grants distance-banded relic + key |
+| Weekly vault | Complete three daily trails | Far vault target appears and awards rare-or-better relic once |
+| Landmark fallback | Disable network before generating trail | Distant procedural caches (~1–8 km) remain playable and can be rerolled once |
+| Field find pickup | Explore new tiles via Sim GPS; compare near Home vs remote | Occasional pickup sheet; farther from Home tends toward rarer items |
 | Inventory use / activate | Workshop → Journal → long-press item | Boosts start effects; charges apply trail reroll / fog lantern / survey pulse |
 | Assemble | Workshop → Recipe book | Recipes craft when materials are sufficient |
 | Salvage | Workshop → Journal → long-press uncommon+ item | Breaks into 1–2 materials |

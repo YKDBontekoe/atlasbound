@@ -96,18 +96,19 @@ Persistence: Pinpoint tables inside `Documents/atlasbound.sqlite`. Leaderboard I
 
 ## Treasure trails
 
-Serverless daily exploration loop using nearby MapKit landmarks.
+Serverless daily exploration loop using MapKit landmarks across multi-kilometer range (geodesic 400 m–12 km), with procedural fallback caches on distant hex rings.
 
 | Type | Role | Threading |
 |------|------|-----------|
-| `TreasureEventEngine` | Daily/weekly keys, choices, deterministic relic rolls | `Sendable` |
-| `LandmarkResolver` | Named-landmark search and pedestrian validation | async value type |
+| `TreasureEventEngine` | Daily/weekly keys, choices, distance-banded relic rolls | `Sendable` |
+| `LandmarkResolver` | Named-landmark search across a 12 km region; band-spread selection | async value type |
+| `DistanceLootEngine` | Shared distance bands for treasure + field-find loot quality | `Sendable` |
 | `TreasureStore` | Trail, vault, encounter, and relic persistence | `@MainActor` |
 | `DiscoveryMapView` | Tappable treasure destination marker | SwiftUI |
 | `WorkshopTabView` | Combined Journal + Factory tab (adventure log, inventory, production) | SwiftUI |
 | `JournalHubView` | Trail, relics, discoveries, optional activity history | SwiftUI |
 
-Each local day produces a three-stage trail. Three daily keys unlock the ISO-week vault.
+Each local day produces a three-stage trail. Three daily keys unlock the ISO-week vault. Relic rarity and completion XP scale with destination distance (`local` / `mid` / `far` / `expedition`).
 
 ## Field finds & inventory
 
@@ -121,7 +122,7 @@ Deterministic pickups while exploring tiles; stackable pack separate from Treasu
 | `JournalHubView` | Inventory use / activate / salvage; links to shared Recipe book | SwiftUI |
 | `FactoryHubView` | Factory overview, research, structures, recipe book (sole craft UI) | SwiftUI |
 
-Find IDs are `find:{dayKey}:{tileID}` — claim once per local day. Atlas Tokens remain non-consumable; field items grant temporary modifiers and charges only.
+Find IDs are `find:{dayKey}:{tileID}` — claim once per local day. Atlas Tokens remain non-consumable; field items grant temporary modifiers and charges only. Territory buffs raise find **chance** near Home; distance from Home Base raises find **quality** (rare spark odds and uncommon+ table weight).
 
 ## Home Base / territory claims
 

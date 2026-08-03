@@ -26,8 +26,8 @@ enum TreasureChoice: String, Codable, Sendable, CaseIterable, Identifiable {
 
     var detail: String {
         switch self {
-        case .direct: "A shorter route with reliable treasure."
-        case .detour: "A longer detour with better rare-relic odds."
+        case .direct: "A clearer route — still rewards farther landmarks."
+        case .detour: "A longer frontier detour with better rare-relic odds."
         }
     }
 }
@@ -77,6 +77,45 @@ struct LandmarkTarget: Codable, Hashable, Sendable, Identifiable {
     let category: String
     let clue: String
     let isFallback: Bool
+    /// Geodesic / hex-approximated meters from the trail or vault spawn anchor.
+    let distanceMeters: Double
+
+    var distanceBand: DistanceLootBand {
+        DistanceLootEngine.band(meters: distanceMeters)
+    }
+
+    init(
+        id: String,
+        tileID: String,
+        name: String,
+        category: String,
+        clue: String,
+        isFallback: Bool,
+        distanceMeters: Double = 0
+    ) {
+        self.id = id
+        self.tileID = tileID
+        self.name = name
+        self.category = category
+        self.clue = clue
+        self.isFallback = isFallback
+        self.distanceMeters = max(0, distanceMeters)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, tileID, name, category, clue, isFallback, distanceMeters
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        tileID = try c.decode(String.self, forKey: .tileID)
+        name = try c.decode(String.self, forKey: .name)
+        category = try c.decode(String.self, forKey: .category)
+        clue = try c.decode(String.self, forKey: .clue)
+        isFallback = try c.decode(Bool.self, forKey: .isFallback)
+        distanceMeters = try c.decodeIfPresent(Double.self, forKey: .distanceMeters) ?? 0
+    }
 }
 
 struct TreasureStage: Codable, Hashable, Sendable, Identifiable {
@@ -151,5 +190,16 @@ enum TreasureConstants {
     static let trailCompletionXP = 75
     static let vaultCompletionXP = 150
     static let maximumMapTargets = 2
+
+    /// MapKit search box around the player for named landmarks.
+    static let landmarkSearchMeters: Double = 12_000
+    /// Minimum geodesic distance for a landmark target.
+    static let minTargetMeters: Double = 400
+    /// Maximum geodesic distance for a landmark target.
+    static let maxTargetMeters: Double = 12_000
+    /// Hex ring radii (~1–8 km on the 20 m grid) for offline fallback caches.
+    static let fallbackRingRadii = [50, 100, 150, 200, 300, 400]
+    /// Weekly vault spawn radius (~5 km on the 20 m grid).
+    static let vaultRingRadius = 250
 }
 

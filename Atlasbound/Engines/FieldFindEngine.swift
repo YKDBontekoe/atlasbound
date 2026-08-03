@@ -14,14 +14,15 @@ struct FieldFindEngine: Sendable {
         "find:\(dayKey):\(tileID)"
     }
 
-    /// Rolls a find for a visited tile. Same day+tile is deterministic.
+    /// Rolls a find for a visited tile. Same day+tile+distance band is deterministic.
     func rollFind(
         tileID: String,
         isDiscovery: Bool,
         dayKey: String,
         claimedFindIDs: Set<String>,
         findsClaimedToday: Int,
-        chanceBonusPercent: Int = 0
+        chanceBonusPercent: Int = 0,
+        metersFromHome: Double? = nil
     ) -> FieldFind? {
         guard findsClaimedToday < FieldFindConstants.maxFindsPerDay else { return nil }
         let id = findID(dayKey: dayKey, tileID: tileID)
@@ -35,7 +36,8 @@ struct FieldFindEngine: Sendable {
         let threshold = min(100, baseThreshold + max(0, chanceBonusPercent))
         guard chanceRoll < threshold else { return nil }
 
-        let itemID = pickItemID(seed: seed, isDiscovery: isDiscovery)
+        let band = DistanceLootEngine.band(meters: metersFromHome ?? 0)
+        let itemID = pickItemID(seed: seed, isDiscovery: isDiscovery, band: band)
         let quantity = 1 + Int((seed / 97) % 2) // 1 or 2 for materials-heavy rolls feel
         let qty = ItemCatalog.definition(for: itemID)?.category == .material ? quantity : 1
 
@@ -56,7 +58,8 @@ struct FieldFindEngine: Sendable {
         tileEngine: TileEngine,
         dayKey: String,
         claimedFindIDs: Set<String>,
-        isTileDiscovered: (String) -> Bool
+        isTileDiscovered: (String) -> Bool,
+        homeCenter: TileCoordinate? = nil
     ) -> [FieldFindPreview] {
         let ring = tileEngine.ring(around: anchor, radius: radius)
         var previews: [FieldFindPreview] = []
@@ -65,13 +68,20 @@ struct FieldFindEngine: Sendable {
             let id = findID(dayKey: dayKey, tileID: tileID)
             guard !claimedFindIDs.contains(id) else { continue }
             let discovered = isTileDiscovered(tileID)
+            let metersFromHome: Double? = homeCenter.map { home in
+                DistanceLootEngine.meters(
+                    hexDistance: TileEngine.hexDistance(home, axial),
+                    tileSizeMeters: tileEngine.tileSizeMeters
+                )
+            }
             // Previews prefer undiscovered edges; include light revisit chance tiles too.
             guard let find = rollFind(
                 tileID: tileID,
                 isDiscovery: !discovered,
                 dayKey: dayKey,
                 claimedFindIDs: claimedFindIDs,
-                findsClaimedToday: 0
+                findsClaimedToday: 0,
+                metersFromHome: metersFromHome
             ) else { continue }
             let rarity = ItemCatalog.definition(for: find.itemID)?.rarity ?? .common
             previews.append(FieldFindPreview(id: find.id, tileID: tileID, itemID: find.itemID, rarity: rarity))
@@ -213,13 +223,27 @@ struct FieldFindEngine: Sendable {
 
     // MARK: - Private loot
 
-    private func pickItemID(seed: UInt64, isDiscovery: Bool) -> String {
+    private func pickItemID(seed: UInt64, isDiscovery: Bool, band: DistanceLootBand) -> String {
         let spark = Int((seed / 13) % 100)
-        if spark < FieldFindConstants.rareSparkChancePercent {
+        let sparkChance = DistanceLootEngine.rareSparkChancePercent(for: band)
+        if spark < sparkChance {
             return pickWeighted(from: rareSparkTable, seed: seed / 17)
         }
         let table = isDiscovery ? discoveryTable : revisitTable
-        return pickWeighted(from: table, seed: seed / 17)
+        return pickWeighted(from: boostedTable(table, band: band), seed: seed / 17)
+    }
+
+    private func boostedTable(
+        _ table: [(String, Int)],
+        band: DistanceLootBand
+    ) -> [(String, Int)] {
+        let multiplier = DistanceLootEngine.uncommonWeightMultiplier(for: band)
+        guard multiplier > 1 else { return table }
+        return table.map { itemID, weight in
+            let rarity = ItemCatalog.definition(for: itemID)?.rarity ?? .common
+            let scaled = rarity >= .uncommon ? weight * multiplier : weight
+            return (itemID, scaled)
+        }
     }
 
     private func pickWeighted(from table: [(String, Int)], seed: UInt64) -> String {
