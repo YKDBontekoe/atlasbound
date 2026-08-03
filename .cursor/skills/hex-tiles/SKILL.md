@@ -38,8 +38,9 @@ Production tile IDs use `hex:20:{q}:{r}`. There is no runtime grid switching.
 ## When adding map visuals
 
 - Geometry from engine only
-- Cap expensive annotations if adding markers (existing ~80 cap pattern)
-- Fog wash uses nearby fogged ring tiles from `WorldController.nearbyFogTiles`
+- Style via `TileMapMaterial` + `MapTileLOD` (near dual-rim silhouette, mid single stroke, far perimeter outline)
+- Cap mastery markers with LOD (`maxVisibleMarkers` = 40 near; mastered+ only at mid; none at far)
+- Fog wash uses nearby fogged ring tiles from `WorldController.nearbyFogTiles` (LOD tightens fog cap)
 
 ## See also
 
