@@ -21,23 +21,32 @@ struct TreasureEventEngine: Sendable {
         dayKey: String
     ) -> TreasureTrail {
         let seed = StableHash.fnv1a64(dayKey)
+        let radii = TreasureConstants.fallbackRingRadii
         let candidates = (0..<(TreasureConstants.stagesPerTrail * 2)).map { index -> LandmarkTarget in
-            let radius = 5 + index * 3
+            let radius = radii[index % radii.count]
             let direction = Int((seed + UInt64(index * 5)) % 6)
-            let ring = tileEngine.ring(around: anchor, radius: radius)
-            let coordinate = ring.isEmpty ? anchor : ring[direction * max(1, ring.count / 6) % ring.count]
+            let coordinate = DistanceLootEngine.tileAtRadius(
+                around: anchor,
+                radius: radius,
+                direction: direction
+            )
             let tileID = TileEngine.makeTileID(
                 q: coordinate.q,
                 r: coordinate.r,
                 sizeMeters: tileEngine.tileSizeMeters
+            )
+            let distanceMeters = DistanceLootEngine.meters(
+                hexDistance: radius,
+                tileSizeMeters: tileEngine.tileSizeMeters
             )
             return LandmarkTarget(
                 id: "fallback:\(dayKey):\(index)",
                 tileID: tileID,
                 name: "Mysterious Cache",
                 category: "Hidden landmark",
-                clue: "Follow the compass to an undiscovered edge of your atlas.",
-                isFallback: true
+                clue: "Follow the compass toward a distant edge of your atlas.",
+                isFallback: true,
+                distanceMeters: distanceMeters
             )
         }
         return makeTrail(dayKey: dayKey, targets: candidates)
@@ -70,16 +79,22 @@ struct TreasureEventEngine: Sendable {
         tileEngine: TileEngine,
         weekKey: String
     ) -> LandmarkTarget {
-        let ring = tileEngine.ring(around: anchor, radius: 12)
-        let index = ring.isEmpty ? 0 : Int(StableHash.fnv1a64(weekKey) % UInt64(ring.count))
-        let coordinate = ring.isEmpty ? anchor : ring[index]
+        let radius = TreasureConstants.vaultRingRadius
+        let seed = StableHash.fnv1a64(weekKey)
+        let index = Int(seed % UInt64(max(1, 6 * radius)))
+        let coordinate = DistanceLootEngine.tileOnRing(around: anchor, radius: radius, index: index)
+        let distanceMeters = DistanceLootEngine.meters(
+            hexDistance: TileEngine.hexDistance(anchor, coordinate),
+            tileSizeMeters: tileEngine.tileSizeMeters
+        )
         return LandmarkTarget(
             id: "vault:\(weekKey)",
             tileID: TileEngine.makeTileID(q: coordinate.q, r: coordinate.r, sizeMeters: tileEngine.tileSizeMeters),
             name: "Weekly Atlas Vault",
             category: "Vault",
-            clue: "Three trail keys have revealed a vault near your frontier.",
-            isFallback: true
+            clue: "Three trail keys have revealed a vault on a distant frontier.",
+            isFallback: true,
+            distanceMeters: distanceMeters
         )
     }
 
@@ -88,12 +103,14 @@ struct TreasureEventEngine: Sendable {
         landmarkName: String,
         choice: TreasureChoice,
         isVault: Bool,
+        distanceMeters: Double = 0,
         date: Date = .now
     ) -> RelicRecord {
         let value = StableHash.fnv1a64(seed)
         let theme = RelicTheme.allCases[Int(value % UInt64(RelicTheme.allCases.count))]
+        let band = DistanceLootEngine.band(meters: distanceMeters)
+        let roll = max(0, Int((value / 7) % 100) - DistanceLootEngine.rarityRollBonus(for: band))
         let rarity: RelicRarity
-        let roll = Int((value / 7) % 100)
         if isVault {
             rarity = roll < 20 ? .legendary : .rare
         } else if choice == .detour {
@@ -112,5 +129,12 @@ struct TreasureEventEngine: Sendable {
             discoveredAt: date,
             source: isVault ? "Weekly Vault" : "Daily Trail"
         )
+    }
+
+    func completionFamiliarityXP(isVault: Bool, distanceMeters: Double) -> Int {
+        let band = DistanceLootEngine.band(meters: distanceMeters)
+        return isVault
+            ? DistanceLootEngine.vaultCompletionXP(for: band)
+            : DistanceLootEngine.trailCompletionXP(for: band)
     }
 }

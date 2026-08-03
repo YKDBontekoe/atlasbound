@@ -60,11 +60,13 @@ final class InventoryStore: ObservableObject {
 
     /// `discoveryTileIDs` are tiles first-discovered in this visit batch.
     /// `findChanceBonus` maps tile ID → percent bonus (e.g. territory claim buffs).
+    /// `metersFromHome` maps tile ID → distance from Home Base center (nil = local loot band).
     func processVisitedTileIDs(
         _ tileIDs: [String],
         discoveryTileIDs: Set<String>,
         date: Date = .now,
-        findChanceBonus: (String) -> Int = { _ in 0 }
+        findChanceBonus: (String) -> Int = { _ in 0 },
+        metersFromHome: (String) -> Double? = { _ in nil }
     ) {
         refreshDayState(date: date)
         pruneEffects(at: date)
@@ -79,7 +81,8 @@ final class InventoryStore: ObservableObject {
                 dayKey: dayKey,
                 claimedFindIDs: claimedFindIDs,
                 findsClaimedToday: findsClaimedToday,
-                chanceBonusPercent: findChanceBonus(tileID)
+                chanceBonusPercent: findChanceBonus(tileID),
+                metersFromHome: metersFromHome(tileID)
             ) else { continue }
             collect(find)
             return
@@ -125,6 +128,7 @@ final class InventoryStore: ObservableObject {
         around anchor: TileCoordinate?,
         tileEngine: TileEngine,
         discoveredTileIDs: Set<String>,
+        homeCenter: TileCoordinate? = nil,
         date: Date = .now
     ) -> [FieldFindPreview] {
         guard let anchor else { return [] }
@@ -135,7 +139,8 @@ final class InventoryStore: ObservableObject {
             tileEngine: tileEngine,
             dayKey: engine.localDayKey(for: date),
             claimedFindIDs: claimedFindIDs,
-            isTileDiscovered: { discoveredTileIDs.contains($0) }
+            isTileDiscovered: { discoveredTileIDs.contains($0) },
+            homeCenter: homeCenter
         )
     }
 

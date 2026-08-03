@@ -182,4 +182,66 @@ final class FieldFindEngineTests: XCTestCase {
             XCTAssertFalse(blocked.contains(where: { $0.id == first.id }))
         }
     }
+
+    func testRollFindRemainsDeterministicWithDistanceParam() {
+        let tileID = TileEngine.makeTileID(q: 12, r: -7, sizeMeters: 20)
+        let dayKey = "2026-08-03"
+        let first = engine.rollFind(
+            tileID: tileID,
+            isDiscovery: true,
+            dayKey: dayKey,
+            claimedFindIDs: [],
+            findsClaimedToday: 0,
+            metersFromHome: 9_000
+        )
+        let second = engine.rollFind(
+            tileID: tileID,
+            isDiscovery: true,
+            dayKey: dayKey,
+            claimedFindIDs: [],
+            findsClaimedToday: 0,
+            metersFromHome: 9_000
+        )
+        XCTAssertEqual(first, second)
+    }
+
+    func testExpeditionBandYieldsHigherRarityThanLocal() {
+        let dayKey = "2026-08-03"
+        var localScore = 0
+        var expeditionScore = 0
+        var localHits = 0
+        var expeditionHits = 0
+
+        for q in 0..<400 {
+            let tileID = TileEngine.makeTileID(q: q, r: -q / 2, sizeMeters: 20)
+            if let local = engine.rollFind(
+                tileID: tileID,
+                isDiscovery: true,
+                dayKey: dayKey,
+                claimedFindIDs: [],
+                findsClaimedToday: 0,
+                metersFromHome: 200
+            ) {
+                localHits += 1
+                localScore += ItemCatalog.definition(for: local.itemID)?.rarity.rawValue ?? 0
+            }
+            if let far = engine.rollFind(
+                tileID: tileID,
+                isDiscovery: true,
+                dayKey: dayKey,
+                claimedFindIDs: [],
+                findsClaimedToday: 0,
+                metersFromHome: 10_000
+            ) {
+                expeditionHits += 1
+                expeditionScore += ItemCatalog.definition(for: far.itemID)?.rarity.rawValue ?? 0
+            }
+        }
+
+        XCTAssertGreaterThan(localHits, 20)
+        XCTAssertEqual(localHits, expeditionHits, "Drop chance is independent of distance")
+        let localAvg = Double(localScore) / Double(max(1, localHits))
+        let expeditionAvg = Double(expeditionScore) / Double(max(1, expeditionHits))
+        XCTAssertGreaterThan(expeditionAvg, localAvg)
+    }
 }
