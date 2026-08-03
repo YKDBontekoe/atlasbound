@@ -52,6 +52,7 @@ struct AtlasStatsMapView: View {
     @State private var position: MapCameraPosition = .automatic
     @State private var visibleRegion: MKCoordinateRegion?
     @State private var cachedOverlays: [AtlasStatsTileOverlay] = []
+    @State private var cachedLOD: MapTileLOD = .near
 
     var body: some View {
         VStack(spacing: 10) {
@@ -125,6 +126,7 @@ struct AtlasStatsMapView: View {
     }
 
     private func refreshOverlays() {
+        cachedLOD = MapTileLOD.resolve(for: visibleRegion)
         switch layer {
         case .mastery:
             cachedOverlays = buildMasteryOverlays()
@@ -140,11 +142,23 @@ struct AtlasStatsMapView: View {
     }
 
     private func cullCurrentGrid() -> [WorldTile] {
-        MapOverlayCuller.cullTiles(
+        let lod = cachedLOD
+        let culled = MapOverlayCuller.cullTiles(
             tiles.filter(\.isDiscovered),
             engine: TileEngine(option: .twenty),
-            visibleRegion: visibleRegion
+            visibleRegion: visibleRegion,
+            maxCount: lod.polygonCap
         )
+        guard lod == .far else { return culled }
+        let engine = TileEngine(option: .twenty)
+        let discoveredIDs = Set(tiles.filter(\.isDiscovered).map(\.id))
+        let perimeter = culled.filter {
+            engine.isTerritoryPerimeter($0.coordinate, discoveredIDs: discoveredIDs)
+        }
+        if perimeter.isEmpty {
+            return Array(culled.prefix(lod.polygonCap))
+        }
+        return Array(perimeter.prefix(lod.polygonCap))
     }
 
     private func buildMasteryOverlays() -> [AtlasStatsTileOverlay] {
@@ -152,17 +166,43 @@ struct AtlasStatsMapView: View {
         let engine = TileEngine(option: .twenty)
         let discoveredIDs = Set(tiles.filter(\.isDiscovered).map(\.id))
         let perimeterIDs = engine.territoryPerimeterIDs(among: visible, discoveredIDs: discoveredIDs)
-        return visible.map { tile in
+        let lod = cachedLOD
+        var overlays: [AtlasStatsTileOverlay] = []
+        overlays.reserveCapacity(visible.count * (lod.drawsDualRim ? 2 : 1))
+
+        for tile in visible {
             let perimeter = perimeterIDs.contains(tile.id)
-            return AtlasStatsTileOverlay(
-                id: tile.id,
-                coordinate: tile.coordinate,
-                tileSizeMeters: 20,
-                fill: tile.state.mapFill(isFreshDiscovery: false),
-                stroke: tile.state.mapStroke(isFreshDiscovery: false, isPerimeter: perimeter),
-                strokeWidth: tile.state.mapStrokeWidth(isFreshDiscovery: false, isPerimeter: perimeter)
+            let material = TileMapMaterial.resolve(
+                state: tile.state,
+                isFreshDiscovery: false,
+                weeklyCharge: tile.weeklyCharge,
+                isPerimeter: perimeter,
+                lod: lod
             )
+            overlays.append(
+                AtlasStatsTileOverlay(
+                    id: tile.id,
+                    coordinate: tile.coordinate,
+                    tileSizeMeters: 20,
+                    fill: material.fill,
+                    stroke: material.outerStroke,
+                    strokeWidth: material.outerStrokeWidth
+                )
+            )
+            if let inner = material.innerStroke, material.drawsDualRim {
+                overlays.append(
+                    AtlasStatsTileOverlay(
+                        id: "\(tile.id)#inner",
+                        coordinate: tile.coordinate,
+                        tileSizeMeters: 20,
+                        fill: .clear,
+                        stroke: inner,
+                        strokeWidth: material.innerStrokeWidth
+                    )
+                )
+            }
         }
+        return overlays
     }
 
     private func buildActivityOverlays() -> [AtlasStatsTileOverlay] {

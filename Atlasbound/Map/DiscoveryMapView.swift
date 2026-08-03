@@ -30,6 +30,8 @@ struct DiscoveryMapView: View {
     @State private var cachedClaimedBoundary: [TileCoordinate] = []
     @State private var cachedPlacePins: [PlaceMapPin] = []
     @State private var cachedPerimeterIDs: Set<String> = []
+    @State private var cachedDualRimIDs: Set<String> = []
+    @State private var cachedLOD: MapTileLOD = .near
     @State private var cachedMaximumVisitCount = 1
     @State private var lastCamera: MapCamera?
 
@@ -61,15 +63,23 @@ struct DiscoveryMapView: View {
             ForEach(cachedDiscovered) { tile in
                 let vertices = engine.polygon(for: tile.coordinate)
                 if vertices.count >= 3 {
-                    let fresh = controller.sessionDiscoveredIDs.contains(tile.id)
-                    let charge = tile.weeklyCharge
-                    let perimeter = cachedPerimeterIDs.contains(tile.id)
+                    let material = discoveredMaterial(for: tile)
                     MapPolygon(coordinates: vertices)
-                        .foregroundStyle(discoveredFill(for: tile, isFresh: fresh, weeklyCharge: charge))
-                        .stroke(
-                            discoveredStroke(for: tile, isFresh: fresh, isPerimeter: perimeter),
-                            lineWidth: discoveredStrokeWidth(for: tile, isFresh: fresh, isPerimeter: perimeter)
-                        )
+                        .foregroundStyle(material.fill)
+                        .stroke(material.outerStroke, lineWidth: material.outerStrokeWidth)
+                }
+            }
+
+            // Near-LOD light inner rim — second polygon because MapPolygon allows one stroke.
+            ForEach(cachedDiscovered.filter { cachedDualRimIDs.contains($0.id) }) { tile in
+                let vertices = engine.polygon(for: tile.coordinate)
+                if vertices.count >= 3 {
+                    let material = discoveredMaterial(for: tile)
+                    if let inner = material.innerStroke {
+                        MapPolygon(coordinates: vertices)
+                            .foregroundStyle(Color.clear)
+                            .stroke(inner, lineWidth: material.innerStrokeWidth)
+                    }
                 }
             }
 
@@ -147,9 +157,9 @@ struct DiscoveryMapView: View {
             }
 
             ForEach(cachedMarkers) { tile in
-                if let symbol = tile.state.markerSymbol {
+                if tile.state.markerSymbol != nil {
                     Annotation("", coordinate: engine.centerCoordinate(for: tile.coordinate), anchor: .center) {
-                        TileMarkerView(symbol: symbol, tint: tile.state.markerTint)
+                        TileMarkerView(state: tile.state)
                             .transition(.scale.combined(with: .opacity))
                     }
                 }
@@ -324,12 +334,29 @@ struct DiscoveryMapView: View {
 
     private func refreshOverlays() {
         let engine = store.tileEngine
-        let discovered = cullDiscovered(engine: engine)
+        let lod = MapTileLOD.resolve(for: visibleRegion)
+        cachedLOD = lod
+        let discovered = cullDiscovered(engine: engine, lod: lod)
         let discoveredIDs = store.discoveredTileIDs
         cachedDiscovered = discovered
         cachedMaximumVisitCount = max(discovered.map(\.visitCount).max() ?? 1, 1)
         cachedPerimeterIDs = engine.territoryPerimeterIDs(among: discovered, discoveredIDs: discoveredIDs)
-        cachedFog = buildFog(engine: engine)
+        cachedDualRimIDs = lod.drawsDualRim
+            ? Set(
+                discovered.compactMap { tile in
+                    guard cachedPerimeterIDs.contains(tile.id) else { return nil }
+                    let material = TileMapMaterial.resolve(
+                        state: tile.state,
+                        isFreshDiscovery: controller.sessionDiscoveredIDs.contains(tile.id),
+                        weeklyCharge: tile.weeklyCharge,
+                        isPerimeter: true,
+                        lod: lod
+                    )
+                    return material.drawsDualRim ? tile.id : nil
+                }
+              )
+            : []
+        cachedFog = buildFog(engine: engine, lod: lod)
         cachedFrontierEdge = controller.frontierEdgeTileIDs.compactMap { engine.parseTileID($0) }
         cachedTargetBoundary = controller.targetSectorBoundaryTileIDs.compactMap { engine.parseTileID($0) }
         cachedClaimedBoundary = Array(
@@ -340,14 +367,19 @@ struct DiscoveryMapView: View {
         cachedPlacePins = showsPlacesLayer
             ? Array(controller.placeMapPins.prefix(AtlasTheme.maxVisiblePlacePins))
             : []
-        cachedMarkers = showsMasteryLayer
-            ? Array(
-                discovered
-                    .filter { $0.state.markerSymbol != nil }
-                    .sorted { $0.state.rawValue > $1.state.rawValue }
-                    .prefix(AtlasTheme.maxVisibleMarkers)
-              )
-            : []
+        cachedMarkers = buildMarkers(from: discovered, lod: lod)
+    }
+
+    private func buildMarkers(from discovered: [WorldTile], lod: MapTileLOD) -> [WorldTile] {
+        guard showsMasteryLayer, let minimum = lod.minimumMarkerState, lod.markerCap > 0 else {
+            return []
+        }
+        return Array(
+            discovered
+                .filter { $0.state.rawValue >= minimum.rawValue && $0.state.markerSymbol != nil }
+                .sorted { $0.state.rawValue > $1.state.rawValue }
+                .prefix(lod.markerCap)
+        )
     }
 
     private func applyCameraPitch() {
@@ -370,47 +402,64 @@ struct DiscoveryMapView: View {
         }
     }
 
-    private func cullDiscovered(engine: TileEngine) -> [WorldTile] {
-        MapOverlayCuller.cullTiles(
+    private func cullDiscovered(engine: TileEngine, lod: MapTileLOD) -> [WorldTile] {
+        let culled = MapOverlayCuller.cullTiles(
             store.discoveredTiles,
             engine: engine,
-            visibleRegion: visibleRegion
+            visibleRegion: visibleRegion,
+            maxCount: lod.polygonCap
         )
+        guard lod == .far else { return culled }
+        let discoveredIDs = store.discoveredTileIDs
+        let perimeter = culled.filter {
+            engine.isTerritoryPerimeter($0.coordinate, discoveredIDs: discoveredIDs)
+        }
+        // Far zoom: outline-only silhouette — drop interior fills to stay cheap.
+        if perimeter.isEmpty {
+            return Array(culled.prefix(lod.polygonCap))
+        }
+        return Array(perimeter.prefix(lod.polygonCap))
     }
 
     /// Local fog around the player — enough to read the grid without filling the whole camera.
-    private func buildFog(engine: TileEngine) -> [TileCoordinate] {
+    private func buildFog(engine: TileEngine, lod: MapTileLOD) -> [TileCoordinate] {
         let anchor = recorder.lastLocation?.coordinate ?? visibleRegion?.center
         let radius = controller.isRecording ? AtlasTheme.fogRadiusRecording : AtlasTheme.fogRadiusIdle
         let tiles = controller.nearbyFogTiles(around: anchor, radius: radius)
-        if tiles.count <= AtlasTheme.maxFogPolygons {
+        let cap = lod.fogCap
+        if tiles.count <= cap {
             return tiles
         }
-        return Array(tiles.prefix(AtlasTheme.maxFogPolygons))
+        return Array(tiles.prefix(cap))
     }
 
-    private func discoveredFill(for tile: WorldTile, isFresh: Bool, weeklyCharge: Int) -> Color {
+    private func discoveredMaterial(for tile: WorldTile) -> TileMapMaterial {
+        let fresh = controller.sessionDiscoveredIDs.contains(tile.id)
+        let perimeter = cachedPerimeterIDs.contains(tile.id)
         guard dataLayer == .visitHeat else {
-            return tile.state.mapFill(isFreshDiscovery: isFresh, weeklyCharge: weeklyCharge)
+            return TileMapMaterial.resolve(
+                state: tile.state,
+                isFreshDiscovery: fresh,
+                weeklyCharge: tile.weeklyCharge,
+                isPerimeter: perimeter,
+                lod: cachedLOD
+            )
         }
         let intensity = min(1, Double(tile.visitCount) / Double(cachedMaximumVisitCount))
-        return AtlasTheme.teal.opacity((isFresh ? 0.42 : 0.12) + intensity * 0.52)
-    }
-
-    private func discoveredStroke(for tile: WorldTile, isFresh: Bool, isPerimeter: Bool) -> Color {
-        guard dataLayer == .visitHeat else {
-            return tile.state.mapStroke(isFreshDiscovery: isFresh, isPerimeter: isPerimeter)
-        }
-        guard isPerimeter else { return .clear }
-        let intensity = min(1, Double(tile.visitCount) / Double(cachedMaximumVisitCount))
-        return AtlasTheme.gold.opacity(0.35 + intensity * 0.65)
-    }
-
-    private func discoveredStrokeWidth(for tile: WorldTile, isFresh: Bool, isPerimeter: Bool) -> CGFloat {
-        guard dataLayer == .visitHeat else {
-            return tile.state.mapStrokeWidth(isFreshDiscovery: isFresh, isPerimeter: isPerimeter)
-        }
-        return isPerimeter ? 1.5 : 0
+        let fillOpacity = ((fresh ? 0.42 : 0.12) + intensity * 0.52) * cachedLOD.fillOpacityScale
+        let outerStroke: Color = perimeter
+            ? AtlasTheme.gold.opacity(0.35 + intensity * 0.65)
+            : (fresh ? AtlasTheme.teal.opacity(0.45) : .clear)
+        let outerWidth: CGFloat = perimeter
+            ? 1.5 * cachedLOD.outerStrokeScale
+            : (fresh ? 0.9 : 0)
+        return TileMapMaterial(
+            fill: AtlasTheme.teal.opacity(fillOpacity),
+            outerStroke: outerStroke,
+            outerStrokeWidth: outerWidth,
+            innerStroke: nil,
+            innerStrokeWidth: 0
+        )
     }
 
     private var visibleFactoryStructures: [PlacedFactoryStructure] {
@@ -586,20 +635,38 @@ struct HomeBaseMapMarkerView: View {
 }
 
 struct TileMarkerView: View {
-    let symbol: String
-    let tint: Color
+    let state: TileState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
+    @State private var pulse = false
 
     var body: some View {
         ZStack {
+            if state.markerPulses {
+                HexShape()
+                    .stroke(state.markerTint.opacity(0.45), lineWidth: 1.5)
+                    .frame(width: pulse ? 30 : 24, height: pulse ? 33 : 26)
+                    .opacity(pulse ? 0.15 : 0.55)
+            }
             HexShape()
-                .fill(tint.opacity(0.92))
-                .frame(width: 22, height: 24)
-                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-            Image(systemName: symbol)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.white)
+                .fill(state.markerTint.opacity(0.94))
+                .frame(width: markerSize.width, height: markerSize.height)
+                .overlay {
+                    HexShape()
+                        .stroke(state.markerChromeStroke, lineWidth: state == .legendary ? 1.4 : 1.1)
+                }
+                .overlay {
+                    HexShape()
+                        .stroke(Color.white.opacity(0.22), lineWidth: 0.6)
+                        .padding(1.5)
+                }
+                .shadow(color: .black.opacity(0.18), radius: 2.5, y: 1)
+            if let symbol = state.markerSymbol {
+                Image(systemName: symbol)
+                    .font(.system(size: symbolSize, weight: state.markerSymbolWeight))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.2), radius: 0.5, y: 0.5)
+            }
         }
         .scaleEffect(appeared || reduceMotion ? 1 : 0.5)
         .opacity(appeared || reduceMotion ? 1 : 0)
@@ -607,8 +674,29 @@ struct TileMarkerView: View {
             AtlasMotion.withOptionalAnimation(AtlasMotion.celebrate, reduceMotion: reduceMotion) {
                 appeared = true
             }
+            guard state.markerPulses, !reduceMotion else { return }
+            withAnimation(AtlasMotion.ambient.repeatForever(autoreverses: true)) {
+                pulse = true
+            }
         }
         .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var markerSize: (width: CGFloat, height: CGFloat) {
+        switch state {
+        case .legendary: (24, 26)
+        case .mastered: (23, 25)
+        default: (22, 24)
+        }
+    }
+
+    private var symbolSize: CGFloat {
+        switch state {
+        case .legendary: 10
+        case .mastered, .surveyed: 9.5
+        default: 9
+        }
     }
 }
 
