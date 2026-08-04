@@ -304,7 +304,7 @@ struct MainMapScreen: View {
             Spacer(minLength: 0)
 
             Button {
-                showSettings = true
+                showTerritorySheet = true
             } label: {
                 HStack(spacing: 6) {
                     Text("\(controller.currentSectorName) · \(controller.currentSectorCompletionPercent)% · 20 m")
@@ -318,6 +318,11 @@ struct MainMapScreen: View {
                 .padding(.vertical, 10)
             }
             .buttonStyle(GlassButtonStyle(shape: .capsule))
+            .accessibilityIdentifier("sectorTerritoryButton")
+            .accessibilityLabel(
+                "\(controller.currentSectorName), \(controller.currentSectorCompletionPercent) percent explored"
+            )
+            .accessibilityHint("Opens territory claims")
 
             Spacer(minLength: 0)
 
