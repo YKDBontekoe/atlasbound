@@ -273,6 +273,36 @@ final class SmokeUITests: XCTestCase {
         }
     }
 
+    func testOpenTerritoryFromSectorPillIfAvailable() throws {
+        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 12))
+        app.tabBars.buttons["Map"].tap()
+
+        let sectorPill = firstExisting(
+            app.buttons["sectorTerritoryButton"],
+            app.descendants(matching: .any)["sectorTerritoryButton"]
+        )
+
+        guard sectorPill.waitForExistence(timeout: 10) else {
+            throw XCTSkip("Map sector pill not available in this simulator session")
+        }
+
+        sectorPill.tap()
+        XCTAssertTrue(
+            app.navigationBars["Territory"].waitForExistence(timeout: 5)
+                || app.staticTexts["Claims"].waitForExistence(timeout: 3)
+                || app.staticTexts["Here now"].waitForExistence(timeout: 3)
+        )
+        XCTAssertFalse(
+            app.navigationBars["Settings"].exists,
+            "Sector pill must open territory, not settings"
+        )
+
+        let done = firstExisting(app.buttons["Done"], app.buttons["Close"])
+        if done.waitForExistence(timeout: 3) {
+            done.tap()
+        }
+    }
+
     private func firstExisting(_ elements: XCUIElement...) -> XCUIElement {
         elements.first ?? app.buttons.firstMatch
     }
