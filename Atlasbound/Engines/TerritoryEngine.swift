@@ -155,20 +155,36 @@ struct TerritoryEngine: Sendable {
 
     // MARK: - Buffs
 
-    func familiarityMultiplier(forSectorID sectorID: String?, state: TerritoryState) -> Double {
+    func familiarityMultiplier(
+        forSectorID sectorID: String?,
+        state: TerritoryState,
+        claimBuffMultiplier: Double = 1
+    ) -> Double {
         guard let sectorID, state.isClaimed(sectorID) else { return 1 }
+        let base: Double
         if state.homeSectorID == sectorID {
-            return TerritoryConstants.homeFamiliarityMultiplier
+            base = TerritoryConstants.homeFamiliarityMultiplier
+        } else {
+            base = TerritoryConstants.claimFamiliarityMultiplier
         }
-        return TerritoryConstants.claimFamiliarityMultiplier
+        // Amplify only the buff portion above 1.0.
+        let buff = (base - 1) * max(1, claimBuffMultiplier)
+        return 1 + buff
     }
 
-    func findChanceBonusPercent(forSectorID sectorID: String?, state: TerritoryState) -> Int {
+    func findChanceBonusPercent(
+        forSectorID sectorID: String?,
+        state: TerritoryState,
+        claimBuffMultiplier: Double = 1
+    ) -> Int {
         guard let sectorID, state.isClaimed(sectorID) else { return 0 }
+        let base: Int
         if state.homeSectorID == sectorID {
-            return TerritoryConstants.homeFindChanceBonusPercent
+            base = TerritoryConstants.homeFindChanceBonusPercent
+        } else {
+            base = TerritoryConstants.claimFindChanceBonusPercent
         }
-        return TerritoryConstants.claimFindChanceBonusPercent
+        return Int((Double(base) * max(1, claimBuffMultiplier)).rounded())
     }
 
     /// Average familiarity multiplier across visited tiles (unclaimed = 1.0).
@@ -176,7 +192,8 @@ struct TerritoryEngine: Sendable {
         base: Int,
         tileIDs: [String],
         state: TerritoryState,
-        tileEngine: TileEngine
+        tileEngine: TileEngine,
+        claimBuffMultiplier: Double = 1
     ) -> Int {
         guard base > 0, !tileIDs.isEmpty else { return base }
         var total = 0.0
@@ -184,7 +201,11 @@ struct TerritoryEngine: Sendable {
         for tileID in tileIDs {
             guard let axial = tileEngine.parseTileID(tileID) else { continue }
             let sectorID = sectorEngine.sectorID(for: axial, sizeMeters: tileEngine.tileSizeMeters)
-            total += familiarityMultiplier(forSectorID: sectorID, state: state)
+            total += familiarityMultiplier(
+                forSectorID: sectorID,
+                state: state,
+                claimBuffMultiplier: claimBuffMultiplier
+            )
             count += 1
         }
         guard count > 0 else { return base }
@@ -195,11 +216,16 @@ struct TerritoryEngine: Sendable {
     func findChanceBonusPercent(
         forTileID tileID: String,
         state: TerritoryState,
-        tileEngine: TileEngine
+        tileEngine: TileEngine,
+        claimBuffMultiplier: Double = 1
     ) -> Int {
         guard let axial = tileEngine.parseTileID(tileID) else { return 0 }
         let sectorID = sectorEngine.sectorID(for: axial, sizeMeters: tileEngine.tileSizeMeters)
-        return findChanceBonusPercent(forSectorID: sectorID, state: state)
+        return findChanceBonusPercent(
+            forSectorID: sectorID,
+            state: state,
+            claimBuffMultiplier: claimBuffMultiplier
+        )
     }
 
     // MARK: - Presence

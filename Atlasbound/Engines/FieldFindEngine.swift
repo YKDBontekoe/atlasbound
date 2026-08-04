@@ -22,7 +22,8 @@ struct FieldFindEngine: Sendable {
         claimedFindIDs: Set<String>,
         findsClaimedToday: Int,
         chanceBonusPercent: Int = 0,
-        metersFromHome: Double? = nil
+        metersFromHome: Double? = nil,
+        qualityBonusPercent: Int = 0
     ) -> FieldFind? {
         guard findsClaimedToday < FieldFindConstants.maxFindsPerDay else { return nil }
         let id = findID(dayKey: dayKey, tileID: tileID)
@@ -37,7 +38,12 @@ struct FieldFindEngine: Sendable {
         guard chanceRoll < threshold else { return nil }
 
         let band = DistanceLootEngine.band(meters: metersFromHome ?? 0)
-        let itemID = pickItemID(seed: seed, isDiscovery: isDiscovery, band: band)
+        let itemID = pickItemID(
+            seed: seed,
+            isDiscovery: isDiscovery,
+            band: band,
+            qualityBonusPercent: qualityBonusPercent
+        )
         let quantity = 1 + Int((seed / 97) % 2) // 1 or 2 for materials-heavy rolls feel
         let qty = ItemCatalog.definition(for: itemID)?.category == .material ? quantity : 1
 
@@ -223,9 +229,17 @@ struct FieldFindEngine: Sendable {
 
     // MARK: - Private loot
 
-    private func pickItemID(seed: UInt64, isDiscovery: Bool, band: DistanceLootBand) -> String {
+    private func pickItemID(
+        seed: UInt64,
+        isDiscovery: Bool,
+        band: DistanceLootBand,
+        qualityBonusPercent: Int = 0
+    ) -> String {
         let spark = Int((seed / 13) % 100)
-        let sparkChance = DistanceLootEngine.rareSparkChancePercent(for: band)
+        let sparkChance = min(
+            80,
+            DistanceLootEngine.rareSparkChancePercent(for: band) + max(0, qualityBonusPercent)
+        )
         if spark < sparkChance {
             return pickWeighted(from: rareSparkTable, seed: seed / 17)
         }

@@ -24,14 +24,14 @@ Between consecutive GPS samples, walk intermediate hexes with `hexLine` (`tileID
 | `mastered` | ≥ 300 |
 | `legendary` | ≥ 500 |
 
-Thresholds live in `ProgressionEngine.advanceStateIfNeeded`. These are intentionally simple; a skill tree can layer on top.
+Thresholds live in `ProgressionEngine.advanceStateIfNeeded`. Surveying skills can soften effective thresholds without rewriting stored `masteryXP`.
 
 ## XP
 
 | Kind | Rule |
 |------|------|
-| Discovery | First visit: **+100** XP; state → discovered |
-| Familiarity | Revisits: **25, 20, 16, 12, 10**, then floor **5** |
+| Discovery | First visit: **+100** XP (× Pathfinding skills); state → discovered |
+| Familiarity | Revisits: **25, 20, 16, 12, 10**, then floor **5** (× Surveying / claim buffs) |
 
 `familiarityXP(forVisitCount:)` uses visit count *before* the revisit (at least 1 after discovery).
 
@@ -41,13 +41,22 @@ Session totals: `SessionProgress` (discovered / revisited / XP splits). Lifetime
 
 Lifetime discovery + familiarity XP also feeds `ExplorerProgressionEngine`. This account-wide layer is derived from canonical progress, so existing saves gain the correct level and rewards without a migration.
 
-- 50 levels use the cumulative curve `250 × (level - 1)² + 750 × (level - 1)`.
-- Rank titles advance from Wanderer through Atlas Legend.
+- Levels are **uncapped**. L1–50 keep the classic curve `250 × (level - 1)² + 750 × (level - 1)`; beyond 50 the continuation is `xp(50) + 2000×(L−50) + 40×(L−50)²`.
+- Rank titles advance from Wanderer through Atlas Legend; past level 50 titles become procedural epithets (`Atlas Legend · Ember Circlet I`, …).
 - Each level grants Atlas Tokens; milestone levels unlock live-map presentation features, including visit heat and 3D terrain.
-- Achievements measure discovery, deep mastery, repeat visits, activity variety, active days, and Frontier expeditions.
+- Achievements are **tiered and infinite** (escalating targets per family); the Progress UI shows recent unlocked tiers plus the next locked tier.
 - Atlas Tokens and unlocks are deterministic lifetime rewards, not consumable currency.
 
-This system does not change per-tile mastery XP or discovery/revisit awards.
+This system does not change the base per-tile mastery XP rules; skills multiply awards at visit time.
+
+## Skill tree
+
+`SkillTreeEngine` + `SkillStore` (`skill_state` blob) implement four infinite disciplines: **Pathfinding**, **Surveying**, **Cartography**, and **Artifice**.
+
+- Skill Points earned = `explorerLevel − 1` (retroactive). Spent ranks persist; available = earned − spent.
+- Each discipline has a fixed node graph; every node has infinite ranks with cost `1, 2, 3…` and diminishing-return bonuses.
+- Derived `SkillModifiers` feed Progression, Idle Scouts, Field Finds, Territory claim buffs, Frontier combo window, and Factory speed / Insight thrift.
+- Atlas Tokens remain non-consumable; Skill Points are the spendable progression currency.
 
 ## Exploration and activity types
 
@@ -58,8 +67,8 @@ Automatic Explore discovers without fitness history while the app is open. Scree
 ## Session extras
 
 - **Scout Circuit:** a local-day, derived challenge for discovering 5 new tiles, revisiting 3 known tiles, and visiting 12 unique tiles. It reads canonical visit timestamps and resets with the local day. Completing all three goals unlocks a once-per-day claimable material chest (no XP change from the goals themselves).
-- **Idle Scouts / Home Camp:** with a Home Base set, a capped offline tick (max 8 h) drips camp materials and lets hired scouts permanently discover a tiny number of fogged tiles inside claimed sectors (Home first). Hiring each scout unlocks the next roster tier. Daily AFK discoveries hard-cap at 18. Persist roster + counters only — never geometry.
-- **Frontier combo:** during an active expedition, consecutive qualifying frontier tiles within **20 minutes** build a combo multiplier on frontier scoring (see `FrontierEngine`).
+- **Idle Scouts / Home Camp:** with a Home Base set, a capped offline tick (max 8 h) drips camp materials and lets hired scouts permanently discover a tiny number of fogged tiles inside claimed sectors (Home first). Hiring each scout unlocks the next roster tier (Apprentice → … → Waykeeper). Daily AFK discoveries soft-cap at 18 (Pathfinding can raise toward an absolute 36). Persist roster + counters only — never geometry.
+- **Frontier combo:** during an active expedition, consecutive qualifying frontier tiles within **20 minutes** (extendable via Pathfinding) build a combo multiplier on frontier scoring (see `FrontierEngine`).
 - **Treasure trails:** three local-day landmark targets spanning hundreds of meters to multiple kilometers, with direct/detour choices. Farther destinations yield better relic rarity and completion XP. Completion grants a relic and weekly key.
 - **Weekly vault:** three keys reveal a once-per-ISO-week destination several kilometers out with rare-or-better loot (further boosted by distance band).
 - **Field finds:** deterministic tile pickups (`FieldFindEngine`) into `InventoryStore` — materials, boosts, charges; assemble / salvage / use / activate. Soft daily claim cap; claimed find IDs only (no geometry). Drop **rate** is boosted near Home/claims; drop **quality** improves with distance from Home Base (local → expedition bands).
@@ -89,7 +98,7 @@ Discovered tile centers are quantized into ~2 km cache cells and reverse-geocode
 - Deposits are deterministically derived from `StableHash(tileID)` and become visible at `explored`.
 - Road components, shortest paths, throughput, power balance, and deposit geometry are derived rather than persisted.
 - Production advances in deterministic one-minute steps with at most eight hours of offline progress.
-- Factory research consumes Atlas Insight and is also gated by the existing Explorer level.
+- Factory research consumes Atlas Insight and is also gated by the existing Explorer level. Late tiers include Logistics III, Automation II, Power III, and Extraction III; Artifice skills provide infinite soft factory power beyond the fixed research catalog.
 - Research bootstraps with a slower field-material Insight recipe; Mechanics unlocks the faster mechanism-based recipe.
 - Nearby players can manually load or unload machine buffers, while connected depots automate transfers.
 - Depot stock can be **remote-collected** into the backpack from Workshop → Factory without standing nearby.

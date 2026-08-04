@@ -11,6 +11,7 @@ struct ProgressTabView: View {
 
     @State private var mapLayer: AtlasStatsMapLayer = .mastery
     @State private var showExplorerMap = false
+    @State private var showSkillTree = false
 
     private var allTiles: [WorldTile] { store.discoveredTiles }
 
@@ -65,38 +66,43 @@ struct ProgressTabView: View {
                 VStack(spacing: 14) {
                     ExplorerProgressionView(snapshot: explorerProgression)
                         .staggeredAppear(index: 0)
+                    SkillTreeCard(
+                        snapshot: controller.skillTreeSnapshot,
+                        onOpen: { showSkillTree = true }
+                    )
+                        .staggeredAppear(index: 1)
                     DailyChallengeProgressCard(
                         snapshot: dailyChallenge,
                         canClaimReward: controller.canClaimCircuitReward,
                         onClaimReward: { _ = controller.claimCircuitReward() }
                     )
-                        .staggeredAppear(index: 1)
-                    territoryCard
                         .staggeredAppear(index: 2)
-                    atlasMapCard
+                    territoryCard
                         .staggeredAppear(index: 3)
-                    masteryLadderCard
+                    atlasMapCard
                         .staggeredAppear(index: 4)
+                    masteryLadderCard
+                        .staggeredAppear(index: 5)
                     if !placesVisited.isEmpty || regionLookup.isResolving {
                         placesVisitedCard
-                            .staggeredAppear(index: 5)
+                            .staggeredAppear(index: 6)
                     }
                     frontierStatsCard
-                        .staggeredAppear(index: 6)
-                    territoryClaimsCard
                         .staggeredAppear(index: 7)
-                    personalRecordsCard
+                    territoryClaimsCard
                         .staggeredAppear(index: 8)
+                    personalRecordsCard
+                        .staggeredAppear(index: 9)
                     if !activityFootprint.isEmpty {
                         activityFootprintCard
-                            .staggeredAppear(index: 9)
+                            .staggeredAppear(index: 10)
                     }
                     explorerVitalsCard
-                        .staggeredAppear(index: 10)
-                    xpTotalsCard
                         .staggeredAppear(index: 11)
-                    pinpointStatsCard
+                    xpTotalsCard
                         .staggeredAppear(index: 12)
+                    pinpointStatsCard
+                        .staggeredAppear(index: 13)
                 }
                 .padding(20)
             }
@@ -111,6 +117,9 @@ struct ProgressTabView: View {
                     layer: $mapLayer,
                     frontierChargedTileIDs: Set(store.frontierState.chargedTileIDs)
                 )
+            }
+            .sheet(isPresented: $showSkillTree) {
+                SkillTreeView(controller: controller)
             }
         }
     }

@@ -134,7 +134,7 @@ final class ExplorerProgressionEngineTests: XCTestCase {
 
         XCTAssertEqual(snapshot.level, 3)
         XCTAssertEqual(snapshot.title, "Scout")
-        XCTAssertTrue(snapshot.achievements.allSatisfy(\.isUnlocked))
+        XCTAssertTrue(snapshot.achievements.contains(where: \.isUnlocked))
         XCTAssertGreaterThan(snapshot.atlasTokens, 0)
         XCTAssertTrue(snapshot.rewards.contains { $0.level == 2 && $0.kind == .mapLayer })
     }

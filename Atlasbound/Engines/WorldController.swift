@@ -29,6 +29,7 @@ final class WorldController: ObservableObject {
     let treasureStore: TreasureStore
     let inventoryStore: InventoryStore
     let idleStore: IdleStore
+    let skillStore: SkillStore
     private let progression = ProgressionEngine()
     private let frontierEngine = FrontierEngine()
     private let sectorEngine = HexSectorEngine()
@@ -58,6 +59,7 @@ final class WorldController: ObservableObject {
         treasureStore: TreasureStore? = nil,
         inventoryStore: InventoryStore? = nil,
         idleStore: IdleStore? = nil,
+        skillStore: SkillStore? = nil,
         recorder: ActivityRecorder? = nil,
         landmarkResolver: any LandmarkResolving = LandmarkResolver()
     ) {
@@ -68,6 +70,7 @@ final class WorldController: ObservableObject {
         self.treasureStore = treasureStore ?? TreasureStore()
         self.inventoryStore = inventoryStore ?? InventoryStore()
         self.idleStore = idleStore ?? IdleStore()
+        self.skillStore = skillStore ?? SkillStore()
         self.recorder = recorder ?? ActivityRecorder()
         self.landmarkResolver = landmarkResolver
         restoreSelectedActivityType()
@@ -378,7 +381,7 @@ final class WorldController: ObservableObject {
 
         func bump(_ id: String, amount: Int) {
             guard var tile = sessionTiles[id] ?? store.tiles[id], tile.isDiscovered else { return }
-            progression.applyMasteryPulse(tile: &tile, amount: amount)
+            progression.applyMasteryPulse(tile: &tile, amount: amount, modifiers: skillModifiers)
             if explorationMode.isExplicitSession {
                 sessionTiles[id] = tile
             }
@@ -502,6 +505,24 @@ final class WorldController: ObservableObject {
         )
     }
 
+    var skillModifiers: SkillModifiers {
+        skillStore.modifiers()
+    }
+
+    var skillTreeSnapshot: SkillTreeSnapshot {
+        skillStore.snapshot(explorerLevel: explorerLevel)
+    }
+
+    @discardableResult
+    func rankUpSkill(_ nodeID: String) -> SkillRankUpResult {
+        let result = skillStore.rankUp(nodeID: nodeID, explorerLevel: explorerLevel)
+        if case .ranked = result.outcome {
+            AtlasHaptics.success()
+            objectWillChange.send()
+        }
+        return result
+    }
+
     var dailyChallengeSnapshot: DailyChallengeSnapshot {
         dailyChallengeEngine.snapshot(tiles: store.discoveredTiles)
     }
@@ -519,6 +540,7 @@ final class WorldController: ObservableObject {
     /// Catch up Home drip and capped scout discoveries since last simulation.
     @discardableResult
     func advanceIdle(to date: Date = .now) -> IdleAdvanceReport {
+        let mods = skillModifiers
         var report = IdleAdvanceReport.empty
         idleStore.update { state in
             report = idleScoutEngine.advance(
@@ -526,7 +548,8 @@ final class WorldController: ObservableObject {
                 to: date,
                 territory: store.territoryState,
                 discoveredTileIDs: store.discoveredTileIDs,
-                tileEngine: tileEngine
+                tileEngine: tileEngine,
+                modifiers: mods
             )
         }
         if !report.homeDripItems.isEmpty {
@@ -836,12 +859,14 @@ final class WorldController: ObservableObject {
         let discoveryCandidates = Set(newIDs.filter {
             updated[$0]?.isDiscovered != true
         })
+        let mods = skillModifiers
         let progress = progression.processVisits(
             tileIDs: newIDs,
             tiles: &updated,
             tileEngine: tileEngine,
             at: date,
-            activity: .unknown
+            activity: .unknown,
+            modifiers: mods
         )
         let modified = inventoryStore.applyXPModifiers(
             discovery: progress.discoveryXP,
@@ -851,7 +876,8 @@ final class WorldController: ObservableObject {
             base: modified.familiarity,
             tileIDs: newIDs,
             state: store.territoryState,
-            tileEngine: tileEngine
+            tileEngine: tileEngine,
+            claimBuffMultiplier: mods.claimBuffMultiplier
         )
         store.applyLiveVisitProgress(
             updatedTiles: newIDs.compactMap { updated[$0] },
@@ -862,6 +888,8 @@ final class WorldController: ObservableObject {
         let territoryForFinds = store.territoryState
         let findTileEngine = tileEngine
         let homeCenter = homeBaseTileCoordinate
+        let findChanceSkill = mods.findChanceBonusPercent
+        let claimBuff = mods.claimBuffMultiplier
         inventoryStore.processVisitedTileIDs(
             newIDs,
             discoveryTileIDs: discoveryCandidates,
@@ -870,8 +898,9 @@ final class WorldController: ObservableObject {
                 TerritoryEngine().findChanceBonusPercent(
                     forTileID: tileID,
                     state: territoryForFinds,
-                    tileEngine: findTileEngine
-                )
+                    tileEngine: findTileEngine,
+                    claimBuffMultiplier: claimBuff
+                ) + findChanceSkill
             },
             metersFromHome: { tileID in
                 guard let homeCenter,
@@ -880,7 +909,8 @@ final class WorldController: ObservableObject {
                     hexDistance: TileEngine.hexDistance(homeCenter, tile),
                     tileSizeMeters: findTileEngine.tileSizeMeters
                 )
-            }
+            },
+            qualityBonusPercent: mods.findQualityBonusPercent
         )
         objectWillChange.send()
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
@@ -912,12 +942,14 @@ final class WorldController: ObservableObject {
             return tile.state == .fogged || tile.firstVisitedAt == nil
         })
 
+        let mods = skillModifiers
         let progress = progression.processVisits(
             tileIDs: newIDs,
             tiles: &sessionTiles,
             tileEngine: engine,
             at: date,
-            activity: activity
+            activity: activity,
+            modifiers: mods
         )
 
         let modified = inventoryStore.applyXPModifiers(
@@ -928,7 +960,8 @@ final class WorldController: ObservableObject {
             base: modified.familiarity,
             tileIDs: newIDs,
             state: store.territoryState,
-            tileEngine: tileEngine
+            tileEngine: tileEngine,
+            claimBuffMultiplier: mods.claimBuffMultiplier
         )
 
         var discovered = sessionDiscoveredIDs
@@ -957,6 +990,8 @@ final class WorldController: ObservableObject {
         let territoryForFinds = store.territoryState
         let findTileEngine = tileEngine
         let homeCenter = homeBaseTileCoordinate
+        let findChanceSkill = mods.findChanceBonusPercent
+        let claimBuff = mods.claimBuffMultiplier
         inventoryStore.processVisitedTileIDs(
             newIDs,
             discoveryTileIDs: discoveryCandidates,
@@ -965,8 +1000,9 @@ final class WorldController: ObservableObject {
                 TerritoryEngine().findChanceBonusPercent(
                     forTileID: tileID,
                     state: territoryForFinds,
-                    tileEngine: findTileEngine
-                )
+                    tileEngine: findTileEngine,
+                    claimBuffMultiplier: claimBuff
+                ) + findChanceSkill
             },
             metersFromHome: { tileID in
                 guard let homeCenter,
@@ -975,7 +1011,8 @@ final class WorldController: ObservableObject {
                     hexDistance: TileEngine.hexDistance(homeCenter, tile),
                     tileSizeMeters: findTileEngine.tileSizeMeters
                 )
-            }
+            },
+            qualityBonusPercent: mods.findQualityBonusPercent
         )
         objectWillChange.send()
         processFrontierScoring(newDiscoveryIDs: Array(discoveryCandidates), at: date)
@@ -1029,7 +1066,8 @@ final class WorldController: ObservableObject {
                 connectionBonusesAwarded: connectionBonuses,
                 combo: frontierCombo,
                 tileEngine: tileEngine,
-                at: date
+                at: date,
+                comboWindow: SkillTreeEngine.baseFrontierComboWindow + skillModifiers.frontierComboWindowBonus
             )
 
             frontierCombo = result.combo

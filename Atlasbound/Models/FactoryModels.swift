@@ -184,6 +184,10 @@ enum FactoryResearchCatalog {
         .init(id: "power_2", name: "Power II", detail: "Tier-two waystone dynamos.", insightCost: 30, explorerLevel: 15, prerequisiteIDs: ["mechanics"]),
         .init(id: "logistics_2", name: "Logistics II", detail: "Waystone roads and grand depots.", insightCost: 40, explorerLevel: 20, prerequisiteIDs: ["automation"]),
         .init(id: "extraction_2", name: "Extraction II", detail: "Tier-two outposts with doubled extraction.", insightCost: 50, explorerLevel: 25, prerequisiteIDs: ["power_2"]),
+        .init(id: "logistics_3", name: "Logistics III", detail: "Arterial logistics and denser depot throughput.", insightCost: 60, explorerLevel: 30, prerequisiteIDs: ["logistics_2"]),
+        .init(id: "automation_2", name: "Automation II", detail: "Faster assembly halls and kit lines.", insightCost: 70, explorerLevel: 35, prerequisiteIDs: ["automation", "logistics_3"]),
+        .init(id: "power_3", name: "Power III", detail: "Tier-three dynamos with greater supply.", insightCost: 80, explorerLevel: 40, prerequisiteIDs: ["power_2", "automation_2"]),
+        .init(id: "extraction_3", name: "Extraction III", detail: "Tier-three outposts with triple extraction.", insightCost: 90, explorerLevel: 45, prerequisiteIDs: ["extraction_2", "power_3"]),
     ]
 
     static let byID = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
