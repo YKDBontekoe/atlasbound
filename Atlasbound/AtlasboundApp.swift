@@ -10,6 +10,7 @@ struct AtlasboundApp: App {
     @StateObject private var inventoryStore = InventoryStore()
     @StateObject private var factoryStore = FactoryStore()
     @StateObject private var idleStore = IdleStore()
+    @StateObject private var skillStore = SkillStore()
     @StateObject private var controllerHolder = ControllerHolder()
     @StateObject private var factoryHolder = FactoryHolder()
     @StateObject private var pinpointHolder = PinpointHolder()
@@ -45,12 +46,14 @@ struct AtlasboundApp: App {
                     gameCenterManager: gameCenterManager,
                     treasureStore: treasureStore,
                     inventoryStore: inventoryStore,
-                    idleStore: idleStore
+                    idleStore: idleStore,
+                    skillStore: skillStore
                 )
                 factoryHolder.bootstrap(
                     store: factoryStore,
                     tileStore: store,
-                    inventoryStore: inventoryStore
+                    inventoryStore: inventoryStore,
+                    skillStore: skillStore
                 )
                 pinpointHolder.bootstrap(tileStore: store, gameCenterManager: gameCenterManager)
             }
@@ -65,13 +68,15 @@ final class FactoryHolder: ObservableObject {
     func bootstrap(
         store: FactoryStore,
         tileStore: TileStore,
-        inventoryStore: InventoryStore
+        inventoryStore: InventoryStore,
+        skillStore: SkillStore
     ) {
         guard controller == nil else { return }
         controller = FactoryController(
             store: store,
             tileStore: tileStore,
-            inventoryStore: inventoryStore
+            inventoryStore: inventoryStore,
+            skillStore: skillStore
         )
         controller?.advance()
     }
@@ -88,7 +93,8 @@ final class ControllerHolder: ObservableObject {
         gameCenterManager: GameCenterManager,
         treasureStore: TreasureStore,
         inventoryStore: InventoryStore,
-        idleStore: IdleStore
+        idleStore: IdleStore,
+        skillStore: SkillStore
     ) {
         guard controller == nil else { return }
         controller = WorldController(
@@ -98,7 +104,8 @@ final class ControllerHolder: ObservableObject {
             gameCenterManager: gameCenterManager,
             treasureStore: treasureStore,
             inventoryStore: inventoryStore,
-            idleStore: idleStore
+            idleStore: idleStore,
+            skillStore: skillStore
         )
     }
 }

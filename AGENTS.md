@@ -44,6 +44,8 @@ Atlasbound/
     ActivityRecorder.swift     # CLLocation filtering
     TileEngine.swift           # Lat/lon → axial hex
     ProgressionEngine.swift    # Discovery / familiarity XP
+    ExplorerProgressionEngine.swift # Uncapped account levels, titles, achievements
+    SkillTreeEngine.swift      # Skill Points, infinite ranks, SkillModifiers
     StatsEngine.swift          # Territory area, footprints, explorer metrics
     RegionLookupEngine.swift   # Coarse-cell place labels + places-visited aggregate
     GeocodeLimiter.swift       # Shared throttled CLGeocoder
@@ -69,9 +71,10 @@ Atlasbound/
     InventoryStore.swift       # Field finds + stackable inventory
     FactoryStore.swift         # Factory structures + research
     IdleStore.swift            # Scout roster + Home drip / circuit-claim counters
-  Models/                      # WorldTile, activity types, FrontierModels, TerritoryModels, TreasureModels, ItemModels, IdlePackModels, PinpointModels
+    SkillStore.swift           # Skill tree ranks (Skill Points)
+  Models/                      # WorldTile, activity types, FrontierModels, TerritoryModels, TreasureModels, ItemModels, IdlePackModels, SkillTreeModels, PinpointModels
   Map/                         # DiscoveryMapView, AtlasStatsMapView, GuessMapView (MapKit)
-  Views/                       # MainMapScreen, summary, Workshop (Journal+Factory), Pinpoint + inventory + idle scout views
+  Views/                       # MainMapScreen, summary, Workshop (Journal+Factory), Progress skill tree, Pinpoint + inventory + idle scout views
   Theme/                       # AtlasTheme
 AtlasboundTests/               # Unit + chrome snapshot tests
 AtlasboundUITests/             # UI smoke tests

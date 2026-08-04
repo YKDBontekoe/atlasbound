@@ -239,7 +239,8 @@ struct FrontierEngine: Sendable {
     func advanceCombo(
         current: FrontierComboState,
         qualifyingTile: Bool,
-        at date: Date
+        at date: Date,
+        window: TimeInterval = comboWindow
     ) -> FrontierComboState {
         var combo = current
         if let expires = combo.expiresAt, expires <= date {
@@ -247,7 +248,7 @@ struct FrontierEngine: Sendable {
         }
         guard qualifyingTile else { return combo }
         combo.count += 1
-        combo.expiresAt = date.addingTimeInterval(Self.comboWindow)
+        combo.expiresAt = date.addingTimeInterval(max(Self.comboWindow, window))
         return combo
     }
 
@@ -262,7 +263,8 @@ struct FrontierEngine: Sendable {
         connectionBonusesAwarded: Set<String>,
         combo: FrontierComboState,
         tileEngine: TileEngine,
-        at date: Date
+        at date: Date,
+        comboWindow: TimeInterval = Self.comboWindow
     ) -> (award: FrontierTileAward?, combo: FrontierComboState, connectionBonusAwarded: Bool, completionBonus: Int?) {
         guard isNewDiscovery else {
             return (nil, combo, false, nil)
@@ -271,7 +273,7 @@ struct FrontierEngine: Sendable {
             return (nil, combo, false, nil)
         }
 
-        let nextCombo = advanceCombo(current: combo, qualifyingTile: true, at: date)
+        let nextCombo = advanceCombo(current: combo, qualifyingTile: true, at: date, window: comboWindow)
         let multiplier = nextCombo.multiplier(at: date)
 
         let base = Self.baseTilePoints

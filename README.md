@@ -12,9 +12,10 @@ Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily l
 - One canonical **20 m** hex atlas
 - Fog vs discovered tile overlay on the map; mastery ladder and familiarity XP
 - Configurable live atlas with muted Explorer basemap, optional 3D terrain, plus mastery, visit-heat, places, fog, and Frontier layers
-- **Explorer progression** — 50 account levels, rank titles, Atlas Tokens, map-layer unlocks, and achievement milestones
+- **Explorer progression** — uncapped account levels, procedural titles past Atlas Legend, Atlas Tokens, map-layer unlocks, and tiered infinite achievements
+- **Skill tree** — Pathfinding, Surveying, Cartography, and Artifice disciplines with infinite ranks spent via Skill Points
 - **Scout Circuit** — three fresh daily goals for discovery, revisits, and route coverage, with a claimable daily material chest
-- **Idle Scouts / Home Camp** — hire a scout roster that unlocks deeper scouts; capped AFK discoveries near Home/claims plus Home material drip (8 h offline cap)
+- **Idle Scouts / Home Camp** — hire a scout roster through Waykeeper; capped AFK discoveries near Home/claims plus Home material drip (8 h offline cap)
 - **Frontier Expeditions** — weekly missions, combo scoring, Game Center leaderboards
 - **Treasure trails** — three daily landmark clues, route choices, collectible relics, and weekly vaults
 - **Field finds** — deterministic tile pickups into a stackable inventory (materials, boosts, charges); assemble, salvage, use, and activate

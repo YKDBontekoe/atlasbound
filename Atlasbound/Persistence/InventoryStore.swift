@@ -66,7 +66,8 @@ final class InventoryStore: ObservableObject {
         discoveryTileIDs: Set<String>,
         date: Date = .now,
         findChanceBonus: (String) -> Int = { _ in 0 },
-        metersFromHome: (String) -> Double? = { _ in nil }
+        metersFromHome: (String) -> Double? = { _ in nil },
+        qualityBonusPercent: Int = 0
     ) {
         refreshDayState(date: date)
         pruneEffects(at: date)
@@ -82,7 +83,8 @@ final class InventoryStore: ObservableObject {
                 claimedFindIDs: claimedFindIDs,
                 findsClaimedToday: findsClaimedToday,
                 chanceBonusPercent: findChanceBonus(tileID),
-                metersFromHome: metersFromHome(tileID)
+                metersFromHome: metersFromHome(tileID),
+                qualityBonusPercent: qualityBonusPercent
             ) else { continue }
             collect(find)
             return

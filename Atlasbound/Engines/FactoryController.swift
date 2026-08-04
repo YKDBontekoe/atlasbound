@@ -12,6 +12,7 @@ final class FactoryController: ObservableObject {
     let store: FactoryStore
     let tileStore: TileStore
     let inventoryStore: InventoryStore
+    let skillStore: SkillStore
 
     private let constructionEngine = ConstructionEngine()
     private let networkEngine = FactoryNetworkEngine()
@@ -20,10 +21,16 @@ final class FactoryController: ObservableObject {
     private var cachedTopologyKey = ""
     private var cachedNetworks: [FactoryNetworkSnapshot] = []
 
-    init(store: FactoryStore, tileStore: TileStore, inventoryStore: InventoryStore) {
+    init(
+        store: FactoryStore,
+        tileStore: TileStore,
+        inventoryStore: InventoryStore,
+        skillStore: SkillStore? = nil
+    ) {
         self.store = store
         self.tileStore = tileStore
         self.inventoryStore = inventoryStore
+        self.skillStore = skillStore ?? SkillStore()
     }
 
     var structures: [PlacedFactoryStructure] {
@@ -38,6 +45,13 @@ final class FactoryController: ObservableObject {
         ExplorerProgressionEngine().level(
             forTotalXP: tileStore.discoveryXPTotal + tileStore.familiarityXPTotal
         )
+    }
+
+    /// Insight cost after Artifice thrift (foundations stay free).
+    func effectiveInsightCost(for research: FactoryResearchDefinition) -> Int {
+        guard research.insightCost > 0 else { return 0 }
+        let multiplier = max(0.5, skillStore.modifiers().insightCostMultiplier)
+        return max(1, Int((Double(research.insightCost) * multiplier).rounded()))
     }
 
     var networks: [FactoryNetworkSnapshot] {
@@ -253,7 +267,8 @@ final class FactoryController: ObservableObject {
         let next = simulationEngine.advance(
             state: store.state,
             to: date,
-            tileEngine: tileStore.tileEngine
+            tileEngine: tileStore.tileEngine,
+            speedMultiplier: skillStore.modifiers().factorySpeedMultiplier
         )
         store.replaceState(next)
     }
@@ -279,17 +294,26 @@ final class FactoryController: ObservableObject {
         guard var structure = store.structures[tileID],
               let definition = FactoryCatalog.byID[structure.definitionID],
               definition.kind == .extractor || definition.kind == .generator else { return false }
-        let researchID = definition.kind == .extractor ? "extraction_2" : "power_2"
+        let nextTier = structure.tier + 1
+        let researchID: String
+        switch (definition.kind, nextTier) {
+        case (.extractor, 2): researchID = "extraction_2"
+        case (.extractor, 3): researchID = "extraction_3"
+        case (.generator, 2): researchID = "power_2"
+        case (.generator, 3): researchID = "power_3"
+        default:
+            return false
+        }
         guard store.unlockedResearchIDs.contains(researchID) else {
             latestMessage = "Requires \(FactoryResearchCatalog.byID[researchID]?.name ?? "research")."
             return false
         }
-        guard structure.tier < 2, isPlayerNear(tileID: tileID),
+        guard structure.tier < 3, isPlayerNear(tileID: tileID),
               consumeConstructionItem(definition.kitItemID, near: tileID) else {
             latestMessage = "Stand nearby with another \(definition.name) kit."
             return false
         }
-        structure.tier = 2
+        structure.tier = nextTier
         store.update { $0.structures[tileID] = structure }
         latestMessage = "\(definition.name) upgraded."
         return true
@@ -318,12 +342,18 @@ final class FactoryController: ObservableObject {
         guard let research = FactoryResearchCatalog.byID[researchID],
               !store.unlockedResearchIDs.contains(researchID),
               research.prerequisiteIDs.isSubset(of: store.unlockedResearchIDs),
-              explorerLevel >= research.explorerLevel,
-              totalAvailableItem("atlas_insight") >= research.insightCost else {
+              explorerLevel >= research.explorerLevel else {
             latestMessage = "Research requirements are not yet met."
             return false
         }
-        guard consumeGlobalItem("atlas_insight", quantity: research.insightCost) else { return false }
+        let cost = effectiveInsightCost(for: research)
+        guard totalAvailableItem("atlas_insight") >= cost else {
+            latestMessage = "Research requirements are not yet met."
+            return false
+        }
+        if cost > 0 {
+            guard consumeGlobalItem("atlas_insight", quantity: cost) else { return false }
+        }
         store.update { $0.unlockedResearchIDs.insert(researchID) }
         latestMessage = "\(research.name) researched."
         return true

@@ -10,7 +10,8 @@ struct FactorySimulationEngine: Sendable {
     func advance(
         state initialState: FactoryState,
         to date: Date,
-        tileEngine: TileEngine
+        tileEngine: TileEngine,
+        speedMultiplier: Double = 1
     ) -> FactoryState {
         var state = initialState
         let elapsed = date.timeIntervalSince(state.lastSimulatedAt)
@@ -32,12 +33,14 @@ struct FactorySimulationEngine: Sendable {
             structures: state.structures,
             tileEngine: tileEngine
         )
+        let speed = max(1, speedMultiplier)
         for _ in 0..<minutes {
             simulateMinute(
                 state: &state,
                 networks: networks,
                 cachedPaths: paths,
-                tileEngine: tileEngine
+                tileEngine: tileEngine,
+                speedMultiplier: speed
             )
         }
         state.lastSimulatedAt = totalMinutes > Self.maximumOfflineMinutes
@@ -50,14 +53,16 @@ struct FactorySimulationEngine: Sendable {
         state: inout FactoryState,
         networks: [FactoryNetworkSnapshot],
         cachedPaths: [String: [String]],
-        tileEngine: TileEngine
+        tileEngine: TileEngine,
+        speedMultiplier: Double
     ) {
         for network in networks {
             simulate(
                 network: network,
                 state: &state,
                 cachedPaths: cachedPaths,
-                tileEngine: tileEngine
+                tileEngine: tileEngine,
+                speedMultiplier: speedMultiplier
             )
         }
     }
@@ -66,12 +71,17 @@ struct FactorySimulationEngine: Sendable {
         network: FactoryNetworkSnapshot,
         state: inout FactoryState,
         cachedPaths: [String: [String]],
-        tileEngine: TileEngine
+        tileEngine: TileEngine,
+        speedMultiplier: Double
     ) {
         var remainingRoadCapacity = Dictionary(uniqueKeysWithValues: network.roadTileIDs.map { roadID in
             let tier = state.structures[roadID]
                 .flatMap { FactoryCatalog.byID[$0.definitionID]?.roadTier } ?? .trail
-            return (roadID, tier.capacityPerMinute)
+            var capacity = tier.capacityPerMinute
+            if state.unlockedResearchIDs.contains("logistics_3") {
+                capacity = Int((Double(capacity) * 1.25).rounded())
+            }
+            return (roadID, capacity)
         })
 
         let buildingIDs = network.buildingTileIDs.sorted()
@@ -104,7 +114,13 @@ struct FactorySimulationEngine: Sendable {
                 }
             }
             if generator.fueledMinutes > 0 {
-                availablePower += generator.tier >= 2 ? 50 : definition.powerSupply
+                if generator.tier >= 3 {
+                    availablePower += 80
+                } else if generator.tier >= 2 {
+                    availablePower += 50
+                } else {
+                    availablePower += definition.powerSupply
+                }
             }
             state.structures[id] = generator
         }
@@ -140,7 +156,16 @@ struct FactorySimulationEngine: Sendable {
             case .extractor:
                 let deposit = constructionEngine.deposit(for: id)
                 if let itemID = deposit.kind.outputItemID, structure.extractedUnits < deposit.capacity {
-                    let amount = state.unlockedResearchIDs.contains("extraction_2") && structure.tier >= 2 ? 2 : 1
+                    var amount = 1
+                    if state.unlockedResearchIDs.contains("extraction_3") && structure.tier >= 3 {
+                        amount = 3
+                    } else if state.unlockedResearchIDs.contains("extraction_2") && structure.tier >= 2 {
+                        amount = 2
+                    }
+                    // Soft Artifice speed occasionally yields an extra unit.
+                    if speedMultiplier > 1.25, StableHash.fnv1a64("extract:\(id):\(structure.extractedUnits)") % 4 == 0 {
+                        amount += 1
+                    }
                     let remaining = deposit.capacity - structure.extractedUnits
                     let produced = min(amount, remaining)
                     if totalQuantity(structure.outputBuffer) + produced <= Self.defaultBufferCapacity {
@@ -176,7 +201,12 @@ struct FactorySimulationEngine: Sendable {
                 if has(recipe.inputs, in: structure.inputBuffer),
                    canFit(recipe.outputs, in: structure.outputBuffer, capacity: Self.defaultBufferCapacity) {
                     structure.recipeProgressMinutes += 1
-                    if structure.recipeProgressMinutes >= recipe.durationMinutes {
+                    let durationBonus = state.unlockedResearchIDs.contains("automation_2") ? 1.1 : 1.0
+                    let effectiveDuration = max(
+                        1,
+                        Int((Double(recipe.durationMinutes) / (speedMultiplier * durationBonus)).rounded())
+                    )
+                    if structure.recipeProgressMinutes >= effectiveDuration {
                         subtract(recipe.inputs, from: &structure.inputBuffer)
                         add(recipe.outputs, to: &structure.outputBuffer)
                         for output in recipe.outputs {

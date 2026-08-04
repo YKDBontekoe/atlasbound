@@ -58,7 +58,8 @@ struct IdleScoutEngine: Sendable {
         territory: TerritoryState,
         discoveredTileIDs: Set<String>,
         tileEngine: TileEngine,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        modifiers: SkillModifiers = .identity
     ) -> IdleAdvanceReport {
         let elapsed = max(0, Int(date.timeIntervalSince(state.lastSimulatedAt) / 60))
         let minutes = min(elapsed, IdleConstants.maximumOfflineMinutes)
@@ -81,7 +82,8 @@ struct IdleScoutEngine: Sendable {
             territory: territory,
             discoveredTileIDs: discoveredTileIDs,
             tileEngine: tileEngine,
-            dayKey: state.scoutDiscoveryDayKey ?? dayKey(for: date, calendar: calendar)
+            dayKey: state.scoutDiscoveryDayKey ?? dayKey(for: date, calendar: calendar),
+            modifiers: modifiers
         )
 
         // Cap catch-up, then stamp now so the next open does not re-apply the same window.
@@ -167,13 +169,18 @@ struct IdleScoutEngine: Sendable {
         territory: TerritoryState,
         discoveredTileIDs: Set<String>,
         tileEngine: TileEngine,
-        dayKey: String
+        dayKey: String,
+        modifiers: SkillModifiers = .identity
     ) -> [String] {
         guard minutes > 0, !state.hiredScouts.isEmpty, territory.hasHomeBase else { return [] }
-        let remaining = max(0, IdleConstants.dailyScoutDiscoveryCap - state.scoutDiscoveriesToday)
+        let dailyCap = min(
+            SkillTreeEngine.absoluteScoutDailyCap,
+            IdleConstants.dailyScoutDiscoveryCap + max(0, modifiers.scoutDailyCapBonus)
+        )
+        let remaining = max(0, dailyCap - state.scoutDiscoveriesToday)
         guard remaining > 0 else { return [] }
 
-        let rate = Double(state.totalTilesPerHour)
+        let rate = Double(state.totalTilesPerHour) * max(1, modifiers.scoutThroughputMultiplier)
         guard rate > 0 else { return [] }
         state.scoutDiscoveryAccumulator += rate * Double(minutes) / 60.0
         let wanted = min(Int(state.scoutDiscoveryAccumulator), remaining)

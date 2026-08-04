@@ -107,8 +107,39 @@ enum ScoutCatalog {
                 ItemAmount(itemID: "waystone_plate", quantity: 2),
             ],
             prerequisiteScoutID: "surveyor_scout",
-            unlocksScoutID: nil,
+            unlocksScoutID: "ranger_scout",
             explorerLevel: 20
+        ),
+        ScoutDefinition(
+            id: "ranger_scout",
+            name: "Ranger Scout",
+            detail: "A far-ranging idle explorer who presses claim edges harder.",
+            symbolName: "figure.hiking",
+            tilesPerHour: 5,
+            hireCost: [
+                ItemAmount(itemID: "atlas_insight", quantity: 8),
+                ItemAmount(itemID: "waystone_plate", quantity: 4),
+                ItemAmount(itemID: "compass_filament", quantity: 4),
+            ],
+            prerequisiteScoutID: "cartographer_scout",
+            unlocksScoutID: "waykeeper_scout",
+            explorerLevel: 28
+        ),
+        ScoutDefinition(
+            id: "waykeeper_scout",
+            name: "Waykeeper Scout",
+            detail: "The apex idle explorer — maximum capped AFK discoveries.",
+            symbolName: "shield.checkered",
+            tilesPerHour: 6,
+            hireCost: [
+                ItemAmount(itemID: "atlas_insight", quantity: 12),
+                ItemAmount(itemID: "landmark_fibers", quantity: 6),
+                ItemAmount(itemID: "waystone_plate", quantity: 6),
+                ItemAmount(itemID: "mechanism", quantity: 2),
+            ],
+            prerequisiteScoutID: "ranger_scout",
+            unlocksScoutID: nil,
+            explorerLevel: 40
         ),
     ]
 
