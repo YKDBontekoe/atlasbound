@@ -85,13 +85,20 @@ struct ExplorerProgressionEngine: Sendable {
                 return "Atlas Legend"
             }
             return proceduralTitle(forLevel: level)
-        case 30...: "Worldweaver"
-        case 20...: "Trailblazer"
-        case 15...: "Pathfinder"
-        case 10...: "Cartographer"
-        case 5...: "Wayfinder"
-        case 2...: "Scout"
-        default: "Wanderer"
+        case 30...:
+            return "Worldweaver"
+        case 20...:
+            return "Trailblazer"
+        case 15...:
+            return "Pathfinder"
+        case 10...:
+            return "Cartographer"
+        case 5...:
+            return "Wayfinder"
+        case 2...:
+            return "Scout"
+        default:
+            return "Wanderer"
         }
     }
 
