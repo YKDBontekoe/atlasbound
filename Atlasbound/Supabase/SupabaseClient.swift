@@ -28,4 +28,22 @@ enum SupabaseClientProvider {
         guard let key = SupabaseConfiguration.publishableKey else { return nil }
         return SupabaseClient(supabaseURL: SupabaseConfiguration.projectURL, supabaseKey: key)
     }()
+
+    /// Data requests use a separate client so Auth remains responsible for
+    /// session refresh while PostgREST/Functions always receive the current
+    /// user's bearer token. Supabase Swift intentionally disallows accessing
+    /// `auth` on a client configured with `auth.accessToken`.
+    static let authenticatedClient: SupabaseClient? = {
+        guard let key = SupabaseConfiguration.publishableKey else { return nil }
+        return SupabaseClient(
+            supabaseURL: SupabaseConfiguration.projectURL,
+            supabaseKey: key,
+            options: SupabaseClientOptions(
+                auth: .init(accessToken: {
+                    guard let authClient = SupabaseClientProvider.client else { return nil }
+                    return try await authClient.auth.session.accessToken
+                })
+            )
+        )
+    }()
 }

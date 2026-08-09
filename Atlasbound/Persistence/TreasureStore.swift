@@ -16,6 +16,12 @@ final class TreasureStore: ObservableObject {
     private let database: AtlasDatabase
     private let engine = TreasureEventEngine()
     private let sharedRepository = SharedTreasureRepository()
+    private var sharedEventsRefreshTask: Task<Void, Never>?
+    private var lastSharedEventsRefreshDate: Date?
+    private var lastSharedEventsRefreshCoordinate: CLLocationCoordinate2D?
+
+    private static let sharedEventsRefreshInterval: TimeInterval = 30
+    private static let sharedEventsRefreshDistance: CLLocationDistance = 250
 
     init(fileURL: URL? = nil, database: AtlasDatabase? = nil) {
         if let database {
@@ -76,14 +82,34 @@ final class TreasureStore: ObservableObject {
         latestReward = nil
         pendingSharedEvent = nil
         sharedEvents = []
+        sharedEventsRefreshTask?.cancel()
+        sharedEventsRefreshTask = nil
+        lastSharedEventsRefreshDate = nil
+        lastSharedEventsRefreshCoordinate = nil
     }
 
     /// Refreshes the active server-authored events around the authenticated player.
     func refreshSharedEvents(at coordinate: CLLocationCoordinate2D) {
-        Task { [weak self] in
+        let now = Date.now
+        if sharedEventsRefreshTask != nil {
+            return
+        }
+        if let lastDate = lastSharedEventsRefreshDate,
+           let lastCoordinate = lastSharedEventsRefreshCoordinate,
+           now.timeIntervalSince(lastDate) < Self.sharedEventsRefreshInterval,
+           CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+               .distance(from: CLLocation(latitude: lastCoordinate.latitude, longitude: lastCoordinate.longitude))
+               < Self.sharedEventsRefreshDistance {
+            return
+        }
+
+        lastSharedEventsRefreshDate = now
+        lastSharedEventsRefreshCoordinate = coordinate
+        sharedEventsRefreshTask = Task { [weak self] in
             let events = await self?.sharedRepository.nearby(around: coordinate) ?? []
-            guard let self else { return }
+            guard !Task.isCancelled, let self else { return }
             self.sharedEvents = events
+            self.sharedEventsRefreshTask = nil
         }
     }
 

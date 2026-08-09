@@ -7,9 +7,14 @@ import Supabase
 @MainActor
 final class CloudProgressRepository {
     private let client: SupabaseClient?
+    private let authClient: SupabaseClient?
 
-    init(client: SupabaseClient? = SupabaseClientProvider.client) {
+    init(
+        client: SupabaseClient? = SupabaseClientProvider.authenticatedClient,
+        authClient: SupabaseClient? = SupabaseClientProvider.client
+    ) {
         self.client = client
+        self.authClient = authClient
     }
 
     struct RemoteWorld {
@@ -22,7 +27,8 @@ final class CloudProgressRepository {
 
     func loadWorld() async -> RemoteWorld? {
         guard let client,
-              let userID = try? await client.auth.session.user.id else { return nil }
+              let authClient,
+              let userID = try? await authClient.auth.session.user.id else { return nil }
         do {
             let tileRows: [RemoteTileRow] = try await client
                 .from("player_tiles")
@@ -75,7 +81,8 @@ final class CloudProgressRepository {
         territory: TerritoryState?
     ) async -> Bool {
         guard let client,
-              let userID = try? await client.auth.session.user.id else { return false }
+              let authClient,
+              let userID = try? await authClient.auth.session.user.id else { return false }
 
         do {
             if clearAllTiles {

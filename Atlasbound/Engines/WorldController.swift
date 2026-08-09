@@ -587,7 +587,7 @@ final class WorldController: ObservableObject {
     @discardableResult
     func hireScout(_ scoutID: String, at date: Date = .now) -> ScoutHireResult {
         advanceIdle(to: date)
-        var hireResult = idleScoutEngine.canHire(
+        let hireResult = idleScoutEngine.canHire(
             scoutID: scoutID,
             state: idleStore.state,
             explorerLevel: explorerLevel,
@@ -768,6 +768,7 @@ final class WorldController: ObservableObject {
     func rerollTreasureTrail() {
         guard let playerTileCoordinate else { return }
         cancelTreasurePreparation()
+        treasurePreparationDayKey = nil
         treasureStore.reroll(anchor: playerTileCoordinate, tileEngine: tileEngine)
     }
 
@@ -780,7 +781,6 @@ final class WorldController: ObservableObject {
               treasureStore.dailyTrail?.currentStageIndex == 0 else { return }
         guard treasurePreparationTask == nil else { return }
         guard treasurePreparationDayKey != dayKey else { return }
-        treasurePreparationDayKey = dayKey
         let engine = tileEngine
         let resolver = landmarkResolver
         isPreparingTreasureTrail = true
@@ -793,7 +793,8 @@ final class WorldController: ObservableObject {
             guard let self else { return }
             self.treasurePreparationTask = nil
             self.isPreparingTreasureTrail = false
-            guard !Task.isCancelled, !targets.isEmpty else { return }
+            guard !Task.isCancelled, targets.count >= TreasureConstants.stagesPerTrail * 2 else { return }
+            self.treasurePreparationDayKey = dayKey
             self.treasureStore.replaceTrailTargets(targets)
             self.treasureStore.registerCurrentTarget(at: location.coordinate, tileEngine: engine)
         }

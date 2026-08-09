@@ -13,9 +13,11 @@ final class AuthStore: ObservableObject {
     var onSessionEnded: (@MainActor () -> Void)?
 
     let client: SupabaseClient?
+    private let dataClient: SupabaseClient?
 
     init() {
         client = SupabaseClientProvider.client
+        dataClient = SupabaseClientProvider.authenticatedClient
         Task { await restoreSession() }
     }
 
@@ -57,8 +59,9 @@ final class AuthStore: ObservableObject {
         guard let client else { return }
         do {
             session = try await client.auth.session(from: url)
-            await loadProfile()
-            errorMessage = nil
+            if await loadProfile() {
+                errorMessage = nil
+            }
         }
         catch { errorMessage = error.localizedDescription }
     }
@@ -73,23 +76,23 @@ final class AuthStore: ObservableObject {
     }
 
     func deleteAccount() async {
-        guard let client else { return }
+        guard let dataClient, let authClient = client else { return }
         do {
-            try await client.functions.invoke("delete-account")
-            try? await client.auth.signOut()
+            try await dataClient.functions.invoke("delete-account")
+            try? await authClient.auth.signOut()
             resetSessionState()
         } catch { errorMessage = error.localizedDescription }
     }
 
     func saveDisplayName(_ value: String) async {
-        guard let client, let userID = session?.user.id else { return }
+        guard let dataClient, let userID = session?.user.id else { return }
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (1...40).contains(normalized.count) else {
             errorMessage = "Display name must be between 1 and 40 characters."
             return
         }
         do {
-            try await client
+            try await dataClient
                 .from("profiles")
                 .update(ProfileUpdate(displayName: normalized, profileCompleted: true))
                 .eq("id", value: userID.uuidString)
@@ -100,19 +103,29 @@ final class AuthStore: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
 
-    private func loadProfile() async {
-        guard let client, let userID = session?.user.id else { return }
+    @discardableResult
+    private func loadProfile() async -> Bool {
+        guard let dataClient, let userID = session?.user.id else { return false }
         do {
-            let profile: ProfileRow = try await client
+            let profile: ProfileRow? = try await dataClient
                 .from("profiles")
                 .select()
                 .eq("id", value: userID.uuidString)
-                .single()
+                .maybeSingle()
                 .execute()
                 .value
+            guard let profile else {
+                displayName = ""
+                needsProfileSetup = true
+                return true
+            }
             displayName = profile.displayName
             needsProfileSetup = !profile.profileCompleted
-        } catch { }
+            return true
+        } catch {
+            errorMessage = "Couldn’t load your profile. Check your connection and try again."
+            return false
+        }
     }
 
     private func resetSessionState() {

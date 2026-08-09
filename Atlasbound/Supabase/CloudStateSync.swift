@@ -8,11 +8,16 @@ import Supabase
 @MainActor
 final class CloudStateSync: ObservableObject {
     private let client: SupabaseClient?
+    private let authClient: SupabaseClient?
     private var task: Task<Void, Never>?
     private var lastUploadedSnapshot: Data?
 
-    init(client: SupabaseClient? = SupabaseClientProvider.client) {
+    init(
+        client: SupabaseClient? = SupabaseClientProvider.authenticatedClient,
+        authClient: SupabaseClient? = SupabaseClientProvider.client
+    ) {
         self.client = client
+        self.authClient = authClient
     }
 
     func hydrate(
@@ -25,7 +30,8 @@ final class CloudStateSync: ObservableObject {
         skills: SkillStore
     ) async -> Bool {
         guard let client,
-              let userID = try? await client.auth.session.user.id else { return false }
+              let authClient,
+              let userID = try? await authClient.auth.session.user.id else { return false }
         do {
             let rows: [RemoteCloudState] = try await client
                 .from("player_state")
@@ -104,7 +110,8 @@ final class CloudStateSync: ObservableObject {
         skills: SkillStore
     ) async {
         guard let client,
-              let userID = try? await client.auth.session.user.id else { return }
+              let authClient,
+              let userID = try? await authClient.auth.session.user.id else { return }
 
         let row = CloudStateRow(
             userID: userID,

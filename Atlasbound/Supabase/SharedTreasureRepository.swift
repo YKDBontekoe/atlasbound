@@ -6,7 +6,7 @@ import Supabase
 final class SharedTreasureRepository {
     private let client: SupabaseClient?
 
-    init(client: SupabaseClient? = SupabaseClientProvider.client) {
+    init(client: SupabaseClient? = SupabaseClientProvider.authenticatedClient) {
         self.client = client
     }
 

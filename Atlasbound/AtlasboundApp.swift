@@ -19,6 +19,7 @@ struct AtlasboundApp: App {
     @StateObject private var factoryHolder = FactoryHolder()
     @StateObject private var cloudStateSync = CloudStateSync()
     @State private var cloudBootstrapStarted = false
+    @State private var cloudBootstrapError: String?
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
 
     private var isUITestMode: Bool {
@@ -34,6 +35,10 @@ struct AtlasboundApp: App {
                     AuthView(auth: auth)
                 } else if auth.needsProfileSetup && !isUITestMode {
                     ProfileSetupView(auth: auth)
+                } else if let cloudBootstrapError, !isUITestMode {
+                    CloudBootstrapErrorView(message: cloudBootstrapError) {
+                        retryCloudBootstrap()
+                    }
                 } else if let controller = controllerHolder.controller,
                    let factoryController = factoryHolder.controller {
                     RootTabView(
@@ -92,10 +97,11 @@ struct AtlasboundApp: App {
         guard auth.session != nil || isUITestMode else { return }
         guard !cloudBootstrapStarted else { return }
         cloudBootstrapStarted = true
+        cloudBootstrapError = nil
         Task {
             if auth.session != nil {
                 guard await store.hydrateFromCloud() else {
-                    cloudBootstrapStarted = false
+                    failCloudBootstrap()
                     return
                 }
                 guard await cloudStateSync.hydrate(
@@ -107,12 +113,25 @@ struct AtlasboundApp: App {
                     idle: idleStore,
                     skills: skillStore
                 ) else {
-                    cloudBootstrapStarted = false
+                    failCloudBootstrap()
                     return
                 }
             }
             bootstrapControllers()
         }
+    }
+
+    @MainActor
+    private func failCloudBootstrap() {
+        cloudBootstrapStarted = false
+        cloudBootstrapError = "Your local atlas is safe, but cloud sync did not finish. Check your connection and try again."
+    }
+
+    @MainActor
+    private func retryCloudBootstrap() {
+        cloudBootstrapError = nil
+        cloudBootstrapStarted = false
+        bootstrapWorldIfAuthenticated()
     }
 
     @MainActor
@@ -160,6 +179,7 @@ struct AtlasboundApp: App {
         controllerHolder.reset()
         factoryHolder.reset()
         cloudBootstrapStarted = false
+        cloudBootstrapError = nil
     }
 }
 
