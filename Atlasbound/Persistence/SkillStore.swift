@@ -64,6 +64,10 @@ final class SkillStore: ObservableObject {
         persist()
     }
 
+    func resetLocalSession() {
+        state = .empty
+    }
+
     private func persist() {
         database.saveSkillState(state)
     }

@@ -505,6 +505,20 @@ final class AtlasDatabase {
         )
     }
 
+    /// Clears all account-scoped local state without changing schema metadata.
+    func clearAllLocalState() {
+        try? db.transaction {
+            for table in [
+                "tiles", "progress", "frontier", "territory_state",
+                "activity_sessions", "activity_aggregates", "region_cells",
+                "pinpoint_games", "pinpoint_stats", "treasure_state",
+                "inventory_state", "factory_state", "idle_state", "skill_state"
+            ] {
+                try db.execute("DELETE FROM \(table);")
+            }
+        }
+    }
+
     func persistWorldSnapshot(
         dirtyTiles: [WorldTile],
         progress: PersistedProgressRecord?,
@@ -676,6 +690,26 @@ final class AtlasDatabase {
         }
     }
 
+    func removeActivityAggregates(except activityTypes: Set<ActivityType>) {
+        do {
+            try db.transaction {
+                if activityTypes.isEmpty {
+                    try db.execute("DELETE FROM activity_aggregates;")
+                    return
+                }
+                let placeholders = Array(repeating: "?", count: activityTypes.count).joined(separator: ",")
+                let statement = try db.prepare("DELETE FROM activity_aggregates WHERE activity NOT IN (\(placeholders));")
+                defer { sqlite3_finalize(statement) }
+                for (index, type) in activityTypes.sorted(by: { $0.rawValue < $1.rawValue }).enumerated() {
+                    SQLiteDatabase.bindText(statement, index: Int32(index + 1), value: type.rawValue)
+                }
+                guard sqlite3_step(statement) == SQLITE_DONE else {
+                    throw SQLiteError.stepFailed(db.sqliteMessage)
+                }
+            }
+        } catch { }
+    }
+
     func upsertActivityAggregate(
         type: ActivityType,
         longest: Double,
@@ -736,6 +770,26 @@ final class AtlasDatabase {
         for cell in cells {
             upsertRegionCell(cell)
         }
+    }
+
+    func removeRegionCells(except cellKeys: Set<String>) {
+        do {
+            try db.transaction {
+                if cellKeys.isEmpty {
+                    try db.execute("DELETE FROM region_cells;")
+                    return
+                }
+                let placeholders = Array(repeating: "?", count: cellKeys.count).joined(separator: ",")
+                let statement = try db.prepare("DELETE FROM region_cells WHERE cell_key NOT IN (\(placeholders));")
+                defer { sqlite3_finalize(statement) }
+                for (index, key) in cellKeys.sorted().enumerated() {
+                    SQLiteDatabase.bindText(statement, index: Int32(index + 1), value: key)
+                }
+                guard sqlite3_step(statement) == SQLITE_DONE else {
+                    throw SQLiteError.stepFailed(db.sqliteMessage)
+                }
+            }
+        } catch { }
     }
 
     func upsertRegionCell(_ cell: PersistedRegionCell) {

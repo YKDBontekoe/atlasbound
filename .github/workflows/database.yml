@@ -1,0 +1,37 @@
+name: Validate Supabase migrations
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - ".github/workflows/database.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrations:
+    name: Reset and validate local database
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.79.0
+      - name: Start local Supabase
+        run: supabase start
+      - name: Replay migrations
+        run: supabase db reset
+      - name: Check migration files
+        run: |
+          set -euo pipefail
+          test -n "$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print -quit)"
+          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup

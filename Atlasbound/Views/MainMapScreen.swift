@@ -3,6 +3,7 @@ import MapKit
 import CoreLocation
 
 struct MainMapScreen: View {
+    @ObservedObject var auth: AuthStore
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     @ObservedObject var factoryController: FactoryController
@@ -37,10 +38,12 @@ struct MainMapScreen: View {
     @State private var isIdleAdventureExpanded = false
 
     init(
+        auth: AuthStore,
         controller: WorldController,
         store: TileStore,
         factoryController: FactoryController
     ) {
+        self.auth = auth
         self.controller = controller
         self.store = store
         self.factoryController = factoryController
@@ -179,6 +182,7 @@ struct MainMapScreen: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsSheet(
+                auth: auth,
                 controller: controller,
                 store: store,
                 factoryController: factoryController,
@@ -810,6 +814,7 @@ struct MainMapScreen: View {
 }
 
 struct SettingsSheet: View {
+    @ObservedObject var auth: AuthStore
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     @ObservedObject var factoryController: FactoryController
@@ -818,6 +823,7 @@ struct SettingsSheet: View {
     @AppStorage(BackgroundRecordingPreference.storageKey) private var backgroundRecordingEnabled = false
     @AppStorage(AutomaticExplorationPreference.backgroundKey) private var automaticBackgroundEnabled = false
     @Environment(\.dismiss) private var dismiss
+    @State private var showingDeleteConfirmation = false
 
     private var appearanceBinding: Binding<AppearancePreference> {
         Binding(
@@ -829,6 +835,16 @@ struct SettingsSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Account") {
+                    LabeledContent("Signed in as", value: auth.displayName)
+                    Button("Sign out") {
+                        Task { await auth.signOut() }
+                    }
+                    Button("Delete account and all progress", role: .destructive) {
+                        showingDeleteConfirmation = true
+                    }
+                }
+
                 Section("Appearance") {
                     Picker("Theme", selection: appearanceBinding) {
                         ForEach(AppearancePreference.allCases) { mode in
@@ -906,6 +922,17 @@ struct SettingsSheet: View {
                     Button("Done") { dismiss() }
                         .accessibilityIdentifier("settingsDone")
                 }
+            }
+            .confirmationDialog(
+                "Delete your Atlasbound account?",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete permanently", role: .destructive) {
+                    Task { await auth.deleteAccount() }
+                }
+            } message: {
+                Text("This permanently removes your account and all cloud progress.")
             }
         }
     }

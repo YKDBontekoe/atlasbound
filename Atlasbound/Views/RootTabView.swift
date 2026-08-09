@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RootTabView: View {
+    @ObservedObject var auth: AuthStore
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     @ObservedObject var activityHistory: ActivityHistoryStore
@@ -15,6 +16,7 @@ struct RootTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             MainMapScreen(
+                auth: auth,
                 controller: controller,
                 store: store,
                 factoryController: factoryController

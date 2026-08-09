@@ -49,6 +49,25 @@ final class RegionLookupStore: ObservableObject {
         )
     }
 
+    func replaceCloudState(_ save: LegacyRegionSave) {
+        cells = save.cells.reduce(into: [:]) { result, cell in
+            guard RegionLookupEngine.representativeCoordinate(forCellKey: cell.cellKey) != nil else { return }
+            result[cell.cellKey] = cell
+        }
+        resolvedCellCount = cells.values.filter(\.didSucceed).count
+        database.removeRegionCells(except: Set(cells.keys))
+        persistToDisk()
+    }
+
+    func resetLocalSession() {
+        resolveTask?.cancel()
+        resolveTask = nil
+        pendingCellKeys = []
+        isResolving = false
+        cells = [:]
+        resolvedCellCount = 0
+    }
+
     /// Resolve uncached / retryable cells for discovered tiles. Safe to call repeatedly.
     func resolve(tiles: [WorldTile]) {
         let counts = RegionLookupEngine.tileCountsByCell(tiles: tiles)

@@ -21,6 +21,8 @@ Package.resolved
 *.p12
 .env
 Atlasbound/atlasbound.env
+Atlasbound/Config/Debug.local.xcconfig
+Atlasbound/Config/Release.local.xcconfig
 
 # Python / test artifacts
 __pycache__/

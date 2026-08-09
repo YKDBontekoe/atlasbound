@@ -43,6 +43,35 @@ final class TreasureStore: ObservableObject {
         return "\(min(trail.currentStageIndex, TreasureConstants.stagesPerTrail))/\(TreasureConstants.stagesPerTrail)"
     }
 
+    func replaceCloudState(_ save: LegacyTreasureSave) {
+        dailyTrail = save.dailyTrail
+        weeklyVault = save.weeklyVault
+        relics = save.relics
+        completedTrailCount = max(0, save.completedTrailCount)
+        pendingEncounter = nil
+        latestReward = nil
+        persist()
+    }
+
+    func clearCloudState() {
+        replaceCloudState(LegacyTreasureSave(
+            version: JSONFileStore.currentSchemaVersion,
+            dailyTrail: nil,
+            weeklyVault: .empty,
+            relics: [],
+            completedTrailCount: 0
+        ))
+    }
+
+    func resetLocalSession() {
+        dailyTrail = nil
+        weeklyVault = .empty
+        relics = []
+        completedTrailCount = 0
+        pendingEncounter = nil
+        latestReward = nil
+    }
+
     func ensureTrail(anchor: TileCoordinate, tileEngine: TileEngine, date: Date = .now) {
         refreshCalendarState(date: date)
         let dayKey = TreasureEventEngine.localDayKey(for: date)

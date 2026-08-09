@@ -56,6 +56,44 @@ final class InventoryStore: ObservableObject {
         return activeEffects.first
     }
 
+    func replaceCloudState(_ save: LegacyInventorySave) {
+        stacks = save.stacks.filter { ItemCatalog.definition(for: $0.itemID) != nil && $0.quantity > 0 }
+        claimedFindIDs = Set(save.claimedFindIDs)
+        claimedFindDayKey = save.claimedFindDayKey
+        findsClaimedToday = max(0, save.findsClaimedToday)
+        activeEffects = save.activeEffects
+        cartographerPins = save.cartographerPins
+        lifetimeFindsCollected = max(0, save.lifetimeFindsCollected)
+        latestPickup = nil
+        latestActionMessage = nil
+        persist()
+    }
+
+    func clearCloudState() {
+        replaceCloudState(LegacyInventorySave(
+            version: JSONFileStore.currentSchemaVersion,
+            stacks: [],
+            claimedFindIDs: [],
+            claimedFindDayKey: "",
+            findsClaimedToday: 0,
+            activeEffects: [],
+            cartographerPins: [],
+            lifetimeFindsCollected: 0
+        ))
+    }
+
+    func resetLocalSession() {
+        stacks = []
+        activeEffects = []
+        cartographerPins = []
+        findsClaimedToday = 0
+        lifetimeFindsCollected = 0
+        claimedFindIDs = []
+        claimedFindDayKey = ""
+        latestPickup = nil
+        latestActionMessage = nil
+    }
+
     // MARK: - Field finds
 
     /// `discoveryTileIDs` are tiles first-discovered in this visit batch.
