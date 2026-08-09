@@ -53,6 +53,7 @@ final class AuthStore: ObservableObject {
     }
 
     func handle(url: URL) async {
+        guard SupabaseConfiguration.isAuthCallback(url) else { return }
         guard let client else { return }
         do {
             session = try await client.auth.session(from: url)
