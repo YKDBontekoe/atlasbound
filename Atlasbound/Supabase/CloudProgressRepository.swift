@@ -13,10 +13,11 @@ final class CloudProgressRepository {
     }
 
     struct RemoteWorld {
+        let hasRemoteRecord: Bool
         let tiles: [WorldTile]
-        let progress: PersistedProgressRecord
-        let frontier: FrontierState
-        let territory: TerritoryState
+        let progress: PersistedProgressRecord?
+        let frontier: FrontierState?
+        let territory: TerritoryState?
     }
 
     func loadWorld() async -> RemoteWorld? {
@@ -50,11 +51,12 @@ final class CloudProgressRepository {
                     familiarityXPTotal: $0.familiarityXP,
                     activitiesCompleted: $0.activitiesCompleted
                 )
-            } ?? PersistedProgressRecord(discoveryXPTotal: 0, familiarityXPTotal: 0, activitiesCompleted: 0)
+            }
             let state = stateRows.first
-            let frontier = state.flatMap { try? $0.frontier.decode(as: PersistedFrontierRecord.self).asFrontierState() } ?? .empty
-            let territory = state.flatMap { try? $0.territory.decode(as: PersistedTerritoryRecord.self).asTerritoryState() } ?? .empty
+            let frontier = state.flatMap { try? $0.frontier.decode(as: PersistedFrontierRecord.self).asFrontierState() }
+            let territory = state.flatMap { try? $0.territory.decode(as: PersistedTerritoryRecord.self).asTerritoryState() }
             return RemoteWorld(
+                hasRemoteRecord: !tileRows.isEmpty || !progressRows.isEmpty || !stateRows.isEmpty,
                 tiles: tileRows.map(\.worldTile),
                 progress: progress,
                 frontier: frontier,
@@ -71,9 +73,9 @@ final class CloudProgressRepository {
         clearAllTiles: Bool,
         frontier: FrontierState?,
         territory: TerritoryState?
-    ) async {
+    ) async -> Bool {
         guard let client,
-              let userID = try? await client.auth.session.user.id else { return }
+              let userID = try? await client.auth.session.user.id else { return false }
 
         do {
             if clearAllTiles {
@@ -99,16 +101,18 @@ final class CloudProgressRepository {
                     .execute()
             }
 
-            if let frontier, let territory {
+            if frontier != nil || territory != nil {
                 let params: [String: AnyJSON] = [
-                    "p_frontier": (try? AnyJSON(PersistedFrontierRecord(from: frontier))) ?? .object([:]),
-                    "p_territory": (try? AnyJSON(PersistedTerritoryRecord(from: territory))) ?? .object([:])
+                    "p_frontier": (try? AnyJSON(PersistedFrontierRecord(from: frontier ?? .empty))) ?? .object([:]),
+                    "p_territory": (try? AnyJSON(PersistedTerritoryRecord(from: territory ?? .empty))) ?? .object([:])
                 ]
                 try await client.rpc("save_world_state", params: params).execute()
             }
+            return true
         } catch {
             // The local store remains authoritative for the current frame; a
             // later sync pass retries failed writes.
+            return false
         }
     }
 }

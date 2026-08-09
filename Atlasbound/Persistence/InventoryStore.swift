@@ -82,6 +82,18 @@ final class InventoryStore: ObservableObject {
         ))
     }
 
+    func resetLocalSession() {
+        stacks = []
+        activeEffects = []
+        cartographerPins = []
+        findsClaimedToday = 0
+        lifetimeFindsCollected = 0
+        claimedFindIDs = []
+        claimedFindDayKey = ""
+        latestPickup = nil
+        latestActionMessage = nil
+    }
+
     // MARK: - Field finds
 
     /// `discoveryTileIDs` are tiles first-discovered in this visit batch.

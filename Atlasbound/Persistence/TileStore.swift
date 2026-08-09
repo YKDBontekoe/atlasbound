@@ -22,6 +22,9 @@ final class TileStore: ObservableObject {
     private var frontierDirty = false
     private var territoryDirty = false
     private var pendingClear = false
+    private var cloudUploadTask: Task<Void, Never>?
+    private var pendingCloudUpload: CloudUpload?
+    private var cloudRevision: UInt64 = 0
 
     private static let installationIDKey = "atlasbound.installationID"
 
@@ -45,20 +48,53 @@ final class TileStore: ObservableObject {
 
     var databaseURL: URL { database.fileURL }
 
-    func hydrateFromCloud() async {
-        guard let world = await cloudRepository.loadWorld() else { return }
+    func hydrateFromCloud() async -> Bool {
+        guard let world = await cloudRepository.loadWorld() else { return false }
+        guard world.hasRemoteRecord else { return true }
         tiles = world.tiles.reduce(into: [:]) { $0[$1.id] = $1 }
-        discoveryXPTotal = world.progress.discoveryXPTotal
-        familiarityXPTotal = world.progress.familiarityXPTotal
-        activitiesCompleted = world.progress.activitiesCompleted
-        frontierState = world.frontier
-        territoryState = world.territory
+        if let progress = world.progress {
+            discoveryXPTotal = progress.discoveryXPTotal
+            familiarityXPTotal = progress.familiarityXPTotal
+            activitiesCompleted = progress.activitiesCompleted
+        }
+        if let frontier = world.frontier { frontierState = frontier }
+        if let territory = world.territory { territoryState = territory }
         dirtyTileIDs = []
         progressDirty = false
         frontierDirty = false
         territoryDirty = false
         pendingClear = false
-        database.clearWorld()
+        cloudRevision &+= 1
+        database.replaceWorld(
+            tiles: world.tiles,
+            progress: world.progress ?? PersistedProgressRecord(
+                discoveryXPTotal: discoveryXPTotal,
+                familiarityXPTotal: familiarityXPTotal,
+                activitiesCompleted: activitiesCompleted
+            ),
+            frontier: world.frontier ?? frontierState,
+            territory: world.territory ?? territoryState
+        )
+        return true
+    }
+
+    func resetLocalSession() {
+        tiles = [:]
+        discoveryXPTotal = 0
+        familiarityXPTotal = 0
+        activitiesCompleted = 0
+        frontierState = .empty
+        territoryState = .empty
+        dirtyTileIDs = []
+        progressDirty = false
+        frontierDirty = false
+        territoryDirty = false
+        pendingClear = false
+        cloudUploadTask?.cancel()
+        cloudUploadTask = nil
+        pendingCloudUpload = nil
+        cloudRevision &+= 1
+        database.clearAllLocalState()
     }
 
     /// - Parameters:
@@ -130,6 +166,7 @@ final class TileStore: ObservableObject {
         if countsAsActivity {
             activitiesCompleted += 1
             progressDirty = true
+            cloudRevision &+= 1
         }
         persistToDisk()
     }
@@ -139,6 +176,7 @@ final class TileStore: ObservableObject {
         discoveryXPTotal += discovery
         familiarityXPTotal += familiarity
         progressDirty = true
+        cloudRevision &+= 1
         persistToDisk()
     }
 
@@ -157,6 +195,7 @@ final class TileStore: ObservableObject {
         discoveryXPTotal += discoveryXP
         familiarityXPTotal += familiarityXP
         progressDirty = true
+        cloudRevision &+= 1
         persistToDisk()
     }
 
@@ -187,6 +226,7 @@ final class TileStore: ObservableObject {
         state = transform(state)
         frontierState = state
         frontierDirty = true
+        cloudRevision &+= 1
         persistToDisk()
     }
 
@@ -199,6 +239,7 @@ final class TileStore: ObservableObject {
         guard next != territoryState else { return }
         territoryState = next
         territoryDirty = true
+        cloudRevision &+= 1
         persistToDisk()
     }
 
@@ -244,6 +285,7 @@ final class TileStore: ObservableObject {
         frontierDirty = true
         territoryDirty = true
         pendingClear = true
+        cloudRevision &+= 1
         persistToDisk(force: true)
     }
 
@@ -263,6 +305,7 @@ final class TileStore: ObservableObject {
 
     private func markTilesDirty(_ ids: [String]) {
         dirtyTileIDs.formUnion(ids)
+        if !ids.isEmpty { cloudRevision &+= 1 }
     }
 
     private func loadFromDisk() {
@@ -296,11 +339,7 @@ final class TileStore: ObservableObject {
             : nil
         let frontier = frontierDirty ? frontierState : nil
         let territory = territoryDirty ? territoryState : nil
-        let cloudProgress = progress ?? PersistedProgressRecord(
-            discoveryXPTotal: discoveryXPTotal,
-            familiarityXPTotal: familiarityXPTotal,
-            activitiesCompleted: activitiesCompleted
-        )
+        let cloudProgress = progress
         let cloudClear = pendingClear
         let cloudFrontier = (frontierDirty || territoryDirty) ? frontierState : nil
         let cloudTerritory = (frontierDirty || territoryDirty) ? territoryState : nil
@@ -323,20 +362,46 @@ final class TileStore: ObservableObject {
             )
         }
 
-        dirtyTileIDs = []
-        progressDirty = false
-        frontierDirty = false
-        territoryDirty = false
-        pendingClear = false
+        enqueueCloudUpload(CloudUpload(
+            tiles: dirtyTiles,
+            progress: cloudProgress,
+            clearAllTiles: cloudClear,
+            frontier: cloudFrontier,
+            territory: cloudTerritory,
+            revision: cloudRevision
+        ))
+    }
 
-        Task { [cloudRepository] in
-            await cloudRepository.persist(
-                tiles: dirtyTiles,
-                progress: cloudProgress,
-                clearAllTiles: cloudClear,
-                frontier: cloudFrontier,
-                territory: cloudTerritory
-            )
+    private func enqueueCloudUpload(_ upload: CloudUpload) {
+        pendingCloudUpload = upload
+        guard cloudUploadTask == nil else { return }
+        cloudUploadTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self, let next = self.pendingCloudUpload else { break }
+                self.pendingCloudUpload = nil
+                let succeeded = await self.cloudRepository.persist(
+                    tiles: next.tiles,
+                    progress: next.progress,
+                    clearAllTiles: next.clearAllTiles,
+                    frontier: next.frontier,
+                    territory: next.territory
+                )
+                if succeeded {
+                    if self.cloudRevision == next.revision {
+                        self.dirtyTileIDs = []
+                        self.progressDirty = false
+                        self.frontierDirty = false
+                        self.territoryDirty = false
+                        self.pendingClear = false
+                    }
+                } else if self.pendingCloudUpload == nil {
+                    self.pendingCloudUpload = next
+                }
+                if !succeeded {
+                    try? await Task.sleep(for: .seconds(10))
+                }
+            }
+            self?.cloudUploadTask = nil
         }
     }
 
@@ -348,4 +413,14 @@ final class TileStore: ObservableObject {
             sizeMeters: tileSize.meters
         )
     }
+}
+
+@MainActor
+private struct CloudUpload {
+    let tiles: [WorldTile]
+    let progress: PersistedProgressRecord?
+    let clearAllTiles: Bool
+    let frontier: FrontierState?
+    let territory: TerritoryState?
+    let revision: UInt64
 }

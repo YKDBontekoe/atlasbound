@@ -77,7 +77,21 @@ final class ActivityHistoryStore: ObservableObject {
             guard let activity = ActivityType(rawValue: key) else { return nil }
             return (activity, max(0, value))
         })
+        database.removeActivityAggregates(except: Set(
+            Array(longestDistanceByActivity.keys)
+                + Array(totalDistanceByActivity.keys)
+                + Array(totalDurationByActivity.keys)
+                + Array(sessionCountByActivity.keys)
+        ))
         persistToDisk()
+    }
+
+    func resetLocalSession() {
+        sessions = []
+        longestDistanceByActivity = [:]
+        totalDistanceByActivity = [:]
+        totalDurationByActivity = [:]
+        sessionCountByActivity = [:]
     }
 
     private func loadFromDisk() {

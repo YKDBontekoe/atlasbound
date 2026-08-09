@@ -56,6 +56,14 @@ final class PinpointStore: ObservableObject {
         ))
     }
 
+    func resetLocalSession() {
+        gameHistory = []
+        highScoreWorldwide = 0
+        highScoreHomeTurf = 0
+        gamesPlayed = 0
+        exactTileHits = 0
+    }
+
     func record(_ game: PinpointGame) {
         gameHistory.append(game)
         if gameHistory.count > Self.maxRetainedGames {

@@ -55,7 +55,17 @@ final class RegionLookupStore: ObservableObject {
             result[cell.cellKey] = cell
         }
         resolvedCellCount = cells.values.filter(\.didSucceed).count
+        database.removeRegionCells(except: Set(cells.keys))
         persistToDisk()
+    }
+
+    func resetLocalSession() {
+        resolveTask?.cancel()
+        resolveTask = nil
+        pendingCellKeys = []
+        isResolving = false
+        cells = [:]
+        resolvedCellCount = 0
     }
 
     /// Resolve uncached / retryable cells for discovered tiles. Safe to call repeatedly.

@@ -32,6 +32,8 @@
 		A10000000000000000000001 /* Atlasbound.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atlasbound.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000002 /* AtlasboundTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AtlasboundTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000003 /* AtlasboundUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AtlasboundUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000084 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Atlasbound/Config/Debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		A10000000000000000000085 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Atlasbound/Config/Release.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -416,6 +418,7 @@
 		};
 		A10000000000000000000052 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000084 /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -444,7 +447,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.atlasbound.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPABASE_PUBLISHABLE_KEY = "sb_publishable_PPuMAQUkyzaxtVi9yiHQFQ_-YlxIL7t";
+				SUPABASE_PUBLISHABLE_KEY = "$(SUPABASE_DEBUG_PUBLISHABLE_KEY)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -455,6 +458,7 @@
 		};
 		A10000000000000000000053 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000085 /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -483,7 +487,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.atlasbound.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPABASE_PUBLISHABLE_KEY = "sb_publishable_PPuMAQUkyzaxtVi9yiHQFQ_-YlxIL7t";
+				SUPABASE_PUBLISHABLE_KEY = "$(SUPABASE_RELEASE_PUBLISHABLE_KEY)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;

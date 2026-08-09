@@ -18,7 +18,17 @@ supabase db reset
 find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort
 ```
 
-The iOS app receives the project publishable key through the `SUPABASE_PUBLISHABLE_KEY` Xcode build setting. Publishable keys are safe to ship with the app; service-role/database credentials must never be included in the app.
+The iOS app receives the project publishable key through the `SUPABASE_PUBLISHABLE_KEY` Xcode build setting. The Debug and Release configurations resolve their values from local, ignored xcconfig files (or equivalent build-environment values):
+
+```xcconfig
+// Atlasbound/Config/Debug.local.xcconfig
+SUPABASE_DEBUG_PUBLISHABLE_KEY = <debug publishable key>
+
+// Atlasbound/Config/Release.local.xcconfig
+SUPABASE_RELEASE_PUBLISHABLE_KEY = <release publishable key>
+```
+
+Publishable keys are safe to ship with the app; service-role/database credentials must never be included in the app.
 
 GitHub Actions requires these encrypted secrets for the production migration job:
 

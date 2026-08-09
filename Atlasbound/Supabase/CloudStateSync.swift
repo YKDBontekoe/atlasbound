@@ -9,6 +9,7 @@ import Supabase
 final class CloudStateSync: ObservableObject {
     private let client: SupabaseClient?
     private var task: Task<Void, Never>?
+    private var lastUploadedSnapshot: Data?
 
     init(client: SupabaseClient? = SupabaseClientProvider.client) {
         self.client = client
@@ -23,9 +24,9 @@ final class CloudStateSync: ObservableObject {
         idle: IdleStore,
         skills: SkillStore,
         pinpoint: PinpointStore
-    ) async {
+    ) async -> Bool {
         guard let client,
-              let userID = try? await client.auth.session.user.id else { return }
+              let userID = try? await client.auth.session.user.id else { return false }
         do {
             let rows: [RemoteCloudState] = try await client
                 .from("player_state")
@@ -34,19 +35,7 @@ final class CloudStateSync: ObservableObject {
                 .limit(1)
                 .execute()
                 .value
-            guard let row = rows.first else {
-                clearLocalState(
-                    activityHistory: activityHistory,
-                    regionLookup: regionLookup,
-                    treasure: treasure,
-                    inventory: inventory,
-                    factory: factory,
-                    idle: idle,
-                    skills: skills,
-                    pinpoint: pinpoint
-                )
-                return
-            }
+            guard let row = rows.first else { return true }
 
             if let save = Self.decode(row.activityHistory, as: LegacyActivitySave.self) {
                 activityHistory.replaceCloudState(save)
@@ -64,8 +53,11 @@ final class CloudStateSync: ObservableObject {
             if let save = Self.decode(row.idle, as: LegacyIdleSave.self) { idle.replaceState(save.state) } else { idle.clear() }
             if let save = Self.decode(row.skills, as: LegacySkillSave.self) { skills.replaceState(save.state) } else { skills.clear() }
             if let save = Self.decode(row.pinpoint, as: LegacyPinpointSave.self) { pinpoint.replaceCloudState(save) } else { pinpoint.clearCloudState() }
+            lastUploadedSnapshot = nil
+            return true
         } catch {
             // Keep the local cache intact if the account is temporarily offline.
+            return false
         }
     }
 
@@ -102,6 +94,7 @@ final class CloudStateSync: ObservableObject {
     func stop() {
         task?.cancel()
         task = nil
+        lastUploadedSnapshot = nil
     }
 
     private func persist(
@@ -130,12 +123,14 @@ final class CloudStateSync: ObservableObject {
             skills: skills,
             pinpoint: pinpoint
         )
+        guard let snapshot = try? JSONEncoder().encode(row), snapshot != lastUploadedSnapshot else { return }
         do {
             try await client
                 .from("player_state")
-                .update(row)
+                .upsert(row, onConflict: "user_id")
                 .eq("user_id", value: userID.uuidString)
                 .execute()
+            lastUploadedSnapshot = snapshot
         } catch {
             // The next scheduled pass retries transient failures.
         }
@@ -166,7 +161,6 @@ final class CloudStateSync: ObservableObject {
     }
 }
 
-@MainActor
 private struct CloudStateRow: Encodable {
     let userID: UUID
     let frontier: AnyJSON
@@ -187,6 +181,7 @@ private struct CloudStateRow: Encodable {
         case regions
     }
 
+    @MainActor
     init(
         userID: UUID,
         tileStore: TileStore,

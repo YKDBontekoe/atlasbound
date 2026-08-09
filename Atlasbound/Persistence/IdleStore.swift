@@ -55,6 +55,10 @@ final class IdleStore: ObservableObject {
         persist()
     }
 
+    func resetLocalSession() {
+        state = .empty(at: .now)
+    }
+
     private func persist() {
         database.saveIdleState(state)
     }

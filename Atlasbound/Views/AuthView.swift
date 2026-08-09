@@ -31,7 +31,7 @@ struct AuthView: View {
                             if isSending { ProgressView() }
                         }
                     }
-                    .disabled(isSending)
+                    .disabled(email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
                 }
                 if auth.magicLinkSent {
                     Section { Label("Check your inbox for the sign-in link.", systemImage: "envelope.badge").foregroundStyle(.green) }
@@ -41,6 +41,9 @@ struct AuthView: View {
                 }
             }
             .navigationTitle("Atlasbound")
+            .onChange(of: email) { _, _ in
+                auth.clearMagicLinkSent()
+            }
         }
     }
 }

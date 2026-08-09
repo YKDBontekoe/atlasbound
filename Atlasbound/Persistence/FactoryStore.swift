@@ -54,6 +54,10 @@ final class FactoryStore: ObservableObject {
         persist()
     }
 
+    func resetLocalSession() {
+        state = .empty(at: .now)
+    }
+
     private func persist() {
         database.saveFactoryState(state)
     }

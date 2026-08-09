@@ -14,8 +14,8 @@ enum SupabaseConfiguration {
 }
 
 enum SupabaseClientProvider {
-    static var client: SupabaseClient? {
+    static let client: SupabaseClient? = {
         guard let key = SupabaseConfiguration.publishableKey else { return nil }
         return SupabaseClient(supabaseURL: SupabaseConfiguration.projectURL, supabaseKey: key)
-    }
+    }()
 }

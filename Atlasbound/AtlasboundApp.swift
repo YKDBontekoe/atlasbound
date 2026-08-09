@@ -52,12 +52,34 @@ struct AtlasboundApp: App {
                 AppearancePreference(rawValue: appearanceRaw)?.preferredColorScheme
             )
             .onAppear {
+                let sessionStore = store
+                let sessionActivityHistory = activityHistory
+                let sessionRegionLookup = regionLookup
+                let sessionTreasure = treasureStore
+                let sessionInventory = inventoryStore
+                let sessionFactory = factoryStore
+                let sessionIdle = idleStore
+                let sessionSkills = skillStore
+                let sessionPinpoint = pinpointHolder
+                let sessionCloudSync = cloudStateSync
+                auth.onSessionEnded = { @MainActor in
+                    sessionCloudSync.stop()
+                    sessionStore.resetLocalSession()
+                    sessionActivityHistory.resetLocalSession()
+                    sessionRegionLookup.resetLocalSession()
+                    sessionTreasure.resetLocalSession()
+                    sessionInventory.resetLocalSession()
+                    sessionFactory.resetLocalSession()
+                    sessionIdle.resetLocalSession()
+                    sessionSkills.resetLocalSession()
+                    sessionPinpoint.store?.resetLocalSession()
+                    sessionPinpoint.reset()
+                }
                 bootstrapWorldIfAuthenticated()
             }
             .onChange(of: auth.session?.user.id) { _, newValue in
                 if newValue == nil {
-                    cloudStateSync.stop()
-                    cloudBootstrapStarted = false
+                    resetLocalSession()
                 } else {
                     bootstrapWorldIfAuthenticated()
                 }
@@ -75,9 +97,16 @@ struct AtlasboundApp: App {
         cloudBootstrapStarted = true
         Task {
             pinpointHolder.bootstrap(tileStore: store, gameCenterManager: gameCenterManager)
+            guard let pinpointStore = pinpointHolder.store else {
+                cloudBootstrapStarted = false
+                return
+            }
             if auth.session != nil {
-                await store.hydrateFromCloud()
-                await cloudStateSync.hydrate(
+                guard await store.hydrateFromCloud() else {
+                    cloudBootstrapStarted = false
+                    return
+                }
+                guard await cloudStateSync.hydrate(
                     activityHistory: activityHistory,
                     regionLookup: regionLookup,
                     treasure: treasureStore,
@@ -85,15 +114,18 @@ struct AtlasboundApp: App {
                     factory: factoryStore,
                     idle: idleStore,
                     skills: skillStore,
-                    pinpoint: pinpointHolder.store!
-                )
+                    pinpoint: pinpointStore
+                ) else {
+                    cloudBootstrapStarted = false
+                    return
+                }
             }
-            bootstrapControllers()
+            bootstrapControllers(pinpointStore: pinpointStore)
         }
     }
 
     @MainActor
-    private func bootstrapControllers() {
+    private func bootstrapControllers(pinpointStore: PinpointStore) {
         gameCenterManager.authenticate()
         controllerHolder.bootstrap(
             store: store,
@@ -111,8 +143,7 @@ struct AtlasboundApp: App {
             inventoryStore: inventoryStore,
             skillStore: skillStore
         )
-        pinpointHolder.bootstrap(tileStore: store, gameCenterManager: gameCenterManager)
-        if let pinpointStore = pinpointHolder.store, auth.session != nil {
+        if auth.session != nil {
             cloudStateSync.start(
                 tileStore: store,
                 activityHistory: activityHistory,
@@ -126,11 +157,33 @@ struct AtlasboundApp: App {
             )
         }
     }
+
+    @MainActor
+    private func resetLocalSession() {
+        cloudStateSync.stop()
+        store.resetLocalSession()
+        activityHistory.resetLocalSession()
+        regionLookup.resetLocalSession()
+        treasureStore.resetLocalSession()
+        inventoryStore.resetLocalSession()
+        factoryStore.resetLocalSession()
+        idleStore.resetLocalSession()
+        skillStore.resetLocalSession()
+        pinpointHolder.store?.resetLocalSession()
+        controllerHolder.reset()
+        factoryHolder.reset()
+        pinpointHolder.reset()
+        cloudBootstrapStarted = false
+    }
 }
 
 @MainActor
 final class FactoryHolder: ObservableObject {
     @Published var controller: FactoryController?
+
+    func reset() {
+        controller = nil
+    }
 
     func bootstrap(
         store: FactoryStore,
@@ -152,6 +205,10 @@ final class FactoryHolder: ObservableObject {
 @MainActor
 final class ControllerHolder: ObservableObject {
     @Published var controller: WorldController?
+
+    func reset() {
+        controller = nil
+    }
 
     func bootstrap(
         store: TileStore,
@@ -181,6 +238,11 @@ final class ControllerHolder: ObservableObject {
 final class PinpointHolder: ObservableObject {
     @Published var controller: PinpointController?
     private(set) var store: PinpointStore?
+
+    func reset() {
+        controller = nil
+        store = nil
+    }
 
     func bootstrap(tileStore: TileStore, gameCenterManager: GameCenterManager) {
         guard controller == nil else { return }

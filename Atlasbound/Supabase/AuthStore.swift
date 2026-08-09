@@ -10,6 +10,7 @@ final class AuthStore: ObservableObject {
     @Published private(set) var magicLinkSent = false
     @Published private(set) var displayName = ""
     @Published private(set) var needsProfileSetup = false
+    var onSessionEnded: (@MainActor () -> Void)?
 
     let client: SupabaseClient?
 
@@ -19,6 +20,10 @@ final class AuthStore: ObservableObject {
     }
 
     var isConfigured: Bool { client != nil }
+
+    func clearMagicLinkSent() {
+        magicLinkSent = false
+    }
 
     func restoreSession() async {
         guard let client else {
@@ -61,9 +66,7 @@ final class AuthStore: ObservableObject {
         guard let client else { return }
         do {
             try await client.auth.signOut()
-            session = nil
-            displayName = ""
-            needsProfileSetup = false
+            resetSessionState()
         }
         catch { errorMessage = error.localizedDescription }
     }
@@ -73,9 +76,7 @@ final class AuthStore: ObservableObject {
         do {
             try await client.functions.invoke("delete-account")
             try? await client.auth.signOut()
-            session = nil
-            displayName = ""
-            needsProfileSetup = false
+            resetSessionState()
         } catch { errorMessage = error.localizedDescription }
     }
 
@@ -89,7 +90,7 @@ final class AuthStore: ObservableObject {
         do {
             try await client
                 .from("profiles")
-                .update(ProfileUpdate(displayName: normalized))
+                .update(ProfileUpdate(displayName: normalized, profileCompleted: true))
                 .eq("id", value: userID.uuidString)
                 .execute()
             displayName = normalized
@@ -109,19 +110,33 @@ final class AuthStore: ObservableObject {
                 .execute()
                 .value
             displayName = profile.displayName
-            needsProfileSetup = profile.displayName == "Explorer"
-        } catch {
-            needsProfileSetup = true
-        }
+            needsProfileSetup = !profile.profileCompleted
+        } catch { }
+    }
+
+    private func resetSessionState() {
+        session = nil
+        displayName = ""
+        needsProfileSetup = false
+        magicLinkSent = false
+        onSessionEnded?()
     }
 }
 
 private struct ProfileRow: Decodable {
     let displayName: String
-    enum CodingKeys: String, CodingKey { case displayName = "display_name" }
+    let profileCompleted: Bool
+    enum CodingKeys: String, CodingKey {
+        case displayName = "display_name"
+        case profileCompleted = "profile_completed"
+    }
 }
 
 private struct ProfileUpdate: Encodable {
     let displayName: String
-    enum CodingKeys: String, CodingKey { case displayName = "display_name" }
+    let profileCompleted: Bool
+    enum CodingKeys: String, CodingKey {
+        case displayName = "display_name"
+        case profileCompleted = "profile_completed"
+    }
 }

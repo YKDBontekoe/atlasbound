@@ -63,6 +63,15 @@ final class TreasureStore: ObservableObject {
         ))
     }
 
+    func resetLocalSession() {
+        dailyTrail = nil
+        weeklyVault = .empty
+        relics = []
+        completedTrailCount = 0
+        pendingEncounter = nil
+        latestReward = nil
+    }
+
     func ensureTrail(anchor: TileCoordinate, tileEngine: TileEngine, date: Date = .now) {
         refreshCalendarState(date: date)
         let dayKey = TreasureEventEngine.localDayKey(for: date)

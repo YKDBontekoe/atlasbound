@@ -254,6 +254,7 @@ jobs:
 
   migrate-database:
     name: Apply Supabase migrations
+    needs: [validate, build-tests, build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: supabase-production
@@ -263,6 +264,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: supabase/setup-cli@v1
         with:
