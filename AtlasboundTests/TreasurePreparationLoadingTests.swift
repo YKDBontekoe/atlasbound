@@ -66,6 +66,9 @@ final class TreasurePreparationLoadingTests: XCTestCase {
             activityHistory: history,
             regionLookup: RegionLookupStore(fileURL: root.appendingPathComponent("regions.json")),
             treasureStore: treasure,
+            inventoryStore: InventoryStore(fileURL: root.appendingPathComponent("inventory.json")),
+            idleStore: IdleStore(fileURL: root.appendingPathComponent("idle.json")),
+            skillStore: SkillStore(fileURL: root.appendingPathComponent("skills.json")),
             recorder: recorder,
             landmarkResolver: resolver
         )
