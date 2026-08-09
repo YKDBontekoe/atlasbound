@@ -40,8 +40,9 @@ The Supabase `spawn-shared-treasure` Edge Function uses the same `MAPBOX_PUBLIC_
 
 Publishable keys are safe to ship with the app; service-role/database credentials must never be included in the app.
 
-GitHub Actions requires these encrypted secrets for the production migration job:
+GitHub Actions requires these encrypted secrets for the production release and migration jobs:
 
+- `SUPABASE_RELEASE_PUBLISHABLE_KEY` (or `SUPABASE_PUBLISHABLE_KEY`) for the IPA build
 - `SUPABASE_ACCESS_TOKEN`
 - `SUPABASE_PROJECT_ID` (`ezxelewutisuyxniozfh`)
 - `SUPABASE_DB_PASSWORD`

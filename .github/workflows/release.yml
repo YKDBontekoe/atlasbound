@@ -249,6 +249,7 @@ jobs:
           REQUIRE_MAPBOX_CONFIG: true
           SUPABASE_RELEASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_RELEASE_PUBLISHABLE_KEY }}
           MAPBOX_PUBLIC_ACCESS_TOKEN: ${{ secrets.MAPBOX_PUBLIC_ACCESS_TOKEN }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           chmod +x scripts/build-ipa.sh
           ./scripts/build-ipa.sh
