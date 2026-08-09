@@ -239,7 +239,8 @@ struct FrontierEngine: Sendable {
     func advanceCombo(
         current: FrontierComboState,
         qualifyingTile: Bool,
-        at date: Date
+        at date: Date,
+        window: TimeInterval = comboWindow
     ) -> FrontierComboState {
         var combo = current
         if let expires = combo.expiresAt, expires <= date {
@@ -247,7 +248,7 @@ struct FrontierEngine: Sendable {
         }
         guard qualifyingTile else { return combo }
         combo.count += 1
-        combo.expiresAt = date.addingTimeInterval(Self.comboWindow)
+        combo.expiresAt = date.addingTimeInterval(max(Self.comboWindow, window))
         return combo
     }
 
@@ -262,7 +263,8 @@ struct FrontierEngine: Sendable {
         connectionBonusesAwarded: Set<String>,
         combo: FrontierComboState,
         tileEngine: TileEngine,
-        at date: Date
+        at date: Date,
+        comboWindow: TimeInterval = Self.comboWindow
     ) -> (award: FrontierTileAward?, combo: FrontierComboState, connectionBonusAwarded: Bool, completionBonus: Int?) {
         guard isNewDiscovery else {
             return (nil, combo, false, nil)
@@ -271,7 +273,7 @@ struct FrontierEngine: Sendable {
             return (nil, combo, false, nil)
         }
 
-        let nextCombo = advanceCombo(current: combo, qualifyingTile: true, at: date)
+        let nextCombo = advanceCombo(current: combo, qualifyingTile: true, at: date, window: comboWindow)
         let multiplier = nextCombo.multiplier(at: date)
 
         let base = Self.baseTilePoints
@@ -352,7 +354,12 @@ struct FrontierEngine: Sendable {
         anchorSector: SectorCoordinate,
         usedDirections: Set<Int>
     ) -> Int {
-        let base = Int((seed &+ UInt64(difficulty.sectorDistance * 17) &+ UInt64(anchorSector.q &* 13) &+ UInt64(anchorSector.r &* 7)) % 6)
+        // Axial sector coordinates can be negative. Preserve their bit patterns
+        // when mixing them into the unsigned deterministic seed instead of
+        // trapping while converting a negative Int to UInt64.
+        let qSeed = UInt64(bitPattern: Int64(anchorSector.q &* 13))
+        let rSeed = UInt64(bitPattern: Int64(anchorSector.r &* 7))
+        let base = Int((seed &+ UInt64(difficulty.sectorDistance * 17) &+ qSeed &+ rSeed) % 6)
         if !usedDirections.contains(base) { return base }
         for offset in 1..<6 {
             let candidate = (base + offset) % 6

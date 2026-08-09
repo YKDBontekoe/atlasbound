@@ -18,14 +18,15 @@ struct ProgressionEngine: Sendable {
     func processVisit(
         tile: inout WorldTile,
         at date: Date = .now,
-        activity: ActivityType = .unknown
+        activity: ActivityType = .unknown,
+        modifiers: SkillModifiers = .identity
     ) -> VisitResult {
         tile.activityStamps.insert(activity)
 
         if tile.state == .fogged || tile.firstVisitedAt == nil {
-            return applyDiscovery(&tile, at: date)
+            return applyDiscovery(&tile, at: date, modifiers: modifiers)
         } else {
-            return applyFamiliarity(&tile, at: date)
+            return applyFamiliarity(&tile, at: date, modifiers: modifiers)
         }
     }
 
@@ -34,7 +35,8 @@ struct ProgressionEngine: Sendable {
         tiles: inout [String: WorldTile],
         tileEngine: TileEngine,
         at date: Date = .now,
-        activity: ActivityType = .unknown
+        activity: ActivityType = .unknown,
+        modifiers: SkillModifiers = .identity
     ) -> SessionProgress {
         var discoveryXP = 0
         var familiarityXP = 0
@@ -46,7 +48,7 @@ struct ProgressionEngine: Sendable {
             guard let coordinate = tileEngine.parseTileID(id) else { continue }
             var tile = tiles[id] ?? WorldTile(id: id, coordinate: coordinate)
             guard tile.id == id, tile.coordinate == coordinate else { continue }
-            let result = processVisit(tile: &tile, at: date, activity: activity)
+            let result = processVisit(tile: &tile, at: date, activity: activity, modifiers: modifiers)
             tiles[id] = tile
             processed += 1
 
@@ -71,18 +73,29 @@ struct ProgressionEngine: Sendable {
 
     // MARK: - Private
 
-    private func applyDiscovery(_ tile: inout WorldTile, at date: Date) -> VisitResult {
+    private func applyDiscovery(
+        _ tile: inout WorldTile,
+        at date: Date,
+        modifiers: SkillModifiers
+    ) -> VisitResult {
+        let xp = scaleXP(Self.discoveryXP, by: modifiers.discoveryXPMultiplier)
         tile.state = .discovered
-        tile.masteryXP += Self.discoveryXP
+        tile.masteryXP += xp
         tile.visitCount = max(tile.visitCount, 0) + 1
         tile.firstVisitedAt = date
         tile.lastVisitedAt = date
         tile.uniqueVisitDays = 1
-        return VisitResult(kind: .discovery, xpAwarded: Self.discoveryXP, tileID: tile.id)
+        advanceStateIfNeeded(&tile, modifiers: modifiers)
+        return VisitResult(kind: .discovery, xpAwarded: xp, tileID: tile.id)
     }
 
-    private func applyFamiliarity(_ tile: inout WorldTile, at date: Date) -> VisitResult {
-        let xp = familiarityXP(forVisitCount: tile.visitCount)
+    private func applyFamiliarity(
+        _ tile: inout WorldTile,
+        at date: Date,
+        modifiers: SkillModifiers
+    ) -> VisitResult {
+        let base = familiarityXP(forVisitCount: tile.visitCount)
+        let xp = scaleXP(base, by: modifiers.familiarityXPMultiplier)
         tile.masteryXP += xp
         tile.visitCount += 1
 
@@ -92,7 +105,7 @@ struct ProgressionEngine: Sendable {
         }
         tile.lastVisitedAt = date
 
-        advanceStateIfNeeded(&tile)
+        advanceStateIfNeeded(&tile, modifiers: modifiers)
 
         return VisitResult(kind: .familiarity, xpAwarded: xp, tileID: tile.id)
     }
@@ -108,16 +121,26 @@ struct ProgressionEngine: Sendable {
         return Self.familiarityXPFloor
     }
 
-    private func advanceStateIfNeeded(_ tile: inout WorldTile) {
-        // Lightweight thresholds — skill tree can layer on top.
+    /// Effective mastery thresholds after Surveying skills (never rewrite stored masteryXP).
+    func effectiveThreshold(_ base: Int, modifiers: SkillModifiers) -> Int {
+        let scaled = Double(base) * max(0.75, modifiers.masteryThresholdMultiplier)
+        return max(1, Int(scaled.rounded()))
+    }
+
+    private func advanceStateIfNeeded(_ tile: inout WorldTile, modifiers: SkillModifiers = .identity) {
+        let legendary = effectiveThreshold(Self.legendaryMasteryXP, modifiers: modifiers)
+        let mastered = effectiveThreshold(Self.masteredMasteryXP, modifiers: modifiers)
+        let surveyed = effectiveThreshold(Self.surveyedMasteryXP, modifiers: modifiers)
+        let explored = effectiveThreshold(Self.exploredMasteryXP, modifiers: modifiers)
+
         switch tile.masteryXP {
-        case Self.legendaryMasteryXP...:
+        case legendary...:
             if tile.state.rawValue < TileState.legendary.rawValue { tile.state = .legendary }
-        case Self.masteredMasteryXP..<Self.legendaryMasteryXP:
+        case mastered..<legendary:
             if tile.state.rawValue < TileState.mastered.rawValue { tile.state = .mastered }
-        case Self.surveyedMasteryXP..<Self.masteredMasteryXP:
+        case surveyed..<mastered:
             if tile.state.rawValue < TileState.surveyed.rawValue { tile.state = .surveyed }
-        case Self.exploredMasteryXP..<Self.surveyedMasteryXP:
+        case explored..<surveyed:
             if tile.state.rawValue < TileState.explored.rawValue { tile.state = .explored }
         default:
             break
@@ -125,12 +148,20 @@ struct ProgressionEngine: Sendable {
     }
 
     /// Survey Beacon / tools: add mastery XP and advance state without counting a visit.
-    func applyMasteryPulse(tile: inout WorldTile, amount: Int) {
+    func applyMasteryPulse(
+        tile: inout WorldTile,
+        amount: Int,
+        modifiers: SkillModifiers = .identity
+    ) {
         guard amount > 0, tile.isDiscovered else { return }
-        tile.masteryXP += amount
-        advanceStateIfNeeded(&tile)
+        let scaled = scaleXP(amount, by: modifiers.masteryPulseMultiplier)
+        tile.masteryXP += scaled
+        advanceStateIfNeeded(&tile, modifiers: modifiers)
     }
 
+    private func scaleXP(_ base: Int, by multiplier: Double) -> Int {
+        max(base, Int((Double(base) * max(1, multiplier)).rounded()))
+    }
 }
 
 enum VisitKind: Sendable {

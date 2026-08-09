@@ -49,6 +49,20 @@ final class FrontierEngineTests: XCTestCase {
         XCTAssertEqual(Set(first.map(\.targetSectorID)).count, first.count)
     }
 
+    func testWeeklyOffersSupportNegativeAnchorCoordinates() {
+        let offers = engine.generateWeeklyOffers(
+            playerTile: TileCoordinate(q: -25, r: -11),
+            discoveredTileIDs: [],
+            tiles: [:],
+            tileEngine: tileEngine,
+            installationID: "negative-anchor",
+            weekKey: "2026-W30"
+        )
+
+        XCTAssertFalse(offers.isEmpty)
+        XCTAssertEqual(Set(offers.map(\.targetSectorID)).count, offers.count)
+    }
+
     func testStableHashMatchesKnownFNV1aVector() {
         XCTAssertEqual(StableHash.fnv1a64("hello"), 0xa430_d846_80aa_bd0b)
     }

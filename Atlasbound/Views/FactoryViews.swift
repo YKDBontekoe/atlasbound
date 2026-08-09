@@ -539,13 +539,14 @@ struct FactoryResearchView: View {
                 ForEach(FactoryResearchCatalog.all) { research in
                     let unlocked = store.unlockedResearchIDs.contains(research.id)
                     let prerequisitesMet = research.prerequisiteIDs.isSubset(of: store.unlockedResearchIDs)
+                    let insightCost = controller.effectiveInsightCost(for: research)
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Image(systemName: unlocked ? "checkmark.seal.fill" : "lightbulb.max")
                                 .foregroundStyle(unlocked ? AtlasTheme.teal : AtlasTheme.gold)
                             Text(research.name).font(.headline)
                             Spacer()
-                            Text(unlocked ? "Unlocked" : "\(research.insightCost) Insight")
+                            Text(unlocked ? "Unlocked" : "\(insightCost) Insight")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
                         }
@@ -556,7 +557,8 @@ struct FactoryResearchView: View {
                                 .foregroundStyle(.secondary)
                             if let blockedReason = researchBlockedReason(
                                 research,
-                                prerequisitesMet: prerequisitesMet
+                                prerequisitesMet: prerequisitesMet,
+                                insightCost: insightCost
                             ) {
                                 Label(blockedReason, systemImage: "lock.fill")
                                     .font(.caption2)
@@ -569,12 +571,16 @@ struct FactoryResearchView: View {
                             .disabled(
                                 !prerequisitesMet
                                     || controller.explorerLevel < research.explorerLevel
-                                    || controller.availableItemCount("atlas_insight") < research.insightCost
+                                    || controller.availableItemCount("atlas_insight") < insightCost
                             )
                             .accessibilityLabel("Research \(research.name)")
                             .accessibilityHint(
-                                researchBlockedReason(research, prerequisitesMet: prerequisitesMet)
-                                    ?? "Spends \(research.insightCost) Atlas Insight and unlocks \(research.name)."
+                                researchBlockedReason(
+                                    research,
+                                    prerequisitesMet: prerequisitesMet,
+                                    insightCost: insightCost
+                                )
+                                    ?? "Spends \(insightCost) Atlas Insight and unlocks \(research.name)."
                             )
                         }
                     }
@@ -588,7 +594,8 @@ struct FactoryResearchView: View {
 
     private func researchBlockedReason(
         _ research: FactoryResearchDefinition,
-        prerequisitesMet: Bool
+        prerequisitesMet: Bool,
+        insightCost: Int
     ) -> String? {
         if !prerequisitesMet {
             let missing = research.prerequisiteIDs
@@ -601,8 +608,8 @@ struct FactoryResearchView: View {
             return "Requires Explorer level \(research.explorerLevel)"
         }
         let available = controller.availableItemCount("atlas_insight")
-        if available < research.insightCost {
-            return "Requires \(research.insightCost - available) more Atlas Insight"
+        if available < insightCost {
+            return "Requires \(insightCost - available) more Atlas Insight"
         }
         return nil
     }

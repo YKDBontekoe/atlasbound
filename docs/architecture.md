@@ -18,6 +18,8 @@ AtlasboundApp
   │    nearby construction + simulation + inventory transactions
   ├─ IdleStore (@MainActor ObservableObject)
   │    scout roster + Home drip / circuit-claim counters
+  ├─ SkillStore (@MainActor ObservableObject)
+  │    skill tree ranks (Skill Points spent)
   └─ WorldController (@MainActor ObservableObject)
        ├─ ActivityRecorder     — shared explicit/passive GPS samples
        ├─ TileEngine           — via store.tileEngine
@@ -36,10 +38,12 @@ AtlasboundApp
 | `ActivityRecorder` | `CLLocationManager` wrapper | `@MainActor` |
 | `TileEngine` | Projection + axial hex + polygons | `Sendable` value type |
 | `ProgressionEngine` | Visit → XP + state | `Sendable` value type |
-| `ExplorerProgressionEngine` | Lifetime XP → level, title, reward track, achievements | `Sendable` value type |
+| `ExplorerProgressionEngine` | Lifetime XP → uncapped level, title, reward track, tiered achievements | `Sendable` value type |
+| `SkillTreeEngine` | Skill Points, infinite ranks, diminishing `SkillModifiers` | `Sendable` value type |
 | `DailyChallengeEngine` | Today’s tile timestamps → Scout Circuit goals | `Sendable` value type |
 | `IdleScoutEngine` | Scout hire/unlock, Home drip, capped AFK tile picks | `Sendable` value type |
 | `IdleStore` | Persist idle roster + daily caps (`idle_state` blob) | `@MainActor` |
+| `SkillStore` | Persist skill ranks (`skill_state` blob) | `@MainActor` |
 | `WorldTile` / models | Domain records | `Sendable` where pure |
 | `FactoryController` | Construction, lifecycle simulation, research, transfers, remote collect | `@MainActor` |
 | `FactoryStore` | Load/save factory state in its independent schema | `@MainActor` |

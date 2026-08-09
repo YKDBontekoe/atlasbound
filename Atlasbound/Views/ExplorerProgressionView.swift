@@ -6,13 +6,8 @@ struct ExplorerProgressionView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showsAllAchievements = false
 
-    private var isMaximumLevel: Bool {
-        snapshot.level == ExplorerProgressionEngine.maximumLevel
-    }
-
     private var nextLevelRewards: [ExplorerLevelReward] {
-        let level = isMaximumLevel ? snapshot.level : snapshot.level + 1
-        return snapshot.rewards.filter { $0.level == level }
+        snapshot.rewards.filter { $0.level == snapshot.level + 1 }
     }
 
     private var unlockedAchievementCount: Int {
@@ -60,7 +55,7 @@ struct ExplorerProgressionView: View {
                     Text(snapshot.title)
                         .font(.title2.weight(.bold))
                         .foregroundStyle(.white)
-                    Text("Level \(snapshot.level) of \(ExplorerProgressionEngine.maximumLevel)")
+                    Text("Level \(snapshot.level)")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.white.opacity(0.76))
                 }
@@ -87,13 +82,9 @@ struct ExplorerProgressionView: View {
                 )
 
                 HStack {
-                    if isMaximumLevel {
-                        Text("Maximum rank reached")
-                    } else {
-                        Text("\(snapshot.xpIntoLevel.formatted()) / \(snapshot.xpNeededForLevel.formatted()) XP")
-                        Spacer()
-                        Text("\(snapshot.xpToNextLevel.formatted()) XP to level \(snapshot.level + 1)")
-                    }
+                    Text("\(snapshot.xpIntoLevel.formatted()) / \(snapshot.xpNeededForLevel.formatted()) XP")
+                    Spacer()
+                    Text("\(snapshot.xpToNextLevel.formatted()) XP to level \(snapshot.level + 1)")
                 }
                 .font(.caption2.weight(.semibold))
                 .monospacedDigit()
@@ -191,32 +182,26 @@ struct ExplorerProgressionView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
                     sectionIcon(
-                        symbol: isMaximumLevel ? "crown.fill" : "flag.checkered",
-                        color: isMaximumLevel ? AtlasTheme.gold : AtlasTheme.blue
+                        symbol: "flag.checkered",
+                        color: AtlasTheme.blue
                     )
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(isMaximumLevel ? "Reward track complete" : "Next level")
+                        Text("Next level")
                             .font(.subheadline.weight(.semibold))
-                        Text(
-                            isMaximumLevel
-                                ? "You’ve reached the summit"
-                                : "\(snapshot.xpToNextLevel.formatted()) XP remaining"
-                        )
+                        Text("\(snapshot.xpToNextLevel.formatted()) XP remaining")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     }
 
                     Spacer()
 
-                    if !isMaximumLevel {
-                        Text("LVL \(snapshot.level + 1)")
-                            .font(.caption2.weight(.heavy))
-                            .foregroundStyle(AtlasTheme.blue)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 6)
-                            .background(AtlasTheme.blue.opacity(0.1), in: Capsule())
-                    }
+                    Text("LVL \(snapshot.level + 1)")
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(AtlasTheme.blue)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(AtlasTheme.blue.opacity(0.1), in: Capsule())
                 }
 
                 if nextLevelRewards.isEmpty {

@@ -6,7 +6,7 @@ import os
 /// Geometry is never stored — tiles keep IDs + mastery fields only.
 @MainActor
 final class AtlasDatabase {
-    static let schemaVersion = 3
+    static let schemaVersion = 4
     static let fileName = "atlasbound.sqlite"
 
     private static let logger = Logger(subsystem: "com.atlasbound.app", category: "database")
@@ -178,6 +178,19 @@ final class AtlasDatabase {
             try db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS idle_state (
+                  id INTEGER PRIMARY KEY CHECK (id = 1),
+                  payload TEXT NOT NULL
+                );
+                """
+            )
+            setMetaValue("3", for: "schema_version")
+        }
+
+        let afterV3 = Int(metaValue(for: "schema_version") ?? "0") ?? 0
+        if afterV3 < 4 {
+            try db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS skill_state (
                   id INTEGER PRIMARY KEY CHECK (id = 1),
                   payload TEXT NOT NULL
                 );
@@ -917,6 +930,21 @@ final class AtlasDatabase {
         )
     }
 
+    func loadSkillState() -> SkillState? {
+        guard let save = loadBlob(table: "skill_state", as: LegacySkillSave.self),
+              save.version == SkillStore.schemaVersion else {
+            return nil
+        }
+        return save.state
+    }
+
+    func saveSkillState(_ state: SkillState) {
+        saveBlob(
+            table: "skill_state",
+            value: LegacySkillSave(version: SkillStore.schemaVersion, state: state)
+        )
+    }
+
     private func loadBlob<T: Decodable>(table: String, as type: T.Type) -> T? {
         guard let statement = try? db.prepare("SELECT payload FROM \(table) WHERE id = 1;") else {
             return nil
@@ -995,4 +1023,9 @@ struct LegacyFactorySave: Codable {
 struct LegacyIdleSave: Codable {
     let version: Int
     let state: IdleState
+}
+
+struct LegacySkillSave: Codable {
+    let version: Int
+    let state: SkillState
 }
