@@ -8,11 +8,16 @@ import Supabase
 @MainActor
 final class CloudStateSync: ObservableObject {
     private let client: SupabaseClient?
+    private let authClient: SupabaseClient?
     private var task: Task<Void, Never>?
     private var lastUploadedSnapshot: Data?
 
-    init(client: SupabaseClient? = SupabaseClientProvider.client) {
+    init(
+        client: SupabaseClient? = SupabaseClientProvider.authenticatedClient,
+        authClient: SupabaseClient? = SupabaseClientProvider.client
+    ) {
         self.client = client
+        self.authClient = authClient
     }
 
     func hydrate(
@@ -22,10 +27,12 @@ final class CloudStateSync: ObservableObject {
         inventory: InventoryStore,
         factory: FactoryStore,
         idle: IdleStore,
-        skills: SkillStore
+        skills: SkillStore,
+        isSessionActive: @escaping @MainActor () -> Bool = { true }
     ) async -> Bool {
         guard let client,
-              let userID = try? await client.auth.session.user.id else { return false }
+              let authClient,
+              let userID = try? await authClient.auth.session.user.id else { return false }
         do {
             let rows: [RemoteCloudState] = try await client
                 .from("player_state")
@@ -35,6 +42,7 @@ final class CloudStateSync: ObservableObject {
                 .execute()
                 .value
             guard let row = rows.first else { return true }
+            guard isSessionActive() else { return false }
 
             if let save = Self.decode(row.activityHistory, as: LegacyActivitySave.self) {
                 activityHistory.replaceCloudState(save)
@@ -104,7 +112,8 @@ final class CloudStateSync: ObservableObject {
         skills: SkillStore
     ) async {
         guard let client,
-              let userID = try? await client.auth.session.user.id else { return }
+              let authClient,
+              let userID = try? await authClient.auth.session.user.id else { return }
 
         let row = CloudStateRow(
             userID: userID,

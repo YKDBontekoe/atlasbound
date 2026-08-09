@@ -97,6 +97,21 @@ struct AtlasStatsMapView: View {
         viewport = .overview(geometry: Polygon(outerRing: Ring(coordinates: corners)))
     }
 
+    private var statsMap: some View {
+        Map(viewport: $viewport) {
+            PolygonAnnotationGroup(overlays.filter { $0.vertices.count >= 3 }) { overlay in
+                let ring = Ring(coordinates: overlay.vertices + [overlay.vertices[0]])
+                return PolygonAnnotation(polygon: Polygon(outerRing: ring))
+                    .fillColor(StyleColor(overlay.color))
+                    .fillOpacity(overlay.opacity)
+                    .fillOutlineColor(StyleColor(overlay.color))
+            }
+        }
+        .mapStyle(.standard)
+        .allowsHitTesting(interactive)
+        .frame(minWidth: 1, minHeight: 1)
+    }
+
     var body: some View {
         VStack(spacing: 10) {
             ScrollView(.horizontal, showsIndicators: false) {
@@ -115,17 +130,14 @@ struct AtlasStatsMapView: View {
                 }
             }
 
-            Map(viewport: $viewport) {
-                PolygonAnnotationGroup(overlays.filter { $0.vertices.count >= 3 }) { overlay in
-                    let ring = Ring(coordinates: overlay.vertices + [overlay.vertices[0]])
-                    return PolygonAnnotation(polygon: Polygon(outerRing: ring))
-                        .fillColor(StyleColor(overlay.color))
-                        .fillOpacity(overlay.opacity)
-                        .fillOutlineColor(StyleColor(overlay.color))
+            GeometryReader { proxy in
+                if proxy.size.width > 1, proxy.size.height > 1 {
+                    statsMap
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                } else {
+                    Color.clear
                 }
             }
-            .mapStyle(.standard)
-            .allowsHitTesting(interactive)
             .frame(height: height)
             .clipShape(RoundedRectangle(cornerRadius: AtlasTheme.cardRadius, style: .continuous))
         }

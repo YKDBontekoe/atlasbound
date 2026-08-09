@@ -16,6 +16,14 @@ final class TreasureStore: ObservableObject {
     private let database: AtlasDatabase
     private let engine = TreasureEventEngine()
     private let sharedRepository = SharedTreasureRepository()
+    private var sharedEventsRefreshTask: Task<Void, Never>?
+    private var lastSharedEventsRefreshDate: Date?
+    private var lastSharedEventsRefreshCoordinate: CLLocationCoordinate2D?
+    private var lastSharedEventsRefreshFailureDate: Date?
+
+    private static let sharedEventsRefreshInterval: TimeInterval = 30
+    private static let sharedEventsRefreshDistance: CLLocationDistance = 250
+    private static let sharedEventsRefreshFailureBackoff: TimeInterval = 10
 
     init(fileURL: URL? = nil, database: AtlasDatabase? = nil) {
         if let database {
@@ -76,14 +84,45 @@ final class TreasureStore: ObservableObject {
         latestReward = nil
         pendingSharedEvent = nil
         sharedEvents = []
+        sharedEventsRefreshTask?.cancel()
+        sharedEventsRefreshTask = nil
+        lastSharedEventsRefreshDate = nil
+        lastSharedEventsRefreshCoordinate = nil
+        lastSharedEventsRefreshFailureDate = nil
     }
 
     /// Refreshes the active server-authored events around the authenticated player.
     func refreshSharedEvents(at coordinate: CLLocationCoordinate2D) {
-        Task { [weak self] in
-            let events = await self?.sharedRepository.nearby(around: coordinate) ?? []
-            guard let self else { return }
+        let now = Date.now
+        if sharedEventsRefreshTask != nil {
+            return
+        }
+        if let failureDate = lastSharedEventsRefreshFailureDate,
+           now.timeIntervalSince(failureDate) < Self.sharedEventsRefreshFailureBackoff {
+            return
+        }
+        if let lastDate = lastSharedEventsRefreshDate,
+           let lastCoordinate = lastSharedEventsRefreshCoordinate,
+           now.timeIntervalSince(lastDate) < Self.sharedEventsRefreshInterval,
+           CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+               .distance(from: CLLocation(latitude: lastCoordinate.latitude, longitude: lastCoordinate.longitude))
+               < Self.sharedEventsRefreshDistance {
+            return
+        }
+
+        sharedEventsRefreshTask = Task { [weak self] in
+            let events = await self?.sharedRepository.nearby(around: coordinate)
+            guard !Task.isCancelled, let self else { return }
+            guard let events else {
+                self.lastSharedEventsRefreshFailureDate = .now
+                self.sharedEventsRefreshTask = nil
+                return
+            }
+            self.lastSharedEventsRefreshDate = .now
+            self.lastSharedEventsRefreshCoordinate = coordinate
+            self.lastSharedEventsRefreshFailureDate = nil
             self.sharedEvents = events
+            self.sharedEventsRefreshTask = nil
         }
     }
 
@@ -167,8 +206,9 @@ final class TreasureStore: ObservableObject {
         persist()
     }
 
-    func reroll(anchor: TileCoordinate, tileEngine: TileEngine, date: Date = .now) {
-        guard var trail = dailyTrail, trail.freeRerollsRemaining > 0, !trail.isCompleted else { return }
+    @discardableResult
+    func reroll(anchor: TileCoordinate, tileEngine: TileEngine, date: Date = .now) -> Bool {
+        guard var trail = dailyTrail, trail.freeRerollsRemaining > 0, !trail.isCompleted else { return false }
         let dayKey = TreasureEventEngine.localDayKey(for: date)
         var replacement = engine.makeFallbackTrail(
             anchor: TileCoordinate(q: anchor.q + 3, r: anchor.r - 2),
@@ -187,6 +227,7 @@ final class TreasureStore: ObservableObject {
         dailyTrail = trail
         pendingEncounter = nil
         persist()
+        return true
     }
 
     func processVisitedTileIDs(_ tileIDs: [String]) {

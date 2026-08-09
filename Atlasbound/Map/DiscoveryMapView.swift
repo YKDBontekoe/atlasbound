@@ -56,6 +56,18 @@ struct DiscoveryMapView: View {
     }
 
     var body: some View {
+        GeometryReader { proxy in
+            if proxy.size.width > 1, proxy.size.height > 1 {
+                mapView
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+            } else {
+                Color.clear
+            }
+        }
+        .frame(minWidth: 1, minHeight: 1)
+    }
+
+    private var mapView: some View {
         Map(viewport: $position) {
             Puck2D(bearing: .heading)
                 .showsAccuracyRing(true)
@@ -203,6 +215,7 @@ struct DiscoveryMapView: View {
         .onChange(of: controller.isRecording) { _, _ in overlays = makeOverlays() }
         .onChange(of: showsFogLayer) { _, _ in overlays = makeOverlays() }
         .onChange(of: showsFrontierLayer) { _, _ in overlays = makeOverlays() }
+        .frame(minWidth: 1, minHeight: 1)
     }
 
     private func polygonOverlay(id: String, coordinate: TileCoordinate, fill: MapboxPolygonFill) -> MapboxPolygonOverlay {
