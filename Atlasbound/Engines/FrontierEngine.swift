@@ -354,7 +354,12 @@ struct FrontierEngine: Sendable {
         anchorSector: SectorCoordinate,
         usedDirections: Set<Int>
     ) -> Int {
-        let base = Int((seed &+ UInt64(difficulty.sectorDistance * 17) &+ UInt64(anchorSector.q &* 13) &+ UInt64(anchorSector.r &* 7)) % 6)
+        // Axial sector coordinates can be negative. Preserve their bit patterns
+        // when mixing them into the unsigned deterministic seed instead of
+        // trapping while converting a negative Int to UInt64.
+        let qSeed = UInt64(bitPattern: Int64(anchorSector.q &* 13))
+        let rSeed = UInt64(bitPattern: Int64(anchorSector.r &* 7))
+        let base = Int((seed &+ UInt64(difficulty.sectorDistance * 17) &+ qSeed &+ rSeed) % 6)
         if !usedDirections.contains(base) { return base }
         for offset in 1..<6 {
             let candidate = (base + offset) % 6

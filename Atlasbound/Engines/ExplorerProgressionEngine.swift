@@ -26,8 +26,13 @@ struct ExplorerProgressionEngine: Sendable {
         let progress = min(1, Double(totalXP - currentThreshold) / Double(denominator))
         let achievementFamilies = achievementFamilies(for: metrics)
         let achievements = achievementFamilies.flatMap { visibleTiers(for: $0) }
-        let levelTokens = (2...level).reduce(0) { total, unlockedLevel in
-            total + tokenReward(forLevel: unlockedLevel)
+        let levelTokens: Int
+        if level >= 2 {
+            levelTokens = (2...level).reduce(0) { total, unlockedLevel in
+                total + tokenReward(forLevel: unlockedLevel)
+            }
+        } else {
+            levelTokens = 0
         }
         let achievementTokens = achievementFamilies.reduce(0) { total, family in
             total + unlockedTokenSum(for: family)
@@ -330,11 +335,12 @@ private struct AchievementFamily {
         guard tier > 1 else { return value }
 
         for _ in 2...tier {
-            // Escalate ×10 for discovery-style, ×2 for small caps like activity types.
-            if baseTarget >= 100 {
-                value *= 10
-            } else if baseTarget >= 25 {
+            // Escalate ×10 for discovery-style milestones, ×4 for larger
+            // progression goals, and ×2 for small caps like activity types.
+            if baseTarget >= 25 {
                 value = Int((Double(value) * 4).rounded())
+            } else if baseTarget >= 10 {
+                value *= 10
             } else {
                 value *= 2
             }
