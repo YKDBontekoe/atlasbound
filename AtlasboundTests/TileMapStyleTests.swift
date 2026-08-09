@@ -1,5 +1,4 @@
 import XCTest
-import MapKit
 @testable import Atlasbound
 
 final class TileMapStyleTests: XCTestCase {
@@ -154,26 +153,9 @@ final class TileMapStyleTests: XCTestCase {
 
 final class MapTileLODTests: XCTestCase {
     func testResolveNearMidFarFromSpan() {
-        let nearRegion = MKCoordinateRegion(
-            center: .init(latitude: 52.0, longitude: 4.0),
-            latitudinalMeters: 900,
-            longitudinalMeters: 900
-        )
-        XCTAssertEqual(MapTileLOD.resolve(for: nearRegion), .near)
-
-        let midRegion = MKCoordinateRegion(
-            center: .init(latitude: 52.0, longitude: 4.0),
-            latitudinalMeters: 3_000,
-            longitudinalMeters: 3_000
-        )
-        XCTAssertEqual(MapTileLOD.resolve(for: midRegion), .mid)
-
-        let farRegion = MKCoordinateRegion(
-            center: .init(latitude: 52.0, longitude: 4.0),
-            latitudinalMeters: 20_000,
-            longitudinalMeters: 20_000
-        )
-        XCTAssertEqual(MapTileLOD.resolve(for: farRegion), .far)
+        XCTAssertEqual(MapTileLOD.resolve(for: 900), .near)
+        XCTAssertEqual(MapTileLOD.resolve(for: 3_000), .mid)
+        XCTAssertEqual(MapTileLOD.resolve(for: 20_000), .far)
     }
 
     func testNilRegionDefaultsToNear() {
@@ -205,11 +187,7 @@ final class MapTileLODTests: XCTestCase {
     }
 
     func testSpanMetersUsesLatitudeDelta() {
-        let region = MKCoordinateRegion(
-            center: .init(latitude: 0, longitude: 0),
-            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-        )
-        let meters = MapTileLOD.spanMeters(for: region)
+        let meters = MapTileLOD.spanMeters(forLatitudeDelta: 0.01)
         XCTAssertEqual(meters, 0.01 * 111_320, accuracy: 1)
     }
 }

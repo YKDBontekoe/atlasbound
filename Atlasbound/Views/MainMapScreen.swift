@@ -1,6 +1,6 @@
 import SwiftUI
-import MapKit
 import CoreLocation
+import MapboxMaps
 
 struct MainMapScreen: View {
     @ObservedObject var auth: AuthStore
@@ -12,7 +12,7 @@ struct MainMapScreen: View {
     @ObservedObject private var inventoryStore: InventoryStore
     @Environment(\.colorScheme) private var colorScheme
 
-    @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
+    @State private var position: Viewport = .followPuck(zoom: 15, pitch: 0)
     @State private var followsUser = true
     @State private var showSettings = false
     @State private var showActivityPicker = false
@@ -787,24 +787,13 @@ struct MainMapScreen: View {
             ? AtlasTheme.mapSpanRecordingMeters
             : AtlasTheme.mapSpanIdleMeters
         withAnimation(AtlasMotion.camera) {
-            if uses3DMap {
-                position = .camera(
-                    MapCamera(
-                        centerCoordinate: location.coordinate,
-                        distance: span,
-                        heading: 0,
-                        pitch: 58
-                    )
-                )
-            } else {
-                position = .region(
-                    MKCoordinateRegion(
-                        center: location.coordinate,
-                        latitudinalMeters: span,
-                        longitudinalMeters: span
-                    )
-                )
-            }
+            _ = span
+            position = .camera(
+                center: location.coordinate,
+                zoom: uses3DMap ? 16 : 15,
+                bearing: 0,
+                pitch: uses3DMap ? 58 : 0
+            )
         }
     }
 

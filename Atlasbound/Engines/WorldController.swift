@@ -770,6 +770,7 @@ final class WorldController: ObservableObject {
         guard let playerTileCoordinate, let location = recorder.lastLocation else { return }
         treasureStore.ensureTrail(anchor: playerTileCoordinate, tileEngine: tileEngine)
         treasureStore.ensureVaultTarget(anchor: playerTileCoordinate, tileEngine: tileEngine)
+        treasureStore.refreshSharedEvents(at: location.coordinate)
         guard let dayKey = treasureStore.dailyTrail?.dayKey,
               treasureStore.dailyTrail?.currentStageIndex == 0 else { return }
         guard treasurePreparationTask == nil else { return }
@@ -781,13 +782,15 @@ final class WorldController: ObservableObject {
         treasurePreparationTask = Task { [weak self] in
             let targets = await resolver.targets(
                 near: location.coordinate,
-                tileEngine: engine
+                tileEngine: engine,
+                count: TreasureConstants.stagesPerTrail * 2
             )
             guard let self else { return }
             self.treasurePreparationTask = nil
             self.isPreparingTreasureTrail = false
             guard !Task.isCancelled, !targets.isEmpty else { return }
             self.treasureStore.replaceTrailTargets(targets)
+            self.treasureStore.registerCurrentTarget(at: location.coordinate)
         }
     }
 
@@ -885,6 +888,7 @@ final class WorldController: ObservableObject {
             familiarityXP: territoryFamiliarity
         )
         treasureStore.processVisitedTileIDs(newIDs)
+        treasureStore.claimSharedEvents(matching: newIDs, at: recorder.lastLocation?.coordinate ?? Self.debugDefaultCoordinate)
         let territoryForFinds = store.territoryState
         let findTileEngine = tileEngine
         let homeCenter = homeBaseTileCoordinate
@@ -987,6 +991,7 @@ final class WorldController: ObservableObject {
         )
 
         treasureStore.processVisitedTileIDs(newIDs)
+        treasureStore.claimSharedEvents(matching: newIDs, at: recorder.lastLocation?.coordinate ?? Self.debugDefaultCoordinate)
         let territoryForFinds = store.territoryState
         let findTileEngine = tileEngine
         let homeCenter = homeBaseTileCoordinate

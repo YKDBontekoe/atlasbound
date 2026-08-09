@@ -6,7 +6,6 @@ struct RootTabView: View {
     @ObservedObject var store: TileStore
     @ObservedObject var activityHistory: ActivityHistoryStore
     @ObservedObject var regionLookup: RegionLookupStore
-    @ObservedObject var pinpointController: PinpointController
     @ObservedObject var factoryController: FactoryController
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -27,13 +26,6 @@ struct RootTabView: View {
                 .accessibilityIdentifier("mapTab")
                 .tag(0)
 
-            PinpointView(controller: pinpointController)
-                .tabItem {
-                    Label("Pinpoint", systemImage: "scope")
-                }
-                .accessibilityIdentifier("pinpointTab")
-                .tag(1)
-
             WorkshopTabView(
                 controller: controller,
                 store: store,
@@ -45,23 +37,21 @@ struct RootTabView: View {
                     Label("Workshop", systemImage: "hammer.fill")
                 }
                 .accessibilityIdentifier("workshopTab")
-                .tag(2)
+                .tag(1)
 
             ProgressTabView(
                 store: store,
                 activityHistory: activityHistory,
                 regionLookup: regionLookup,
-                pinpointStore: pinpointController.store,
                 controller: controller
             )
                 .tabItem {
                     Label("Progress", systemImage: "flag.fill")
                 }
                 .accessibilityIdentifier("progressTab")
-                .tag(3)
+                .tag(2)
         }
         .tint(AtlasTheme.blue)
-        .toolbar(pinpointController.isGameInProgress ? .hidden : .visible, for: .tabBar)
         .toolbarBackground(AtlasTheme.tabBarBackground(for: colorScheme), for: .tabBar)
         .onChange(of: controller.isRecording) { _, isRecording in
             if isRecording {

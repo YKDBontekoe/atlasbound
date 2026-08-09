@@ -28,6 +28,15 @@ SUPABASE_DEBUG_PUBLISHABLE_KEY = <debug publishable key>
 SUPABASE_RELEASE_PUBLISHABLE_KEY = <release publishable key>
 ```
 
+Mapbox uses the same pattern for its restricted public runtime token:
+
+```xcconfig
+MAPBOX_DEBUG_PUBLIC_ACCESS_TOKEN = pk...
+MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN = pk...
+```
+
+The Supabase `spawn-shared-treasure` Edge Function additionally requires `MAPBOX_SEARCH_TOKEN`; this is a server secret and must never be placed in Xcode, the IPA, or repository variables.
+
 Publishable keys are safe to ship with the app; service-role/database credentials must never be included in the app.
 
 GitHub Actions requires these encrypted secrets for the production migration job:
@@ -35,6 +44,9 @@ GitHub Actions requires these encrypted secrets for the production migration job
 - `SUPABASE_ACCESS_TOKEN`
 - `SUPABASE_PROJECT_ID` (`ezxelewutisuyxniozfh`)
 - `SUPABASE_DB_PASSWORD`
+- `SUPABASE_RELEASE_PUBLISHABLE_KEY`
+- `MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN`
+- `MAPBOX_SEARCH_TOKEN`
 
 Pull requests replay all migrations against a local Supabase instance. Pushes to `main` preview and apply pending migrations to the linked production project before the IPA/AltStore publish job runs.
 
@@ -56,7 +68,7 @@ Simulator / DEBUG Sim GPS: set `ATLASBOUND_ENABLE_SIM_GPS=true` in `.env`, run `
 | `Engines/` | Domain orchestration & pure math |
 | `Models/` | Codable/Sendable domain types |
 | `Persistence/` | File IO + persisted DTOs |
-| `Map/` | MapKit views |
+| `Map/` | Mapbox map views |
 | `Views/` | Screens / sheets |
 | `Theme/` | Colors, type helpers, appearance preference, glass button styles, motion tokens (`AtlasMotion`), haptics (`AtlasHaptics`) |
 

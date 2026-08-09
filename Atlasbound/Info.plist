@@ -23,5 +23,7 @@
 	<array>
 		<string>location</string>
 	</array>
+	<key>MBXAccessToken</key>
+	<string>$(MAPBOX_PUBLIC_ACCESS_TOKEN)</string>
 </dict>
 </plist>

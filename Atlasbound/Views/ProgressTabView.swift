@@ -5,7 +5,6 @@ struct ProgressTabView: View {
     @ObservedObject var store: TileStore
     @ObservedObject var activityHistory: ActivityHistoryStore
     @ObservedObject var regionLookup: RegionLookupStore
-    @ObservedObject var pinpointStore: PinpointStore
     @ObservedObject var controller: WorldController
     @Environment(\.colorScheme) private var colorScheme
 
@@ -101,8 +100,6 @@ struct ProgressTabView: View {
                         .staggeredAppear(index: 11)
                     xpTotalsCard
                         .staggeredAppear(index: 12)
-                    pinpointStatsCard
-                        .staggeredAppear(index: 13)
                 }
                 .padding(20)
             }
@@ -584,37 +581,6 @@ struct ProgressTabView: View {
             }
             Text("\(value) XP")
                 .font(.system(.subheadline, design: .rounded, weight: .bold))
-        }
-    }
-
-    // MARK: - Pinpoint stats
-
-    private var pinpointStatsCard: some View {
-        StatSectionCard {
-            VStack(spacing: 12) {
-                HStack {
-                    Text("Pinpoint")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Image(systemName: "scope")
-                        .foregroundStyle(AtlasTheme.blue.opacity(0.5))
-                }
-
-                HStack(spacing: 0) {
-                    StatKPI(value: "\(pinpointStore.gamesPlayed)", caption: "Games")
-                    StatKPI(value: "\(pinpointStore.highScoreWorldwide)", caption: "Worldwide", accent: AtlasTheme.blue)
-                    StatKPI(value: "\(pinpointStore.highScoreHomeTurf)", caption: "Home Turf", accent: AtlasTheme.gold)
-                }
-
-                HStack {
-                    Text("Exact tile hits")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(pinpointStore.exactTileHits)")
-                        .font(.caption.weight(.bold).monospacedDigit())
-                }
-            }
         }
     }
 

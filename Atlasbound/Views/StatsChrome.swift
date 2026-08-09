@@ -232,9 +232,11 @@ enum StatsFormat {
         meters >= 1000 ? "km" : "m"
     }
 
-    /// Compact Pinpoint-style distance (1 decimal km).
+    /// Compact distance (1 decimal km).
     static func distanceCompact(_ meters: Double) -> String {
-        PinpointScoring.formatDistance(meters)
+        meters >= 1000
+            ? String(format: "%.1f km", meters / 1000)
+            : String(format: "%.0f m", meters)
     }
 
     static func duration(_ interval: TimeInterval) -> String {

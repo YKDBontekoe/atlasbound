@@ -219,6 +219,10 @@ jobs:
           MARKETING_VERSION: ${{ steps.version.outputs.version }}
           BUILD_NUMBER: ${{ steps.version.outputs.build }}
           IPA_NAME: ${{ steps.version.outputs.ipa_name }}
+          REQUIRE_SUPABASE_CONFIG: true
+          REQUIRE_MAPBOX_CONFIG: true
+          SUPABASE_RELEASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_RELEASE_PUBLISHABLE_KEY }}
+          MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN: ${{ secrets.MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN }}
         run: |
           chmod +x scripts/build-ipa.sh
           ./scripts/build-ipa.sh
@@ -262,6 +266,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      MAPBOX_SEARCH_TOKEN: ${{ secrets.MAPBOX_SEARCH_TOKEN }}
     concurrency:
       group: atlasbound-supabase-production
       cancel-in-progress: false
@@ -289,6 +294,12 @@ jobs:
 
       - name: Deploy account deletion function
         run: supabase functions deploy delete-account --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Configure Mapbox Search secret
+        run: supabase secrets set MAPBOX_SEARCH_TOKEN="$MAPBOX_SEARCH_TOKEN" --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Deploy shared treasure function
+        run: supabase functions deploy spawn-shared-treasure --project-ref "$SUPABASE_PROJECT_ID"
 
   publish:
     name: Release + AltStore source

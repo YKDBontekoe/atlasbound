@@ -106,16 +106,11 @@ final class RegionLookupStore: ObservableObject {
                     continue
                 }
 
-                let placemark = await GeocodeLimiter.shared.reverseGeocode(at: coordinate)
+                let labels = await GeocodeLimiter.shared.reverseGeocode(at: coordinate)
                 if Task.isCancelled { break }
 
-                if let placemark {
-                    let labels = RegionLookupEngine.labels(from: placemark)
-                    if labels.isEmpty {
-                        setCell(.failed(cellKey: key, at: Date()), forKey: key)
-                    } else {
-                        setCell(PersistedRegionCell(cellKey: key, labels: labels, resolvedAt: Date()), forKey: key)
-                    }
+                if let labels, !labels.isEmpty {
+                    setCell(PersistedRegionCell(cellKey: key, labels: labels, resolvedAt: Date()), forKey: key)
                 } else {
                     setCell(.failed(cellKey: key, at: Date()), forKey: key)
                 }

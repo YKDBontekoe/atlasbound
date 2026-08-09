@@ -1,27 +1,36 @@
 import Foundation
 import CoreLocation
 
-/// CLGeocoder is rate-limited; serialize requests to avoid silent failures.
+/// Throttled Mapbox reverse geocoder used for the Places Visited projection.
 actor GeocodeLimiter {
     static let shared = GeocodeLimiter()
 
     private var lastRequest = Date.distantPast
     private let minimumInterval: TimeInterval = 0.15
 
-    func reverseGeocode(at coordinate: CLLocationCoordinate2D) async -> CLPlacemark? {
+    func reverseGeocode(at coordinate: CLLocationCoordinate2D) async -> RegionLookupEngine.PlaceLabels? {
         let elapsed = Date().timeIntervalSince(lastRequest)
         if elapsed < minimumInterval {
-            let delay = minimumInterval - elapsed
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            try? await Task.sleep(for: .seconds(minimumInterval - elapsed))
         }
         lastRequest = Date()
 
-        let geocoder = CLGeocoder()
+        guard let token = MapboxConfiguration.accessToken else { return nil }
+        var components = URLComponents(string: "https://api.mapbox.com/search/geocode/v6/reverse")
+        components?.queryItems = [
+            URLQueryItem(name: "longitude", value: String(coordinate.longitude)),
+            URLQueryItem(name: "latitude", value: String(coordinate.latitude)),
+            URLQueryItem(name: "limit", value: "5"),
+            URLQueryItem(name: "access_token", value: token)
+        ]
+        guard let url = components?.url else { return nil }
+
         do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(
-                CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-            )
-            return placemarks.first
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let features = object["features"] as? [[String: Any]] else { return nil }
+            return RegionLookupEngine.labels(fromMapboxFeatures: features)
         } catch {
             return nil
         }

@@ -14,7 +14,7 @@
       "bundleIdentifier": "com.atlasbound.app",
       "developerName": "Youri Bontekoe",
       "subtitle": "Discover the world, one hex at a time",
-      "localizedDescription": "Atlasbound is a location-based exploration RPG for iPhone.\n\n• Reveal one shared hex atlas with Quick or optional automatic exploration\n• Follow daily landmark treasure trails and unlock weekly vaults\n• Collect themed relics and earn familiarity XP\n• Optionally track walks, rides, and other activities\n• Frontier expeditions, Pinpoint guessing, and Atlas Stats\n• All progress stored on-device",
+      "localizedDescription": "Atlasbound is a location-based exploration RPG for iPhone.\n\n• Reveal one shared hex atlas with Quick or optional automatic exploration\n• Follow daily landmark treasure trails and unlock weekly vaults\n• Collect themed relics and earn familiarity XP\n• Optionally track walks, rides, and other activities\n• Frontier expeditions and Atlas Stats\n• Shared treasure events require a signed-in account",
       "iconURL": "https://ykdbontekoe.github.io/atlasbound/icon.png",
       "tintColor": "#2E8F6B",
       "category": "games",

@@ -32,7 +32,7 @@ struct OnboardingOverlay: View {
     ]
 
     private var artName: String {
-        ["FieldKitMark", "TreasureCacheMark", "PinpointMark", "FactoryMark"][step]
+        ["FieldKitMark", "TreasureCacheMark", "FactoryMark", "FieldKitMark"][step]
     }
 
     var body: some View {
