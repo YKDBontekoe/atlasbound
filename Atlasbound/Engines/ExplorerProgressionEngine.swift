@@ -327,7 +327,9 @@ private struct AchievementFamily {
 
     func target(forTier tier: Int) -> Int {
         var value = baseTarget
-        for _ in 1..<tier {
+        guard tier > 1 else { return value }
+
+        for _ in 2...tier {
             // Escalate ×10 for discovery-style, ×2 for small caps like activity types.
             if baseTarget >= 100 {
                 value *= 10
