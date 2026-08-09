@@ -5,6 +5,11 @@ import Combine
 /// Coordinates recording, tile conversion, progression, and persistence for a session.
 @MainActor
 final class WorldController: ObservableObject {
+    /// Stable fallback used when a shared-event claim has no current GPS sample.
+    /// Kept available in Release because automatic discovery can run without a
+    /// live location (for example after restoring a background session).
+    static let debugDefaultCoordinate = CLLocationCoordinate2D(latitude: 51.8133, longitude: 4.6901)
+
     @Published private(set) var liveRoute: [CLLocationCoordinate2D] = []
     @Published private(set) var sessionVisitedTileIDs: Set<String> = []
     /// Tile IDs first discovered during the active session (map highlight).
@@ -1198,8 +1203,6 @@ final class WorldController: ObservableObject {
 
 #if DEBUG
 extension WorldController {
-    static let debugDefaultCoordinate = CLLocationCoordinate2D(latitude: 51.8133, longitude: 4.6901)
-
     enum DebugStepSize: Double, CaseIterable, Identifiable {
         case fine = 25
         case tile = 55

@@ -49,19 +49,26 @@ if [[ "$REQUIRE_MAPBOX_CONFIG" == "true" && -z "$MAPBOX_TOKEN" ]]; then
 fi
 
 echo "==> Archiving ${SCHEME} (${CONFIGURATION}, unsigned)"
-xcodebuild archive \
-  -project "$PROJECT" \
-  -scheme "$SCHEME" \
-  -configuration "$CONFIGURATION" \
-  -destination "generic/platform=iOS" \
-  -derivedDataPath "$DERIVED_DATA" \
-  -archivePath "$ARCHIVE_PATH" \
-  CODE_SIGN_IDENTITY="" \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGNING_ALLOWED=NO \
-  COMPILER_INDEX_STORE_ENABLE=NO \
-  "${VERSION_FLAGS[@]}" \
-  "${CONFIG_FLAGS[@]}"
+XCODEBUILD_ARGS=(
+  archive
+  -project "$PROJECT"
+  -scheme "$SCHEME"
+  -configuration "$CONFIGURATION"
+  -destination "generic/platform=iOS"
+  -derivedDataPath "$DERIVED_DATA"
+  -archivePath "$ARCHIVE_PATH"
+  CODE_SIGN_IDENTITY=""
+  CODE_SIGNING_REQUIRED=NO
+  CODE_SIGNING_ALLOWED=NO
+  COMPILER_INDEX_STORE_ENABLE=NO
+)
+if ((${#VERSION_FLAGS[@]})); then
+  XCODEBUILD_ARGS+=("${VERSION_FLAGS[@]}")
+fi
+if ((${#CONFIG_FLAGS[@]})); then
+  XCODEBUILD_ARGS+=("${CONFIG_FLAGS[@]}")
+fi
+xcodebuild "${XCODEBUILD_ARGS[@]}"
 
 APP_PATH="$ARCHIVE_PATH/Products/Applications/${SCHEME}.app"
 if [[ ! -d "$APP_PATH" ]]; then
@@ -95,6 +102,11 @@ fi
 
 IPA_NAME="${SCHEME}-${MARKETING_VERSION}.ipa"
 IPA_PATH="$OUTPUT_DIR/$IPA_NAME"
+if [[ "$IPA_PATH" = /* ]]; then
+  ZIP_OUTPUT_PATH="$IPA_PATH"
+else
+  ZIP_OUTPUT_PATH="../$IPA_PATH"
+fi
 
 echo "==> Packaging $IPA_PATH"
 rm -rf build/Payload
@@ -102,8 +114,8 @@ mkdir -p build/Payload
 cp -R "$APP_PATH" "build/Payload/${SCHEME}.app"
 (
   cd build
-  rm -f "../$IPA_PATH"
-  zip -qr9 "../$IPA_PATH" Payload
+  rm -f "$ZIP_OUTPUT_PATH"
+  zip -qr9 "$ZIP_OUTPUT_PATH" Payload
 )
 
 SIZE="$(stat -f%z "$IPA_PATH" 2>/dev/null || stat -c%s "$IPA_PATH")"
