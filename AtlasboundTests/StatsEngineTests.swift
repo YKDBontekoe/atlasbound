@@ -1,20 +1,8 @@
 import XCTest
 import CoreLocation
-import MapKit
 @testable import Atlasbound
 
 final class StatsEngineTests: XCTestCase {
-    func testMapRegionContainsCoordinatesAcrossAntimeridian() {
-        let region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 0, longitude: 179),
-            span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 6)
-        )
-
-        XCTAssertTrue(region.contains(CLLocationCoordinate2D(latitude: 0, longitude: -179)))
-        XCTAssertFalse(region.contains(CLLocationCoordinate2D(latitude: 0, longitude: -170)))
-        XCTAssertEqual(MapOverlayCuller.wrappedLongitudeDelta(179, -179), 2)
-    }
-
     func testHexAreaFormula20m() {
         let area = StatsEngine.areaSquareMeters(tileCount: 2, flatToFlatMeters: 20)
         XCTAssertEqual(area, 2 * (sqrt(3) / 2) * 20 * 20, accuracy: 0.01)

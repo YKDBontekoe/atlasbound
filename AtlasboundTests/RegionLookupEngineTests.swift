@@ -187,7 +187,7 @@ final class RegionLookupStoreTests: XCTestCase {
         let cell = PersistedRegionCell(
             cellKey: "51.80:4.66",
             labels: labels,
-            resolvedAt: Date(timeIntervalSince1970: 1_700_000_000)
+            resolvedAt: Date()
         )
 
         let database = AtlasDatabase.makeIsolated(fileURL: tempURL)

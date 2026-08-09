@@ -1,7 +1,7 @@
 import Foundation
 import CoreLocation
 
-/// Pure helpers for coarse-cell place labels derived from MapKit placemarks.
+/// Pure helpers for coarse-cell place labels returned by Mapbox Geocoding.
 struct RegionLookupEngine: Sendable {
     /// ~0.02° ≈ 2 km cells so neighboring hex tiles share one reverse-geocode.
     static let cellDegrees: Double = 0.02
@@ -93,13 +93,42 @@ struct RegionLookupEngine: Sendable {
         )
     }
 
-    static func labels(from placemark: CLPlacemark) -> PlaceLabels {
-        labels(
-            countryCode: placemark.isoCountryCode,
-            countryName: placemark.country,
-            administrativeArea: placemark.administrativeArea,
-            locality: placemark.locality
-        )
+    static func labels(fromMapboxFeatures features: [[String: Any]]) -> PlaceLabels {
+        var countryCode: String?
+        var countryName: String?
+        var administrativeArea: String?
+        var locality: String?
+        for feature in features {
+            let properties = feature["properties"] as? [String: Any] ?? [:]
+            var candidates: [[String: Any]] = [feature]
+            if let context = properties["context"] as? [String: Any] {
+                for (kind, value) in context {
+                    guard var item = value as? [String: Any] else { continue }
+                    if item["feature_type"] == nil { item["feature_type"] = kind }
+                    candidates.append(item)
+                }
+            }
+            for candidate in candidates {
+                let candidateProperties = candidate["properties"] as? [String: Any] ?? candidate
+                let featureType = candidateProperties["feature_type"] as? String
+                let id = (featureType ?? candidate["id"] as? String ?? "").lowercased()
+                let text = candidateProperties["name"] as? String
+                    ?? candidateProperties["name_preferred"] as? String
+                    ?? candidateProperties["text"] as? String
+                    ?? candidate["text"] as? String
+                let parsedCountryCode = candidateProperties["country_code"] as? String
+                let shortCode = candidateProperties["short_code"] as? String
+                if id.hasPrefix("country") {
+                    countryName = text ?? countryName
+                    countryCode = parsedCountryCode ?? shortCode ?? countryCode
+                } else if id.hasPrefix("region") || id.hasPrefix("district") {
+                    administrativeArea = text ?? administrativeArea
+                } else if id.hasPrefix("place") || id.hasPrefix("locality") || id.hasPrefix("city") {
+                    locality = text ?? locality
+                }
+            }
+        }
+        return labels(countryCode: countryCode, countryName: countryName, administrativeArea: administrativeArea, locality: locality)
     }
 
     /// Build places-visited aggregates from cell labels weighted by tile counts.

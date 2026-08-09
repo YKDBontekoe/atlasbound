@@ -191,7 +191,7 @@ enum TreasureConstants {
     static let vaultCompletionXP = 150
     static let maximumMapTargets = 2
 
-    /// MapKit search box around the player for named landmarks.
+    /// Mapbox search radius around the player for named landmarks.
     static let landmarkSearchMeters: Double = 12_000
     /// Minimum geodesic distance for a landmark target.
     static let minTargetMeters: Double = 400
@@ -202,4 +202,3 @@ enum TreasureConstants {
     /// Weekly vault spawn radius (~5 km on the 20 m grid).
     static let vaultRingRadius = 250
 }
-

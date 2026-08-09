@@ -6,7 +6,7 @@ Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily l
 
 ## Current capabilities
 
-- SwiftUI app with four tabs: **Map**, **Pinpoint**, **Workshop** (Journal + Factory), and **Progress (Atlas Stats)**
+- SwiftUI app with three tabs: **Map**, **Workshop** (Journal + Factory), and **Progress (Atlas Stats)**
 - Automatic foreground exploration plus opt-in screen-locked exploration
 - Optional walk/run/cycle/hike/drive/transit tracking and activity history
 - One canonical **20 m** hex atlas
@@ -21,10 +21,10 @@ Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily l
 - **Field finds** — deterministic tile pickups into a stackable inventory (materials, boosts, charges); assemble, salvage, use, and activate
 - **Home Base / territory claims** — claim neighborhood sectors, designate one Home Base, soft familiarity XP and find-rate buffs inside claims
 - **Real-world factory** — reveal deterministic deposits, craft construction kits, place roads and buildings on nearby discovered hexes, automate production, route goods, generate power, and research upgrades
-- **Pinpoint** — 5-round Look Around location guessing (dynamic Worldwide streets + Home Turf)
-- **Atlas Stats** — territory km², personal records, layered explorer map, Pinpoint stats
+- **Atlas Stats** — territory km², personal records, and a layered explorer map
 - **Activity session history** — last 100 finished sessions with detail sheets
-- Local persistence (JSON in Documents)
+- Local persistence (SQLite in Documents) with authenticated Supabase account sync
+- Mapbox basemap, custom overlays, and shared server-authored treasure events
 - First-run onboarding overlay on the map
 
 ## Open & run
@@ -60,11 +60,15 @@ Best validation for GPS noise, landmark routing, automatic exploration, and scre
 | `WorldController` | Exploration-mode, progression, Frontier, and treasure orchestration |
 | `TreasureEventEngine` / `TreasureStore` | Daily trails, choices, relics, vaults, and persistence |
 | `FactoryController` / `FactoryStore` | Construction, road networks, production simulation, research, and isolated factory persistence |
-| `DiscoveryMapView` | MapKit overlay of discovered hexes + live route |
+| `DiscoveryMapView` | Mapbox rendering of discovered hexes, shared events, and live route |
 
 Progress stores tile IDs and mastery fields only — hex geometry is derived at render time.
 
 Deeper write-ups: [docs/architecture.md](docs/architecture.md), [docs/domain.md](docs/domain.md).
+
+## Mapbox and account requirements
+
+Map rendering requires one restricted Mapbox public access token supplied through the ignored local/CI `MAPBOX_PUBLIC_ACCESS_TOKEN` xcconfig/secret. Treasure and cloud progress require a signed-in Supabase account. The same public token is used by the Supabase Edge Function for Mapbox Search; Mapbox package downloads use a separate `MAPBOX_DOWNLOADS_TOKEN` with `DOWNLOADS:READ` scope.
 
 ## Privacy
 

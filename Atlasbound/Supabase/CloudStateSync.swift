@@ -22,8 +22,7 @@ final class CloudStateSync: ObservableObject {
         inventory: InventoryStore,
         factory: FactoryStore,
         idle: IdleStore,
-        skills: SkillStore,
-        pinpoint: PinpointStore
+        skills: SkillStore
     ) async -> Bool {
         guard let client,
               let userID = try? await client.auth.session.user.id else { return false }
@@ -52,7 +51,6 @@ final class CloudStateSync: ObservableObject {
             if let save = Self.decode(row.factory, as: LegacyFactorySave.self) { factory.replaceState(save.state) } else { factory.clear() }
             if let save = Self.decode(row.idle, as: LegacyIdleSave.self) { idle.replaceState(save.state) } else { idle.clear() }
             if let save = Self.decode(row.skills, as: LegacySkillSave.self) { skills.replaceState(save.state) } else { skills.clear() }
-            if let save = Self.decode(row.pinpoint, as: LegacyPinpointSave.self) { pinpoint.replaceCloudState(save) } else { pinpoint.clearCloudState() }
             lastUploadedSnapshot = nil
             return true
         } catch {
@@ -69,8 +67,7 @@ final class CloudStateSync: ObservableObject {
         inventory: InventoryStore,
         factory: FactoryStore,
         idle: IdleStore,
-        skills: SkillStore,
-        pinpoint: PinpointStore
+        skills: SkillStore
     ) {
         guard task == nil else { return }
         task = Task { [weak self] in
@@ -83,8 +80,7 @@ final class CloudStateSync: ObservableObject {
                     inventory: inventory,
                     factory: factory,
                     idle: idle,
-                    skills: skills,
-                    pinpoint: pinpoint
+                    skills: skills
                 )
                 try? await Task.sleep(for: .seconds(10))
             }
@@ -105,8 +101,7 @@ final class CloudStateSync: ObservableObject {
         inventory: InventoryStore,
         factory: FactoryStore,
         idle: IdleStore,
-        skills: SkillStore,
-        pinpoint: PinpointStore
+        skills: SkillStore
     ) async {
         guard let client,
               let userID = try? await client.auth.session.user.id else { return }
@@ -120,8 +115,7 @@ final class CloudStateSync: ObservableObject {
             inventory: inventory,
             factory: factory,
             idle: idle,
-            skills: skills,
-            pinpoint: pinpoint
+            skills: skills
         )
         guard let snapshot = try? JSONEncoder().encode(row), snapshot != lastUploadedSnapshot else { return }
         do {
@@ -143,8 +137,7 @@ final class CloudStateSync: ObservableObject {
         inventory: InventoryStore,
         factory: FactoryStore,
         idle: IdleStore,
-        skills: SkillStore,
-        pinpoint: PinpointStore
+        skills: SkillStore
     ) {
         activityHistory.replaceCloudState(LegacyActivitySave(version: JSONFileStore.currentSchemaVersion, sessions: [], longestDistanceByActivity: [:], totalDistanceByActivity: [:], totalDurationByActivity: [:], sessionCountByActivity: [:]))
         regionLookup.replaceCloudState(LegacyRegionSave(version: JSONFileStore.currentSchemaVersion, cells: []))
@@ -153,7 +146,6 @@ final class CloudStateSync: ObservableObject {
         factory.clear()
         idle.clear()
         skills.clear()
-        pinpoint.clearCloudState()
     }
 
     private static func decode<T: Decodable>(_ value: AnyJSON, as type: T.Type) -> T? {
@@ -170,13 +162,12 @@ private struct CloudStateRow: Encodable {
     let factory: AnyJSON
     let idle: AnyJSON
     let skills: AnyJSON
-    let pinpoint: AnyJSON
     let activityHistory: AnyJSON
     let regions: AnyJSON
 
     enum CodingKeys: String, CodingKey {
         case userID = "user_id"
-        case frontier, territory, treasure, inventory, factory, idle, skills, pinpoint
+        case frontier, territory, treasure, inventory, factory, idle, skills
         case activityHistory = "activity_history"
         case regions
     }
@@ -191,8 +182,7 @@ private struct CloudStateRow: Encodable {
         inventory: InventoryStore,
         factory: FactoryStore,
         idle: IdleStore,
-        skills: SkillStore,
-        pinpoint: PinpointStore
+        skills: SkillStore
     ) {
         self.userID = userID
         frontier = Self.json(PersistedFrontierRecord(from: tileStore.frontierState))
@@ -215,13 +205,6 @@ private struct CloudStateRow: Encodable {
         self.factory = Self.json(factory.state)
         self.idle = Self.json(idle.state)
         self.skills = Self.json(skills.state)
-        self.pinpoint = Self.json(CloudPinpointSnapshot(
-            games: pinpoint.gameHistory,
-            highScoreWorldwide: pinpoint.highScoreWorldwide,
-            highScoreHomeTurf: pinpoint.highScoreHomeTurf,
-            gamesPlayed: pinpoint.gamesPlayed,
-            exactTileHits: pinpoint.exactTileHits
-        ))
         self.activityHistory = Self.json(LegacyActivitySave(
             version: JSONFileStore.currentSchemaVersion,
             sessions: activityHistory.sessions,
@@ -250,26 +233,17 @@ private struct CloudInventorySnapshot: Codable {
     let lifetimeFindsCollected: Int
 }
 
-private struct CloudPinpointSnapshot: Codable {
-    let games: [PinpointGame]
-    let highScoreWorldwide: Int
-    let highScoreHomeTurf: Int
-    let gamesPlayed: Int
-    let exactTileHits: Int
-}
-
 private struct RemoteCloudState: Decodable {
     let treasure: AnyJSON
     let inventory: AnyJSON
     let factory: AnyJSON
     let idle: AnyJSON
     let skills: AnyJSON
-    let pinpoint: AnyJSON
     let activityHistory: AnyJSON
     let regions: AnyJSON
 
     enum CodingKeys: String, CodingKey {
-        case treasure, inventory, factory, idle, skills, pinpoint
+        case treasure, inventory, factory, idle, skills
         case activityHistory = "activity_history"
         case regions
     }

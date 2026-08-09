@@ -1,5 +1,4 @@
 import Foundation
-import MapKit
 
 /// Zoom-aware draw policy for discovery / stats hex overlays.
 enum MapTileLOD: Int, Sendable, Comparable {
@@ -15,15 +14,8 @@ enum MapTileLOD: Int, Sendable, Comparable {
     }
 
     /// Approximate north–south span of the visible region in meters.
-    static func spanMeters(for region: MKCoordinateRegion) -> Double {
-        region.span.latitudeDelta * 111_320
-    }
-
-    /// Classify camera region. Thresholds sit above idle follow span (~950 m)
-    /// so typical play stays in `.near`.
-    static func resolve(for region: MKCoordinateRegion?) -> MapTileLOD {
-        guard let region else { return .near }
-        let meters = spanMeters(for: region)
+    static func resolve(for spanMeters: Double?) -> MapTileLOD {
+        guard let meters = spanMeters else { return .near }
         if meters <= nearSpanMeters {
             return .near
         }
@@ -31,6 +23,10 @@ enum MapTileLOD: Int, Sendable, Comparable {
             return .mid
         }
         return .far
+    }
+
+    static func spanMeters(forLatitudeDelta latitudeDelta: Double) -> Double {
+        latitudeDelta * 111_320
     }
 
     /// Soft-cap for discovered polygons at this LOD (never above global max).

@@ -48,9 +48,9 @@ enum AtlasTheme {
     static let routeOutlineWidth: CGFloat = 7
     static let routeLineWidth: CGFloat = 4
 
-    /// Soft-cap for discovered MapPolygon overlays inside the viewport.
+    /// Soft-cap for discovered polygon annotations inside the viewport.
     static let maxVisiblePolygons = 320
-    /// Soft-cap for nearby fog wash hexes (MapKit struggles above ~200 polygons).
+    /// Soft-cap for nearby fog wash hexes.
     static let maxFogPolygons = 120
     /// Cap for mastery marker annotations among visible tiles.
     static let maxVisibleMarkers = 40
@@ -72,11 +72,6 @@ enum AtlasTheme {
         static let xl: CGFloat = 20
         static let xxl: CGFloat = 24
     }
-
-    /// Map camera meters when following the user during a recording.
-    static let mapSpanRecordingMeters: Double = 650
-    /// Map camera meters when idle / recentering outside a session.
-    static let mapSpanIdleMeters: Double = 950
 
     // MARK: - Adaptive chrome (map tile accents stay brand-fixed)
 
@@ -193,14 +188,5 @@ extension ExpeditionDifficulty {
         case .trailblazer: AtlasTheme.blue
         case .pathfinder: AtlasTheme.gold
         }
-    }
-}
-
-enum PinpointScoreStyle {
-    static func color(for score: Int) -> Color {
-        if score >= 4500 { return AtlasTheme.gold }
-        if score >= 3000 { return AtlasTheme.teal }
-        if score >= 1000 { return AtlasTheme.blue }
-        return AtlasTheme.finishRed
     }
 }

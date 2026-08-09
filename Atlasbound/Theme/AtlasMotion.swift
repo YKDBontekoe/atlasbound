@@ -5,7 +5,7 @@ enum AtlasMotion {
     /// Glass button press — snappy ease-out.
     static let press = Animation.easeOut(duration: 0.12)
 
-    /// Idle ↔ recording chrome morph, Pinpoint phase changes.
+    /// Idle ↔ recording chrome morph and map phase changes.
     static let chrome = Animation.spring(response: 0.35, dampingFraction: 0.86)
 
     /// Panels, sheets content, expand/collapse.

@@ -102,7 +102,7 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(progressTab.waitForExistence(timeout: 5))
         progressTab.tap()
 
-        // Simulator MapKit sessions can terminate the process here (also flakes on main).
+        // Simulator map sessions can terminate the process here (also flakes on main).
         // Checking `app.state` before `.exists` still races: a mid-query disconnect hard-fails
         // XCTest ("Failed to get matching snapshots: Lost connection…"). Expect that failure
         // and convert it to the same XCTSkip path used when the process is already dead.
@@ -111,7 +111,7 @@ final class SmokeUITests: XCTestCase {
         let connectionLossOptions = Self.lostAppConnectionFailureOptions()
 
         XCTExpectFailure(
-            "Progress tab MapKit sessions can terminate the simulator process",
+            "Progress tab map sessions can terminate the simulator process",
             options: connectionLossOptions
         ) {
             let deadline = Date().addingTimeInterval(12)
@@ -140,7 +140,7 @@ final class SmokeUITests: XCTestCase {
 
         var hasExplorerContent = false
         XCTExpectFailure(
-            "Progress tab MapKit sessions can terminate the simulator process",
+            "Progress tab map sessions can terminate the simulator process",
             options: connectionLossOptions
         ) {
             guard self.isAppProcessAlive else {
@@ -258,7 +258,7 @@ final class SmokeUITests: XCTestCase {
         )
 
         guard settings.waitForExistence(timeout: 10) else {
-            // MapKit / location denial can hide map chrome on some simulators — Journal still covers smoke.
+            // Map / location denial can hide map chrome on some simulators — Journal still covers smoke.
             throw XCTSkip("Map settings control not available in this simulator session")
         }
 

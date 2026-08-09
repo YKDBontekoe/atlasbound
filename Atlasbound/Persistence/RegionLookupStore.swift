@@ -35,7 +35,7 @@ final class RegionLookupStore: ObservableObject {
     /// Labels for successfully resolved cells only.
     var successfulLabels: [String: RegionLookupEngine.PlaceLabels] {
         var result: [String: RegionLookupEngine.PlaceLabels] = [:]
-        for (key, cell) in cells where cell.didSucceed {
+        for (key, cell) in cells where cell.didSucceed && (MapboxConfiguration.permanentGeocodingEnabled || !cell.isExpired) {
             result[key] = cell.labels
         }
         return result
@@ -83,7 +83,9 @@ final class RegionLookupStore: ObservableObject {
 
     private func needsResolve(cellKey: String) -> Bool {
         guard let existing = cells[cellKey] else { return true }
-        if existing.didSucceed { return false }
+        if existing.didSucceed {
+            return MapboxConfiguration.permanentGeocodingEnabled ? false : existing.isExpired
+        }
         guard let failedAt = existing.failedAt else { return true }
         return Date().timeIntervalSince(failedAt) >= failureBackoff
     }
@@ -106,16 +108,11 @@ final class RegionLookupStore: ObservableObject {
                     continue
                 }
 
-                let placemark = await GeocodeLimiter.shared.reverseGeocode(at: coordinate)
+                let labels = await GeocodeLimiter.shared.reverseGeocode(at: coordinate)
                 if Task.isCancelled { break }
 
-                if let placemark {
-                    let labels = RegionLookupEngine.labels(from: placemark)
-                    if labels.isEmpty {
-                        setCell(.failed(cellKey: key, at: Date()), forKey: key)
-                    } else {
-                        setCell(PersistedRegionCell(cellKey: key, labels: labels, resolvedAt: Date()), forKey: key)
-                    }
+                if let labels, !labels.isEmpty {
+                    setCell(PersistedRegionCell(cellKey: key, labels: labels, resolvedAt: Date()), forKey: key)
                 } else {
                     setCell(.failed(cellKey: key, at: Date()), forKey: key)
                 }
@@ -163,6 +160,10 @@ struct PersistedRegionCell: Codable, Hashable, Sendable {
     var failedAt: Date?
 
     var didSucceed: Bool { failedAt == nil && resolvedAt != nil }
+    var isExpired: Bool {
+        guard let resolvedAt else { return true }
+        return !MapboxConfiguration.permanentGeocodingEnabled && Date().timeIntervalSince(resolvedAt) >= 24 * 60 * 60
+    }
 
     var labels: RegionLookupEngine.PlaceLabels {
         RegionLookupEngine.labels(

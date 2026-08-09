@@ -23,7 +23,7 @@ AtlasboundApp
   └─ WorldController (@MainActor ObservableObject)
        ├─ ActivityRecorder     — shared explicit/passive GPS samples
        ├─ TileEngine           — via store.tileEngine
-       ├─ LandmarkResolver     — MapKit public-landmark targets
+       ├─ LandmarkResolver     — offline fallback; Mapbox landmark registration runs in Supabase
        ├─ TreasureEventEngine — pure trail/choice/reward rules
        ├─ FieldFindEngine     — pure find rolls + craft/salvage
        ├─ IdleScoutEngine     — hire chain, Home drip, capped AFK discoveries
@@ -62,7 +62,7 @@ AtlasboundApp
 
 - **Persisted:** 20 m tile IDs, axial `q`/`r`, mastery fields, activity stamps, dates, and totals.
 - **Derived at render:** hex polygons, map overlays, fog rings.
-- Primary store: `Documents/atlasbound.sqlite` (WAL). Tiles are upserted incrementally; nested Frontier / territory / treasure / inventory / factory / Pinpoint payloads live in the same database.
+- Primary store: `Documents/atlasbound.sqlite` (WAL). Tiles are upserted incrementally; nested Frontier / territory / treasure / inventory / factory payloads live in the same database. Shared treasure events are server-owned in Supabase and cached only as an authenticated projection.
 - Legacy Documents JSON files are imported once on first SQLite open, then renamed to `*.json.bak`.
 
 Factory state remains independently versioned inside SQLite so a factory wipe cannot erase the atlas.
@@ -70,38 +70,22 @@ Factory state remains independently versioned inside SQLite so a factory wipe ca
 ## UI notes
 
 - Primary chrome: `MainMapScreen` + settings sheet.
-- Map: `DiscoveryMapView` (MapKit polygons / polyline / user annotation).
+- Map: `DiscoveryMapView` (Mapbox polygons / polyline / user puck / shared events).
 - Live-map presentation preferences use `AppStorage`: mastery/visit-heat data lens, 3D terrain, places, fog, and Frontier visibility. The basemap is always the muted Explorer standard style.
 - Hex overlays use `TileMapMaterial` recipes (soft fills + territory silhouette). Near zoom may draw a dual rim on perimeter tiles; `MapTileLOD` softens to single stroke / outline-only when zoomed out.
 - Mastery markers are capped (`AtlasTheme.maxVisibleMarkers` = 40, highest-ranked; mid LOD keeps mastered+ only).
 - Map header uses procedural hex **sectors** (`HexSectorEngine`), not political geography.
 - Atlas Stats **Places visited** uses reverse-geocoded country / province / city labels from a coarse-cell cache (`RegionLookupStore`).
 
-## Pinpoint mode
+## Mapbox map and shared treasure
 
-A location-guessing game alongside the tile discovery mode.
+`DiscoveryMapView` and `AtlasStatsMapView` use the Mapbox Maps iOS SDK. Hex geometry remains derived by `TileEngine`; Mapbox renders the basemap, user puck, polygon annotations, routes, and shared treasure markers.
 
-| Type | Role | Threading |
-|------|------|-----------|
-| `PinpointScoring` | Pure scoring, area metrics, distance calc | `Sendable` value type |
-| `LookAroundLocationPool` | Worldwide coverage-region sampling + Home Turf targets | `Sendable` value type |
-| `PinpointStore` | Game history + per-mode high scores (SQLite) | `@MainActor` |
-| `PinpointController` | Game orchestration + tile XP awards | `@MainActor` |
-| `GameCenterManager` | GameKit auth + leaderboard submission | `@MainActor` |
-| `PinpointView` | Lobby, preparing, active game, round result, game over | SwiftUI |
-| `PinpointPreparingView` | Full-screen prep UI with live find progress | SwiftUI |
-| `LookAroundSnapshotEngine` | Nearby-probe Look Around snapshots (spoiler-free) | `Sendable` value type |
-| `LookAroundGuessView` | Static snapshot gallery + timed guess map | SwiftUI |
-
-Flow: lobby (Worldwide or Home Turf) → preparing (dynamic Look Around scouting with progress) → 5 rounds (static Look Around gallery around spawn + timer → tap map to guess → score) → game over → submit to Game Center leaderboard. No live `MKLookAroundViewController` during play (avoids place-name spoilers). Worldwide samples random streets inside Look Around coverage regions (not a fixed landmark list).
-
-Gallery performance: up to four frames from spawn + cardinal probes, captured **sequentially**, decoded under a 1024px long-edge budget, with a short post-first-frame probe budget so GeoServices stays available for Worldwide scouting.
-
-Persistence: Pinpoint tables inside `Documents/atlasbound.sqlite`. Leaderboard ID: `com.atlasbound.geoguessr.highscore`.
+`SharedTreasureRepository` reads nearby active events and calls authenticated Supabase RPC/Edge Functions. A generated daily-trail or vault destination is registered server-side, visible to nearby authenticated players until expiry, and atomically claimable by the first player within 75 m. Mapbox Search credentials never ship in the iOS app.
 
 ## Treasure trails
 
-Serverless daily exploration loop using MapKit landmarks across multi-kilometer range (geodesic 400 m–12 km), with procedural fallback caches on distant hex rings.
+Server-authored daily exploration loop using Mapbox Search landmarks across multi-kilometer range (geodesic 400 m–12 km), with procedural fallback caches on distant hex rings.
 
 | Type | Role | Threading |
 |------|------|-----------|

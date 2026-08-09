@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import CoreLocation
 
 @MainActor
 final class TreasureStore: ObservableObject {
@@ -9,9 +10,12 @@ final class TreasureStore: ObservableObject {
     @Published private(set) var completedTrailCount = 0
     @Published var pendingEncounter: TreasureEncounter?
     @Published var latestReward: TreasureReward?
+    @Published private(set) var sharedEvents: [SharedTreasureEvent] = []
+    private var pendingSharedEvent: SharedTreasureEvent?
 
     private let database: AtlasDatabase
     private let engine = TreasureEventEngine()
+    private let sharedRepository = SharedTreasureRepository()
 
     init(fileURL: URL? = nil, database: AtlasDatabase? = nil) {
         if let database {
@@ -70,6 +74,72 @@ final class TreasureStore: ObservableObject {
         completedTrailCount = 0
         pendingEncounter = nil
         latestReward = nil
+        pendingSharedEvent = nil
+        sharedEvents = []
+    }
+
+    /// Refreshes the active server-authored events around the authenticated player.
+    func refreshSharedEvents(at coordinate: CLLocationCoordinate2D) {
+        Task { [weak self] in
+            let events = await self?.sharedRepository.nearby(around: coordinate) ?? []
+            guard let self else { return }
+            self.sharedEvents = events
+        }
+    }
+
+    /// Registers the current target with the server so nearby players can find it.
+    func registerCurrentTarget(at coordinate: CLLocationCoordinate2D, tileEngine: TileEngine? = nil) {
+        guard let target = currentTarget else { return }
+        let targetCoordinate = tileEngine.flatMap { engine in
+            engine.parseTileID(target.tileID).map { engine.centerCoordinate(for: $0) }
+        } ?? coordinate
+        Task { [weak self] in
+            guard let self else { return }
+            let request = SharedTreasureSpawnRequest(
+                tileID: target.tileID,
+                latitude: targetCoordinate.latitude,
+                longitude: targetCoordinate.longitude,
+                isVault: weeklyVault.isUnlocked,
+                dayKey: TreasureEventEngine.localDayKey(for: .now)
+            )
+            if let event = await sharedRepository.spawn(request: request), !sharedEvents.contains(event) {
+                sharedEvents.append(event)
+            }
+        }
+    }
+
+    func claimSharedEvents(matching tileIDs: [String], at coordinate: CLLocationCoordinate2D) {
+        guard pendingEncounter == nil, pendingSharedEvent == nil else { return }
+        let candidates = sharedEvents.filter { tileIDs.contains($0.tileID) }
+        guard !candidates.isEmpty else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            for event in candidates {
+                guard self.pendingEncounter == nil, self.pendingSharedEvent == nil else { return }
+                guard self.sharedEvents.contains(event) else { continue }
+
+                // Reserve the single encounter slot before the network call so
+                // concurrent GPS samples cannot claim multiple events.
+                self.pendingSharedEvent = event
+                guard let result = await self.sharedRepository.claim(eventID: event.id, at: coordinate) else {
+                    self.pendingSharedEvent = nil
+                    continue
+                }
+                guard result.didWin else {
+                    self.pendingSharedEvent = nil
+                    continue
+                }
+
+                self.sharedEvents.removeAll { $0.id == event.id }
+                self.pendingEncounter = TreasureEncounter(
+                    id: "shared:\(event.id.uuidString)",
+                    target: event.landmarkTarget,
+                    stageNumber: 0,
+                    isVault: event.isVault
+                )
+                return
+            }
+        }
     }
 
     func ensureTrail(anchor: TileCoordinate, tileEngine: TileEngine, date: Date = .now) {
@@ -142,6 +212,32 @@ final class TreasureStore: ObservableObject {
     func resolveEncounter(choice: TreasureChoice, date: Date = .now) -> TreasureReward? {
         guard let encounter = pendingEncounter else { return nil }
         pendingEncounter = nil
+
+        if let sharedEvent = pendingSharedEvent,
+           encounter.id == "shared:\(sharedEvent.id.uuidString)" {
+            pendingSharedEvent = nil
+            let relic = engine.relic(
+                seed: "shared:\(sharedEvent.id.uuidString):\(choice.rawValue)",
+                landmarkName: sharedEvent.name,
+                choice: choice,
+                isVault: sharedEvent.isVault,
+                distanceMeters: sharedEvent.distanceMeters,
+                date: date
+            )
+            relics.append(relic)
+            let reward = TreasureReward(
+                id: UUID(),
+                relic: relic,
+                familiarityXP: engine.completionFamiliarityXP(
+                    isVault: sharedEvent.isVault,
+                    distanceMeters: sharedEvent.distanceMeters
+                ),
+                grantedVaultKey: false
+            )
+            latestReward = reward
+            persist()
+            return reward
+        }
 
         if encounter.isVault {
             guard weeklyVault.isUnlocked, !weeklyVault.isCompleted else { return nil }

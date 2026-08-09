@@ -135,6 +135,7 @@
 			name = Atlasbound;
 			packageProductDependencies = (
 				A10000000000000000000082 /* Supabase */,
+				A10000000000000000000088 /* MapboxMaps */,
 			);
 			productName = Atlasbound;
 			productReference = A10000000000000000000001 /* Atlasbound.app */;
@@ -222,6 +223,7 @@
 			packageReferences = (
 				A10000000000000000000080 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */,
 				A10000000000000000000083 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				A10000000000000000000087 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000031 /* Products */;
@@ -636,6 +638,14 @@
 				version = 2.54.1;
 			};
 		};
+		A10000000000000000000087 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mapbox/mapbox-maps-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.15.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -648,6 +658,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000083 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		A10000000000000000000088 /* MapboxMaps */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000087 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */;
+			productName = MapboxMaps;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

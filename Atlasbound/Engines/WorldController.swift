@@ -5,6 +5,11 @@ import Combine
 /// Coordinates recording, tile conversion, progression, and persistence for a session.
 @MainActor
 final class WorldController: ObservableObject {
+    /// Stable fallback used when a shared-event claim has no current GPS sample.
+    /// Kept available in Release because automatic discovery can run without a
+    /// live location (for example after restoring a background session).
+    static let debugDefaultCoordinate = CLLocationCoordinate2D(latitude: 51.8133, longitude: 4.6901)
+
     @Published private(set) var liveRoute: [CLLocationCoordinate2D] = []
     @Published private(set) var sessionVisitedTileIDs: Set<String> = []
     /// Tile IDs first discovered during the active session (map highlight).
@@ -770,6 +775,7 @@ final class WorldController: ObservableObject {
         guard let playerTileCoordinate, let location = recorder.lastLocation else { return }
         treasureStore.ensureTrail(anchor: playerTileCoordinate, tileEngine: tileEngine)
         treasureStore.ensureVaultTarget(anchor: playerTileCoordinate, tileEngine: tileEngine)
+        treasureStore.refreshSharedEvents(at: location.coordinate)
         guard let dayKey = treasureStore.dailyTrail?.dayKey,
               treasureStore.dailyTrail?.currentStageIndex == 0 else { return }
         guard treasurePreparationTask == nil else { return }
@@ -781,13 +787,15 @@ final class WorldController: ObservableObject {
         treasurePreparationTask = Task { [weak self] in
             let targets = await resolver.targets(
                 near: location.coordinate,
-                tileEngine: engine
+                tileEngine: engine,
+                count: TreasureConstants.stagesPerTrail * 2
             )
             guard let self else { return }
             self.treasurePreparationTask = nil
             self.isPreparingTreasureTrail = false
             guard !Task.isCancelled, !targets.isEmpty else { return }
             self.treasureStore.replaceTrailTargets(targets)
+            self.treasureStore.registerCurrentTarget(at: location.coordinate, tileEngine: engine)
         }
     }
 
@@ -885,6 +893,7 @@ final class WorldController: ObservableObject {
             familiarityXP: territoryFamiliarity
         )
         treasureStore.processVisitedTileIDs(newIDs)
+        treasureStore.claimSharedEvents(matching: newIDs, at: recorder.lastLocation?.coordinate ?? Self.debugDefaultCoordinate)
         let territoryForFinds = store.territoryState
         let findTileEngine = tileEngine
         let homeCenter = homeBaseTileCoordinate
@@ -987,6 +996,7 @@ final class WorldController: ObservableObject {
         )
 
         treasureStore.processVisitedTileIDs(newIDs)
+        treasureStore.claimSharedEvents(matching: newIDs, at: recorder.lastLocation?.coordinate ?? Self.debugDefaultCoordinate)
         let territoryForFinds = store.territoryState
         let findTileEngine = tileEngine
         let homeCenter = homeBaseTileCoordinate
@@ -1193,8 +1203,6 @@ final class WorldController: ObservableObject {
 
 #if DEBUG
 extension WorldController {
-    static let debugDefaultCoordinate = CLLocationCoordinate2D(latitude: 51.8133, longitude: 4.6901)
-
     enum DebugStepSize: Double, CaseIterable, Identifiable {
         case fine = 25
         case tile = 55

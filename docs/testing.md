@@ -52,7 +52,7 @@ xcodebuild test \
 
 ### Chrome snapshots
 
-Reference PNGs live in `AtlasboundTests/Visual/__Snapshots__/`. MapKit / `DiscoveryMapView` is **not** snapshotted (flaky map tiles + GPS).
+Reference PNGs live in `AtlasboundTests/Visual/__Snapshots__/`. Mapbox / `DiscoveryMapView` is **not** snapshotted (network map tiles + GPS).
 
 ```bash
 # Regenerate golden images after intentional UI chrome changes
@@ -75,7 +75,7 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | High speed | Sim GPS leap step + Auto, or Freeway Drive | Continuous hex fill via `hexLine` (no large gaps) |
 | Pause / resume | Pause mid-activity | Samples stop; resume continues route |
 | Finish summary | End activity | Sheet with discovery/familiarity splits |
-| Places visited | Progress tab after discovering tiles (network) | Countries / provinces / cities appear as MapKit reverse-geocode resolves |
+| Places visited | Progress tab after discovering tiles (network) | Countries / provinces / cities appear as Mapbox reverse-geocode resolves |
 | Session history | Activity tab → Recent activities | Past sessions listed; tap for detail sheet |
 | Background recording | Settings → Record while screen is off; grant Always; Drive sim with screen locked | Recording continues; tiles still discovered |
 | Activity switch | Map idle sheet / Workshop | Walk → Cycle etc.; activity metadata changes, atlas stays 20 m |
@@ -85,6 +85,7 @@ Commit updated PNGs with the UI change. CI bootstraps missing references once (`
 | Device GPS noise | Explore on a real device | Samples outside the accuracy threshold are discarded |
 | Layers places pins | Toggle layers with resolved places | Locality pins appear; no Apple POIs |
 | Live map options | Map → layers button | Style picker, mastery/heat lens, fog, places, and Frontier toggles update independently |
+| Missing Mapbox token | Remove or leave `MBXAccessToken` empty/unexpanded in the ignored Mapbox xcconfig; launch a local Debug build | `MapboxConfiguration.configure()` completes without assigning a token; the map remains unavailable and logs a DEBUG-only diagnostic |
 | 3D live map | Reach level 4 → Map → cube button | Camera pitches smoothly, preserves center/heading, and returns flat without moving the atlas |
 | Level rewards | Progress after earning XP | Level progress, nearby rewards, tokens, and achievement progress reflect lifetime atlas stats |
 | Scout Circuit | Discover 5 new tiles, return to 3 older tiles, visit 12 unique tiles in one local day | Map mission, active tracker, and Progress card stay in sync; claim circuit chest once when 3/3 |

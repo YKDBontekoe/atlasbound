@@ -1,9 +1,13 @@
 import Foundation
 import CoreLocation
-import MapKit
 
 /// Pure aggregation for atlas statistics — area, footprints, and explorer metrics.
 struct StatsEngine: Sendable {
+    struct CoordinateRegion: Sendable {
+        let center: CLLocationCoordinate2D
+        let latitudeDelta: Double
+        let longitudeDelta: Double
+    }
     struct MasteryEntry: Sendable {
         let state: TileState
         let count: Int
@@ -131,7 +135,7 @@ struct StatsEngine: Sendable {
     static func boundingRegion(
         tileCenters: [CLLocationCoordinate2D],
         padding: BoundingPadding = .multiplicative(factor: 1.35, minDelta: 0.002)
-    ) -> MKCoordinateRegion? {
+    ) -> CoordinateRegion? {
         guard let first = tileCenters.first else { return nil }
         var minLat = first.latitude
         var maxLat = first.latitude
@@ -156,12 +160,13 @@ struct StatsEngine: Sendable {
             lonSpan = max(minDelta, maxLon - minLon + pad)
         }
 
-        return MKCoordinateRegion(
+        return CoordinateRegion(
             center: CLLocationCoordinate2D(
                 latitude: (minLat + maxLat) / 2,
                 longitude: (minLon + maxLon) / 2
             ),
-            span: MKCoordinateSpan(latitudeDelta: latSpan, longitudeDelta: lonSpan)
+            latitudeDelta: latSpan,
+            longitudeDelta: lonSpan
         )
     }
 

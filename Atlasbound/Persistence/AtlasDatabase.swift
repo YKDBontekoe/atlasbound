@@ -6,7 +6,7 @@ import os
 /// Geometry is never stored — tiles keep IDs + mastery fields only.
 @MainActor
 final class AtlasDatabase {
-    static let schemaVersion = 4
+    static let schemaVersion = 5
     static let fileName = "atlasbound.sqlite"
 
     private static let logger = Logger(subsystem: "com.atlasbound.app", category: "database")
@@ -122,20 +122,6 @@ final class AtlasDatabase {
                   failed_at REAL
                 );
 
-                CREATE TABLE IF NOT EXISTS pinpoint_games (
-                  id TEXT PRIMARY KEY NOT NULL,
-                  payload TEXT NOT NULL,
-                  ended_at REAL NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS pinpoint_stats (
-                  id INTEGER PRIMARY KEY CHECK (id = 1),
-                  high_score_worldwide INTEGER NOT NULL,
-                  high_score_home_turf INTEGER NOT NULL,
-                  games_played INTEGER NOT NULL,
-                  exact_tile_hits INTEGER NOT NULL
-                );
-
                 CREATE TABLE IF NOT EXISTS treasure_state (
                   id INTEGER PRIMARY KEY CHECK (id = 1),
                   payload TEXT NOT NULL
@@ -196,6 +182,13 @@ final class AtlasDatabase {
                 );
                 """
             )
+            setMetaValue("4", for: "schema_version")
+        }
+
+        let afterV4 = Int(metaValue(for: "schema_version") ?? "0") ?? 0
+        if afterV4 < 5 {
+            try db.execute("DROP TABLE IF EXISTS pinpoint_games;")
+            try db.execute("DROP TABLE IF EXISTS pinpoint_stats;")
             setMetaValue("\(Self.schemaVersion)", for: "schema_version")
         }
     }
@@ -257,21 +250,6 @@ final class AtlasDatabase {
             replaceRegionCells(regions.cells)
             importedAny = true
             archiveLegacyFile(named: "atlasbound-regions.json")
-        }
-
-        if let pinpoint: LegacyPinpointSave = JSONFileStore.load(
-            LegacyPinpointSave.self,
-            from: docs.appendingPathComponent("atlasbound-pinpoint.json")
-        ), pinpoint.version == JSONFileStore.currentSchemaVersion {
-            replacePinpoint(
-                games: pinpoint.games,
-                highScoreWorldwide: pinpoint.highScoreWorldwide,
-                highScoreHomeTurf: pinpoint.highScoreHomeTurf,
-                gamesPlayed: pinpoint.gamesPlayed ?? pinpoint.games.count,
-                exactTileHits: pinpoint.exactTileHits
-            )
-            importedAny = true
-            archiveLegacyFile(named: "atlasbound-pinpoint.json")
         }
 
         if let treasure: LegacyTreasureSave = JSONFileStore.load(
@@ -511,12 +489,22 @@ final class AtlasDatabase {
             for table in [
                 "tiles", "progress", "frontier", "territory_state",
                 "activity_sessions", "activity_aggregates", "region_cells",
-                "pinpoint_games", "pinpoint_stats", "treasure_state",
+                "treasure_state", "pinpoint_games", "pinpoint_stats",
                 "inventory_state", "factory_state", "idle_state", "skill_state"
             ] {
+                guard tableExists(table) else { continue }
                 try db.execute("DELETE FROM \(table);")
             }
         }
+    }
+
+    private func tableExists(_ table: String) -> Bool {
+        guard let statement = try? db.prepare(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1;"
+        ) else { return false }
+        defer { sqlite3_finalize(statement) }
+        SQLiteDatabase.bindText(statement, index: 1, value: table)
+        return sqlite3_step(statement) == SQLITE_ROW
     }
 
     func persistWorldSnapshot(
@@ -818,110 +806,6 @@ final class AtlasDatabase {
         _ = sqlite3_step(statement)
     }
 
-    // MARK: - Pinpoint
-
-    func loadPinpoint() -> (
-        games: [PinpointGame],
-        highScoreWorldwide: Int,
-        highScoreHomeTurf: Int,
-        gamesPlayed: Int,
-        exactTileHits: Int
-    ) {
-        var games: [PinpointGame] = []
-        if let statement = try? db.prepare(
-            "SELECT payload FROM pinpoint_games ORDER BY ended_at ASC;"
-        ) {
-            defer { sqlite3_finalize(statement) }
-            while sqlite3_step(statement) == SQLITE_ROW {
-                guard let payload = SQLiteDatabase.columnText(statement, index: 0),
-                      let data = payload.data(using: .utf8),
-                      let game = try? decoder.decode(PinpointGame.self, from: data) else { continue }
-                games.append(game)
-            }
-        }
-
-        var highWW = 0
-        var highHT = 0
-        var played = 0
-        var exact = 0
-        if let statement = try? db.prepare(
-            """
-            SELECT high_score_worldwide, high_score_home_turf, games_played, exact_tile_hits
-            FROM pinpoint_stats WHERE id = 1;
-            """
-        ) {
-            defer { sqlite3_finalize(statement) }
-            if sqlite3_step(statement) == SQLITE_ROW {
-                highWW = SQLiteDatabase.columnInt(statement, index: 0)
-                highHT = SQLiteDatabase.columnInt(statement, index: 1)
-                played = SQLiteDatabase.columnInt(statement, index: 2)
-                exact = SQLiteDatabase.columnInt(statement, index: 3)
-            }
-        }
-        return (games, highWW, highHT, played, exact)
-    }
-
-    func replacePinpoint(
-        games: [PinpointGame],
-        highScoreWorldwide: Int,
-        highScoreHomeTurf: Int,
-        gamesPlayed: Int,
-        exactTileHits: Int
-    ) {
-        try? db.execute("DELETE FROM pinpoint_games;")
-        for game in games {
-            upsertPinpointGame(game)
-        }
-        savePinpointStats(
-            highScoreWorldwide: highScoreWorldwide,
-            highScoreHomeTurf: highScoreHomeTurf,
-            gamesPlayed: gamesPlayed,
-            exactTileHits: exactTileHits
-        )
-    }
-
-    func upsertPinpointGame(_ game: PinpointGame) {
-        guard let data = try? encoder.encode(game),
-              let payload = String(data: data, encoding: .utf8),
-              let statement = try? db.prepare(
-                """
-                INSERT INTO pinpoint_games(id, payload, ended_at) VALUES(?,?,?)
-                ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, ended_at = excluded.ended_at;
-                """
-              ) else { return }
-        defer { sqlite3_finalize(statement) }
-        SQLiteDatabase.bindText(statement, index: 1, value: game.id.uuidString)
-        SQLiteDatabase.bindText(statement, index: 2, value: payload)
-        SQLiteDatabase.bindDouble(statement, index: 3, value: game.completedAt.timeIntervalSince1970)
-        _ = sqlite3_step(statement)
-    }
-
-    func savePinpointStats(
-        highScoreWorldwide: Int,
-        highScoreHomeTurf: Int,
-        gamesPlayed: Int,
-        exactTileHits: Int
-    ) {
-        guard let statement = try? db.prepare(
-            """
-            INSERT INTO pinpoint_stats(
-              id, high_score_worldwide, high_score_home_turf, games_played, exact_tile_hits
-            ) VALUES(1,?,?,?,?)
-            ON CONFLICT(id) DO UPDATE SET
-              high_score_worldwide = excluded.high_score_worldwide,
-              high_score_home_turf = excluded.high_score_home_turf,
-              games_played = excluded.games_played,
-              exact_tile_hits = excluded.exact_tile_hits;
-            """
-        ) else { return }
-        defer { sqlite3_finalize(statement) }
-        SQLiteDatabase.bindInt(statement, index: 1, value: highScoreWorldwide)
-        SQLiteDatabase.bindInt(statement, index: 2, value: highScoreHomeTurf)
-        SQLiteDatabase.bindInt(statement, index: 3, value: gamesPlayed)
-        SQLiteDatabase.bindInt(statement, index: 4, value: exactTileHits)
-        _ = sqlite3_step(statement)
-    }
-
     // MARK: - Treasure / inventory / factory blobs
 
     func loadTreasure() -> LegacyTreasureSave? {
@@ -1039,15 +923,6 @@ struct LegacyActivitySave: Codable {
 struct LegacyRegionSave: Codable {
     var version: Int
     var cells: [PersistedRegionCell]
-}
-
-struct LegacyPinpointSave: Codable {
-    var version: Int
-    let games: [PinpointGame]
-    let highScoreWorldwide: Int
-    let highScoreHomeTurf: Int
-    let exactTileHits: Int
-    let gamesPlayed: Int?
 }
 
 struct LegacyTreasureSave: Codable {

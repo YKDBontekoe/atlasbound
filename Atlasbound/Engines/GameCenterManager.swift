@@ -9,8 +9,6 @@ final class GameCenterManager: ObservableObject {
     @Published private(set) var localPlayerName: String = ""
     @Published private(set) var authError: String?
 
-    static let pinpointLeaderboardID = "com.atlasbound.geoguessr.highscore"
-
     static let frontierLeaderboardID = "com.atlasbound.frontier.weekly.20"
 
     func authenticate() {
@@ -41,22 +39,6 @@ final class GameCenterManager: ObservableObject {
         }
     }
 
-    func submitScore(_ score: Int) async {
-        guard isAuthenticated else { return }
-        do {
-            try await GKLeaderboard.submitScore(
-                score,
-                context: 0,
-                player: GKLocalPlayer.local,
-                leaderboardIDs: [Self.pinpointLeaderboardID]
-            )
-        } catch {
-            if !Self.isExpectedUnauthenticatedError(error) {
-                authError = "Failed to submit score: \(error.localizedDescription)"
-            }
-        }
-    }
-
     func submitFrontierScore(_ score: Int) async {
         guard isAuthenticated, score > 0 else { return }
         do {
@@ -69,10 +51,6 @@ final class GameCenterManager: ObservableObject {
         } catch {
             authError = "Failed to submit frontier score: \(error.localizedDescription)"
         }
-    }
-
-    func showLeaderboard() {
-        showLeaderboard(id: Self.pinpointLeaderboardID)
     }
 
     func showFrontierLeaderboard() {
