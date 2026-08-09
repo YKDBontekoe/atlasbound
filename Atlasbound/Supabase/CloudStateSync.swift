@@ -27,7 +27,8 @@ final class CloudStateSync: ObservableObject {
         inventory: InventoryStore,
         factory: FactoryStore,
         idle: IdleStore,
-        skills: SkillStore
+        skills: SkillStore,
+        isSessionActive: @escaping @MainActor () -> Bool = { true }
     ) async -> Bool {
         guard let client,
               let authClient,
@@ -41,6 +42,7 @@ final class CloudStateSync: ObservableObject {
                 .execute()
                 .value
             guard let row = rows.first else { return true }
+            guard isSessionActive() else { return false }
 
             if let save = Self.decode(row.activityHistory, as: LegacyActivitySave.self) {
                 activityHistory.replaceCloudState(save)

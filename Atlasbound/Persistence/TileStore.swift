@@ -48,8 +48,9 @@ final class TileStore: ObservableObject {
 
     var databaseURL: URL { database.fileURL }
 
-    func hydrateFromCloud() async -> Bool {
+    func hydrateFromCloud(isSessionActive: @escaping @MainActor () -> Bool = { true }) async -> Bool {
         guard let world = await cloudRepository.loadWorld() else { return false }
+        guard isSessionActive() else { return false }
         guard world.hasRemoteRecord else { return true }
         tiles = world.tiles.reduce(into: [:]) { $0[$1.id] = $1 }
         if let progress = world.progress {

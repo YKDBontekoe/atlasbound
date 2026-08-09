@@ -10,8 +10,8 @@ final class SharedTreasureRepository {
         self.client = client
     }
 
-    func nearby(around coordinate: CLLocationCoordinate2D, radiusMeters: Double = 5_000) async -> [SharedTreasureEvent] {
-        guard let client else { return [] }
+    func nearby(around coordinate: CLLocationCoordinate2D, radiusMeters: Double = 5_000) async -> [SharedTreasureEvent]? {
+        guard let client else { return nil }
         do {
             return try await client
                 .rpc("nearby_shared_treasures", params: [
@@ -22,7 +22,7 @@ final class SharedTreasureRepository {
                 .execute()
                 .value
         } catch {
-            return []
+            return nil
         }
     }
 

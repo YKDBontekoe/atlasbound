@@ -20,6 +20,7 @@ struct AtlasboundApp: App {
     @StateObject private var cloudStateSync = CloudStateSync()
     @State private var cloudBootstrapStarted = false
     @State private var cloudBootstrapError: String?
+    @State private var cloudBootstrapTask: Task<Void, Never>?
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
 
     private var isUITestMode: Bool {
@@ -79,10 +80,10 @@ struct AtlasboundApp: App {
                 }
                 bootstrapWorldIfAuthenticated()
             }
-            .onChange(of: auth.session?.user.id) { _, newValue in
-                if newValue == nil {
-                    resetLocalSession()
-                } else {
+            .onChange(of: auth.session?.user.id) { oldValue, newValue in
+                guard oldValue != newValue else { return }
+                resetLocalSession()
+                if newValue != nil {
                     bootstrapWorldIfAuthenticated()
                 }
             }
@@ -98,12 +99,19 @@ struct AtlasboundApp: App {
         guard !cloudBootstrapStarted else { return }
         cloudBootstrapStarted = true
         cloudBootstrapError = nil
-        Task {
-            if auth.session != nil {
-                guard await store.hydrateFromCloud() else {
+        let startingUserID = auth.session?.user.id
+        let authStore = auth
+        cloudBootstrapTask = Task { @MainActor in
+            if let startingUserID {
+                let isSessionActive: @MainActor () -> Bool = {
+                    authStore.session?.user.id == startingUserID
+                }
+                guard await store.hydrateFromCloud(isSessionActive: isSessionActive) else {
+                    guard !Task.isCancelled, isSessionActive() else { return }
                     failCloudBootstrap()
                     return
                 }
+                guard !Task.isCancelled, isSessionActive() else { return }
                 guard await cloudStateSync.hydrate(
                     activityHistory: activityHistory,
                     regionLookup: regionLookup,
@@ -111,12 +119,17 @@ struct AtlasboundApp: App {
                     inventory: inventoryStore,
                     factory: factoryStore,
                     idle: idleStore,
-                    skills: skillStore
+                    skills: skillStore,
+                    isSessionActive: isSessionActive
                 ) else {
+                    guard !Task.isCancelled, isSessionActive() else { return }
                     failCloudBootstrap()
                     return
                 }
             }
+            guard !Task.isCancelled,
+                  startingUserID == nil || authStore.session?.user.id == startingUserID
+            else { return }
             bootstrapControllers()
         }
     }
@@ -167,6 +180,8 @@ struct AtlasboundApp: App {
 
     @MainActor
     private func resetLocalSession() {
+        cloudBootstrapTask?.cancel()
+        cloudBootstrapTask = nil
         cloudStateSync.stop()
         store.resetLocalSession()
         activityHistory.resetLocalSession()

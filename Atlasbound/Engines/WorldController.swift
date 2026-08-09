@@ -767,9 +767,11 @@ final class WorldController: ObservableObject {
 
     func rerollTreasureTrail() {
         guard let playerTileCoordinate else { return }
+        guard treasureStore.reroll(anchor: playerTileCoordinate, tileEngine: tileEngine) else {
+            return
+        }
         cancelTreasurePreparation()
         treasurePreparationDayKey = nil
-        treasureStore.reroll(anchor: playerTileCoordinate, tileEngine: tileEngine)
     }
 
     func prepareTreasureTrail() {
@@ -790,10 +792,10 @@ final class WorldController: ObservableObject {
                 tileEngine: engine,
                 count: TreasureConstants.stagesPerTrail * 2
             )
-            guard let self else { return }
+            guard !Task.isCancelled, let self else { return }
             self.treasurePreparationTask = nil
             self.isPreparingTreasureTrail = false
-            guard !Task.isCancelled, targets.count >= TreasureConstants.stagesPerTrail * 2 else { return }
+            guard targets.count >= TreasureConstants.stagesPerTrail * 2 else { return }
             self.treasurePreparationDayKey = dayKey
             self.treasureStore.replaceTrailTargets(targets)
             self.treasureStore.registerCurrentTarget(at: location.coordinate, tileEngine: engine)
