@@ -1,6 +1,7 @@
 import XCTest
 @testable import Atlasbound
 
+@MainActor
 final class SkillTreeEngineTests: XCTestCase {
     private let engine = SkillTreeEngine()
 
