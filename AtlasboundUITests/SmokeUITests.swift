@@ -15,6 +15,7 @@ final class SmokeUITests: XCTestCase {
         ]
         // Avoid first-run permission races; CI also grants via simctl.
         app.launchEnvironment["OS_ACTIVITY_MODE"] = "disable"
+        app.launchEnvironment["ATLASBOUND_UI_TEST_MODE"] = "1"
         launchAppToleratingSimulatorFlakes()
 
         addUIInterruptionMonitor(withDescription: "System alerts") { alert in

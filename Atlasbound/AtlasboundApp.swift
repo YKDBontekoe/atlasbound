@@ -19,14 +19,18 @@ struct AtlasboundApp: App {
     @State private var cloudBootstrapStarted = false
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
 
+    private var isUITestMode: Bool {
+        ProcessInfo.processInfo.environment["ATLASBOUND_UI_TEST_MODE"] == "1"
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
-                if auth.isLoading {
+                if auth.isLoading && !isUITestMode {
                     LoadingWorldView()
-                } else if auth.session == nil {
+                } else if auth.session == nil && !isUITestMode {
                     AuthView(auth: auth)
-                } else if auth.needsProfileSetup {
+                } else if auth.needsProfileSetup && !isUITestMode {
                     ProfileSetupView(auth: auth)
                 } else if let controller = controllerHolder.controller,
                    let factoryController = factoryHolder.controller,
@@ -66,22 +70,24 @@ struct AtlasboundApp: App {
 
     @MainActor
     private func bootstrapWorldIfAuthenticated() {
-        guard auth.session != nil else { return }
+        guard auth.session != nil || isUITestMode else { return }
         guard !cloudBootstrapStarted else { return }
         cloudBootstrapStarted = true
         Task {
             pinpointHolder.bootstrap(tileStore: store, gameCenterManager: gameCenterManager)
-            await store.hydrateFromCloud()
-            await cloudStateSync.hydrate(
-                activityHistory: activityHistory,
-                regionLookup: regionLookup,
-                treasure: treasureStore,
-                inventory: inventoryStore,
-                factory: factoryStore,
-                idle: idleStore,
-                skills: skillStore,
-                pinpoint: pinpointHolder.store!
-            )
+            if auth.session != nil {
+                await store.hydrateFromCloud()
+                await cloudStateSync.hydrate(
+                    activityHistory: activityHistory,
+                    regionLookup: regionLookup,
+                    treasure: treasureStore,
+                    inventory: inventoryStore,
+                    factory: factoryStore,
+                    idle: idleStore,
+                    skills: skillStore,
+                    pinpoint: pinpointHolder.store!
+                )
+            }
             bootstrapControllers()
         }
     }
@@ -106,7 +112,7 @@ struct AtlasboundApp: App {
             skillStore: skillStore
         )
         pinpointHolder.bootstrap(tileStore: store, gameCenterManager: gameCenterManager)
-        if let pinpointStore = pinpointHolder.store {
+        if let pinpointStore = pinpointHolder.store, auth.session != nil {
             cloudStateSync.start(
                 tileStore: store,
                 activityHistory: activityHistory,
