@@ -252,9 +252,47 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  migrate-database:
+    name: Apply Supabase migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: supabase-production
+    concurrency:
+      group: atlasbound-supabase-production
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.79.0
+
+      - name: Link production project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Preview pending migrations
+        run: supabase db push --dry-run
+
+      - name: Apply pending migrations
+        run: supabase db push
+
+      - name: Verify migration history
+        run: supabase migration list
+
+      - name: Deploy account deletion function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: supabase functions deploy delete-account --project-ref "$SUPABASE_PROJECT_ID"
+
   publish:
     name: Release + AltStore source
-    needs: [validate, test-unit, test-ui, build]
+    needs: [validate, test-unit, test-ui, build, migrate-database]
     if: >-
       needs.validate.result == 'success' &&
       needs.test-unit.result == 'success' &&

@@ -36,6 +36,26 @@ final class PinpointStore: ObservableObject {
         }
     }
 
+    func replaceCloudState(_ save: LegacyPinpointSave) {
+        gameHistory = Array(save.games.suffix(Self.maxRetainedGames))
+        gamesPlayed = max(save.gamesPlayed ?? 0, gameHistory.count)
+        highScoreWorldwide = max(0, save.highScoreWorldwide)
+        highScoreHomeTurf = max(0, save.highScoreHomeTurf)
+        exactTileHits = max(0, save.exactTileHits)
+        persistToDisk()
+    }
+
+    func clearCloudState() {
+        replaceCloudState(LegacyPinpointSave(
+            version: JSONFileStore.currentSchemaVersion,
+            games: [],
+            highScoreWorldwide: 0,
+            highScoreHomeTurf: 0,
+            exactTileHits: 0,
+            gamesPlayed: 0
+        ))
+    }
+
     func record(_ game: PinpointGame) {
         gameHistory.append(game)
         if gameHistory.count > Self.maxRetainedGames {

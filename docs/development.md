@@ -6,6 +6,30 @@
 - iOS 17+ deployment target
 - Location permission (simulator or device)
 
+## Supabase
+
+The app uses the `atlasbound` Supabase project (`ezxelewutisuyxniozfh`). Database schema changes are committed as ordered SQL files in `supabase/migrations/`.
+
+For local migration work, install the Supabase CLI and Docker, then run:
+
+```bash
+supabase start
+supabase db reset
+find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print | sort
+```
+
+The iOS app receives the project publishable key through the `SUPABASE_PUBLISHABLE_KEY` Xcode build setting. Publishable keys are safe to ship with the app; service-role/database credentials must never be included in the app.
+
+GitHub Actions requires these encrypted secrets for the production migration job:
+
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_PROJECT_ID` (`ezxelewutisuyxniozfh`)
+- `SUPABASE_DB_PASSWORD`
+
+Pull requests replay all migrations against a local Supabase instance. Pushes to `main` preview and apply pending migrations to the linked production project before the IPA/AltStore publish job runs.
+
+In the Supabase Dashboard, enable email OTP/magic-link auth and add `atlasbound://auth/callback` to the Auth URL configuration. The release workflow also deploys `supabase/functions/delete-account`, which uses the service role only inside Supabase to permanently remove an authenticated user; never put that key in Xcode or GitHub repository variables.
+
 ## Run
 
 1. Open `Atlasbound.xcodeproj`

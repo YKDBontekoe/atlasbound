@@ -59,6 +59,27 @@ final class ActivityHistoryStore: ObservableObject {
         sessionCountByActivity[activity, default: 0]
     }
 
+    func replaceCloudState(_ save: LegacyActivitySave) {
+        sessions = Array(save.sessions.suffix(Self.maxSessions))
+        longestDistanceByActivity = Dictionary(uniqueKeysWithValues: save.longestDistanceByActivity.compactMap { key, value in
+            guard let activity = ActivityType(rawValue: key) else { return nil }
+            return (activity, max(0, value))
+        })
+        totalDistanceByActivity = Dictionary(uniqueKeysWithValues: save.totalDistanceByActivity.compactMap { key, value in
+            guard let activity = ActivityType(rawValue: key) else { return nil }
+            return (activity, max(0, value))
+        })
+        totalDurationByActivity = Dictionary(uniqueKeysWithValues: save.totalDurationByActivity.compactMap { key, value in
+            guard let activity = ActivityType(rawValue: key) else { return nil }
+            return (activity, max(0, value))
+        })
+        sessionCountByActivity = Dictionary(uniqueKeysWithValues: save.sessionCountByActivity.compactMap { key, value in
+            guard let activity = ActivityType(rawValue: key) else { return nil }
+            return (activity, max(0, value))
+        })
+        persistToDisk()
+    }
+
     private func loadFromDisk() {
         let loaded = database.loadActivities()
         sessions = loaded.sessions

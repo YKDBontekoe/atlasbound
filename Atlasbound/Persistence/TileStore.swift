@@ -14,6 +14,7 @@ final class TileStore: ObservableObject {
     let tileSize: TileSizeOption = .twenty
 
     private let database: AtlasDatabase
+    private let cloudRepository = CloudProgressRepository()
     private let installationID: String
     private var deferPersistence = false
     private var dirtyTileIDs: Set<String> = []
@@ -43,6 +44,22 @@ final class TileStore: ObservableObject {
     var isDeferringPersistence: Bool { deferPersistence }
 
     var databaseURL: URL { database.fileURL }
+
+    func hydrateFromCloud() async {
+        guard let world = await cloudRepository.loadWorld() else { return }
+        tiles = world.tiles.reduce(into: [:]) { $0[$1.id] = $1 }
+        discoveryXPTotal = world.progress.discoveryXPTotal
+        familiarityXPTotal = world.progress.familiarityXPTotal
+        activitiesCompleted = world.progress.activitiesCompleted
+        frontierState = world.frontier
+        territoryState = world.territory
+        dirtyTileIDs = []
+        progressDirty = false
+        frontierDirty = false
+        territoryDirty = false
+        pendingClear = false
+        database.clearWorld()
+    }
 
     /// - Parameters:
     ///   - fileURL: Optional SQLite URL. `.json` suffixes from older tests are remapped to `.sqlite`.
@@ -279,6 +296,14 @@ final class TileStore: ObservableObject {
             : nil
         let frontier = frontierDirty ? frontierState : nil
         let territory = territoryDirty ? territoryState : nil
+        let cloudProgress = progress ?? PersistedProgressRecord(
+            discoveryXPTotal: discoveryXPTotal,
+            familiarityXPTotal: familiarityXPTotal,
+            activitiesCompleted: activitiesCompleted
+        )
+        let cloudClear = pendingClear
+        let cloudFrontier = (frontierDirty || territoryDirty) ? frontierState : nil
+        let cloudTerritory = (frontierDirty || territoryDirty) ? territoryState : nil
 
         if pendingClear {
             database.clearWorld()
@@ -303,6 +328,16 @@ final class TileStore: ObservableObject {
         frontierDirty = false
         territoryDirty = false
         pendingClear = false
+
+        Task { [cloudRepository] in
+            await cloudRepository.persist(
+                tiles: dirtyTiles,
+                progress: cloudProgress,
+                clearAllTiles: cloudClear,
+                frontier: cloudFrontier,
+                territory: cloudTerritory
+            )
+        }
     }
 
     private func isCanonical(_ tile: WorldTile) -> Bool {

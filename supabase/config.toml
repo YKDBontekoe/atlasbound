@@ -1,0 +1,14 @@
+project_id = "ezxelewutisuyxniozfh"
+
+[api]
+enabled = true
+
+[db]
+major_version = 17
+
+[studio]
+enabled = true
+
+[auth]
+enabled = true
+additional_redirect_urls = ["atlasbound://auth/callback"]

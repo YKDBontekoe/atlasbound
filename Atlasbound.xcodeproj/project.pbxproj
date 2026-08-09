@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		94D0CD1D3028801A00615889 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000082 /* Supabase */; };
+		94D0CD1E3028801A00615889 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000081 /* SnapshotTesting */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A10000000000000000000070 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +70,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				94D0CD1D3028801A00615889 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,6 +78,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				94D0CD1E3028801A00615889 /* SnapshotTesting in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +132,7 @@
 			);
 			name = Atlasbound;
 			packageProductDependencies = (
+				A10000000000000000000082 /* Supabase */,
 			);
 			productName = Atlasbound;
 			productReference = A10000000000000000000001 /* Atlasbound.app */;
@@ -211,6 +219,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A10000000000000000000080 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */,
+				A10000000000000000000083 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000031 /* Products */;
@@ -435,6 +444,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.atlasbound.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPABASE_PUBLISHABLE_KEY = "sb_publishable_PPuMAQUkyzaxtVi9yiHQFQ_-YlxIL7t";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -473,6 +483,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.atlasbound.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPABASE_PUBLISHABLE_KEY = "sb_publishable_PPuMAQUkyzaxtVi9yiHQFQ_-YlxIL7t";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -613,6 +624,14 @@
 				minimumVersion = 1.17.0;
 			};
 		};
+		A10000000000000000000083 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = exactVersion;
+				version = 2.54.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -620,6 +639,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000080 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */;
 			productName = SnapshotTesting;
+		};
+		A10000000000000000000082 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000083 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
