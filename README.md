@@ -68,7 +68,7 @@ Deeper write-ups: [docs/architecture.md](docs/architecture.md), [docs/domain.md]
 
 ## Mapbox and account requirements
 
-Map rendering requires a restricted Mapbox public access token supplied through ignored local/CI xcconfig values (`MAPBOX_DEBUG_PUBLIC_ACCESS_TOKEN` and `MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN`). Treasure and cloud progress require a signed-in Supabase account. The Mapbox token is public by design; Mapbox Search credentials are kept only in the Supabase Edge Function environment.
+Map rendering requires one restricted Mapbox public access token supplied through the ignored local/CI `MAPBOX_PUBLIC_ACCESS_TOKEN` xcconfig/secret. Treasure and cloud progress require a signed-in Supabase account. The same public token is used by the Supabase Edge Function for Mapbox Search; Mapbox package downloads use a separate `MAPBOX_DOWNLOADS_TOKEN` with `DOWNLOADS:READ` scope.
 
 ## Privacy
 

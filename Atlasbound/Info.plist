@@ -25,5 +25,7 @@
 	</array>
 	<key>MBXAccessToken</key>
 	<string>$(MAPBOX_PUBLIC_ACCESS_TOKEN)</string>
+	<key>MAPBOX_GEOCODING_PERMANENT</key>
+	<string>$(MAPBOX_GEOCODING_PERMANENT)</string>
 </dict>
 </plist>

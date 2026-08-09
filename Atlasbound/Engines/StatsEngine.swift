@@ -3,7 +3,7 @@ import CoreLocation
 
 /// Pure aggregation for atlas statistics — area, footprints, and explorer metrics.
 struct StatsEngine: Sendable {
-    struct CoordinateRegion {
+    struct CoordinateRegion: Sendable {
         let center: CLLocationCoordinate2D
         let latitudeDelta: Double
         let longitudeDelta: Double

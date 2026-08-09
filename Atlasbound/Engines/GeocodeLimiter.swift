@@ -20,7 +20,7 @@ actor GeocodeLimiter {
         components?.queryItems = [
             URLQueryItem(name: "longitude", value: String(coordinate.longitude)),
             URLQueryItem(name: "latitude", value: String(coordinate.latitude)),
-            URLQueryItem(name: "limit", value: "5"),
+            URLQueryItem(name: "permanent", value: MapboxConfiguration.permanentGeocodingEnabled ? "true" : "false"),
             URLQueryItem(name: "access_token", value: token)
         ]
         guard let url = components?.url else { return nil }

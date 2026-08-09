@@ -1,5 +1,6 @@
 create table public.shared_treasure_events (
   id uuid primary key default gen_random_uuid(),
+  event_scope text not null,
   tile_id text not null,
   latitude double precision not null,
   longitude double precision not null,
@@ -15,7 +16,8 @@ create table public.shared_treasure_events (
   claimed_at timestamptz,
   constraint shared_treasure_latitude check (latitude between -90 and 90),
   constraint shared_treasure_longitude check (longitude between -180 and 180),
-  constraint shared_treasure_expiry check (expires_at > created_at)
+  constraint shared_treasure_expiry check (expires_at > created_at),
+  constraint shared_treasure_event_scope_unique unique (created_by, event_scope)
 );
 
 create index shared_treasure_active_location_idx

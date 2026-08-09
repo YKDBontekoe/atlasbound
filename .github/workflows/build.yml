@@ -53,6 +53,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configure Mapbox package credentials
+        env:
+          MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$MAPBOX_DOWNLOADS_TOKEN" ]]; then
+            echo "Mapbox downloads credentials unavailable (validation does not resolve packages)."
+            exit 0
+          fi
+          umask 077
+          printf 'machine api.mapbox.com\nlogin mapbox\npassword %s\n' "$MAPBOX_DOWNLOADS_TOKEN" > "$HOME/.netrc"
+          chmod 600 "$HOME/.netrc"
+
       - name: Validate PR (privacy, JSON, script tests)
         run: |
           chmod +x scripts/validate-pr.sh scripts/check-privacy-alignment.py
@@ -68,6 +81,19 @@ jobs:
 
       - name: Select Xcode
         uses: ./.github/actions/xcode-select
+
+      - name: Configure Mapbox package credentials
+        env:
+          MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$MAPBOX_DOWNLOADS_TOKEN" ]]; then
+            echo "Mapbox downloads credentials unavailable; package resolution will use public/cache access."
+            exit 0
+          fi
+          umask 077
+          printf 'machine api.mapbox.com\nlogin mapbox\npassword %s\n' "$MAPBOX_DOWNLOADS_TOKEN" > "$HOME/.netrc"
+          chmod 600 "$HOME/.netrc"
 
       - name: Build test products
         uses: ./.github/actions/ios-build-tests
@@ -138,6 +164,19 @@ jobs:
       - name: Select Xcode
         uses: ./.github/actions/xcode-select
 
+      - name: Configure Mapbox package credentials
+        env:
+          MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$MAPBOX_DOWNLOADS_TOKEN" ]]; then
+            echo "Mapbox downloads credentials unavailable; package resolution will use public/cache access."
+            exit 0
+          fi
+          umask 077
+          printf 'machine api.mapbox.com\nlogin mapbox\npassword %s\n' "$MAPBOX_DOWNLOADS_TOKEN" > "$HOME/.netrc"
+          chmod 600 "$HOME/.netrc"
+
       - name: Compute automatic version
         id: version
         run: |
@@ -148,11 +187,13 @@ jobs:
           echo "PR preview version ${version} (tag would be ${tag})"
 
       - name: Build IPA
+        # PR CI intentionally omits the release config gates because fork pull requests have empty secrets.
+        # Such artifacts may contain an unresolved/placeholder Mapbox token and are not map-verification builds.
         env:
           MARKETING_VERSION: ${{ steps.version.outputs.version }}
           BUILD_NUMBER: ${{ github.run_number }}
           SUPABASE_RELEASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_RELEASE_PUBLISHABLE_KEY }}
-          MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN: ${{ secrets.MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN }}
+          MAPBOX_PUBLIC_ACCESS_TOKEN: ${{ secrets.MAPBOX_PUBLIC_ACCESS_TOKEN }}
         run: |
           chmod +x scripts/build-ipa.sh
           ./scripts/build-ipa.sh

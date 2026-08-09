@@ -116,10 +116,11 @@ struct RegionLookupEngine: Sendable {
                     ?? candidateProperties["name_preferred"] as? String
                     ?? candidateProperties["text"] as? String
                     ?? candidate["text"] as? String
+                let parsedCountryCode = candidateProperties["country_code"] as? String
                 let shortCode = candidateProperties["short_code"] as? String
                 if id.hasPrefix("country") {
                     countryName = text ?? countryName
-                    countryCode = shortCode ?? countryCode
+                    countryCode = parsedCountryCode ?? shortCode ?? countryCode
                 } else if id.hasPrefix("region") || id.hasPrefix("district") {
                     administrativeArea = text ?? administrativeArea
                 } else if id.hasPrefix("place") || id.hasPrefix("locality") || id.hasPrefix("city") {

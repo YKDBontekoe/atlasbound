@@ -153,6 +153,8 @@ final class TileMapStyleTests: XCTestCase {
 
 final class MapTileLODTests: XCTestCase {
     func testResolveNearMidFarFromSpan() {
+        XCTAssertEqual(MapTileLOD.resolve(for: MapTileLOD.nearSpanMeters), .near)
+        XCTAssertEqual(MapTileLOD.resolve(for: MapTileLOD.midSpanMeters), .mid)
         XCTAssertEqual(MapTileLOD.resolve(for: 900), .near)
         XCTAssertEqual(MapTileLOD.resolve(for: 3_000), .mid)
         XCTAssertEqual(MapTileLOD.resolve(for: 20_000), .far)

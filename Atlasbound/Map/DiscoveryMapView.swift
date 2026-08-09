@@ -25,10 +25,13 @@ struct DiscoveryMapView: View {
 
     private var engine: TileEngine { store.tileEngine }
 
-    private var overlays: [MapboxPolygonOverlay] {
+    @State private var overlays: [MapboxPolygonOverlay] = []
+
+    private func makeOverlays() -> [MapboxPolygonOverlay] {
         var result: [MapboxPolygonOverlay] = []
         if showsFogLayer {
-            result += controller.nearbyFogTiles(around: recorder.lastLocation?.coordinate, radius: 5)
+            let fogRadius = controller.isRecording ? AtlasTheme.fogRadiusRecording : AtlasTheme.fogRadiusIdle
+            result += controller.nearbyFogTiles(around: recorder.lastLocation?.coordinate, radius: fogRadius)
                 .map { polygonOverlay(id: "fog:\($0)", coordinate: $0, fill: .fog) }
         }
         result += store.discoveredTiles.prefix(AtlasTheme.maxVisiblePolygons)
@@ -176,6 +179,11 @@ struct DiscoveryMapView: View {
         }
         .mapStyle(.standard)
         .ornamentOptions(OrnamentOptions(scaleBar: ScaleBarViewOptions(visibility: .hidden)))
+        .onCameraChanged { _ in
+            if followsUser {
+                followsUser = false
+            }
+        }
         .onChange(of: is3DEnabled) { _, enabled in
             position = .followPuck(zoom: 15, pitch: enabled ? 58 : 0)
         }
@@ -184,8 +192,17 @@ struct DiscoveryMapView: View {
             position = .followPuck(zoom: controller.isRecording ? 16 : 15, pitch: is3DEnabled ? 58 : 0)
         }
         .onAppear {
+            overlays = makeOverlays()
             position = .followPuck(zoom: 15, pitch: is3DEnabled ? 58 : 0)
         }
+        .onChange(of: store.discoveredTiles) { _, _ in overlays = makeOverlays() }
+        .onChange(of: controller.frontierEdgeTileIDs) { _, _ in overlays = makeOverlays() }
+        .onChange(of: controller.claimedSectorBoundaryTileIDs) { _, _ in overlays = makeOverlays() }
+        .onChange(of: controller.targetSectorBoundaryTileIDs) { _, _ in overlays = makeOverlays() }
+        .onChange(of: recorder.lastLocation?.timestamp) { _, _ in overlays = makeOverlays() }
+        .onChange(of: controller.isRecording) { _, _ in overlays = makeOverlays() }
+        .onChange(of: showsFogLayer) { _, _ in overlays = makeOverlays() }
+        .onChange(of: showsFrontierLayer) { _, _ in overlays = makeOverlays() }
     }
 
     private func polygonOverlay(id: String, coordinate: TileCoordinate, fill: MapboxPolygonFill) -> MapboxPolygonOverlay {
@@ -204,21 +221,21 @@ private enum MapboxPolygonFill {
 
     var color: StyleColor {
         switch self {
-        case .discovered: StyleColor(.systemBlue)
-        case .fog: StyleColor(.systemGray)
-        case .frontier: StyleColor(.systemYellow)
-        case .claimed: StyleColor(.systemGreen)
-        case .target: StyleColor(.systemOrange)
+        case .discovered: StyleColor(UIColor(AtlasTheme.teal))
+        case .fog: StyleColor(UIColor(AtlasTheme.fogWashFill))
+        case .frontier: StyleColor(UIColor(AtlasTheme.frontierWashFill))
+        case .claimed: StyleColor(UIColor(AtlasTheme.claimedTerritoryWashFill))
+        case .target: StyleColor(UIColor(AtlasTheme.blue.opacity(0.08)))
         }
     }
 
     var outline: StyleColor {
         switch self {
-        case .discovered: StyleColor(.systemBlue)
-        case .fog: StyleColor(.systemGray)
-        case .frontier: StyleColor(.systemYellow)
-        case .claimed: StyleColor(.systemGreen)
-        case .target: StyleColor(.systemOrange)
+        case .discovered: StyleColor(UIColor(AtlasTheme.teal))
+        case .fog: StyleColor(UIColor(AtlasTheme.fogWashStroke))
+        case .frontier: StyleColor(UIColor(AtlasTheme.gold))
+        case .claimed: StyleColor(UIColor(AtlasTheme.claimedTerritoryStroke))
+        case .target: StyleColor(UIColor(AtlasTheme.targetBoundaryStroke))
         }
     }
 

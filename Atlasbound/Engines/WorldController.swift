@@ -795,7 +795,7 @@ final class WorldController: ObservableObject {
             self.isPreparingTreasureTrail = false
             guard !Task.isCancelled, !targets.isEmpty else { return }
             self.treasureStore.replaceTrailTargets(targets)
-            self.treasureStore.registerCurrentTarget(at: location.coordinate)
+            self.treasureStore.registerCurrentTarget(at: location.coordinate, tileEngine: engine)
         }
     }
 

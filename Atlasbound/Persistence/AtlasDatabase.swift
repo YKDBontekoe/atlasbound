@@ -6,7 +6,7 @@ import os
 /// Geometry is never stored — tiles keep IDs + mastery fields only.
 @MainActor
 final class AtlasDatabase {
-    static let schemaVersion = 4
+    static let schemaVersion = 5
     static let fileName = "atlasbound.sqlite"
 
     private static let logger = Logger(subsystem: "com.atlasbound.app", category: "database")
@@ -182,6 +182,13 @@ final class AtlasDatabase {
                 );
                 """
             )
+            setMetaValue("4", for: "schema_version")
+        }
+
+        let afterV4 = Int(metaValue(for: "schema_version") ?? "0") ?? 0
+        if afterV4 < 5 {
+            try db.execute("DROP TABLE IF EXISTS pinpoint_games;")
+            try db.execute("DROP TABLE IF EXISTS pinpoint_stats;")
             setMetaValue("\(Self.schemaVersion)", for: "schema_version")
         }
     }
@@ -482,12 +489,22 @@ final class AtlasDatabase {
             for table in [
                 "tiles", "progress", "frontier", "territory_state",
                 "activity_sessions", "activity_aggregates", "region_cells",
-                "treasure_state",
+                "treasure_state", "pinpoint_games", "pinpoint_stats",
                 "inventory_state", "factory_state", "idle_state", "skill_state"
             ] {
+                guard tableExists(table) else { continue }
                 try db.execute("DELETE FROM \(table);")
             }
         }
+    }
+
+    private func tableExists(_ table: String) -> Bool {
+        guard let statement = try? db.prepare(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1;"
+        ) else { return false }
+        defer { sqlite3_finalize(statement) }
+        SQLiteDatabase.bindText(statement, index: 1, value: table)
+        return sqlite3_step(statement) == SQLITE_ROW
     }
 
     func persistWorldSnapshot(

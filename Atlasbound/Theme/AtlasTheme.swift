@@ -73,11 +73,6 @@ enum AtlasTheme {
         static let xxl: CGFloat = 24
     }
 
-    /// Map camera meters when following the user during a recording.
-    static let mapSpanRecordingMeters: Double = 650
-    /// Map camera meters when idle / recentering outside a session.
-    static let mapSpanIdleMeters: Double = 950
-
     // MARK: - Adaptive chrome (map tile accents stay brand-fixed)
 
     static func canvas(for scheme: ColorScheme) -> Color {

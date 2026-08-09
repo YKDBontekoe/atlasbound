@@ -31,11 +31,12 @@ SUPABASE_RELEASE_PUBLISHABLE_KEY = <release publishable key>
 Mapbox uses the same pattern for its restricted public runtime token:
 
 ```xcconfig
-MAPBOX_DEBUG_PUBLIC_ACCESS_TOKEN = pk...
-MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN = pk...
+MAPBOX_PUBLIC_ACCESS_TOKEN = pk...
+# Only set true for a Mapbox account/token explicitly eligible for permanent geocoding.
+MAPBOX_GEOCODING_PERMANENT = false
 ```
 
-The Supabase `spawn-shared-treasure` Edge Function additionally requires `MAPBOX_SEARCH_TOKEN`; this is a server secret and must never be placed in Xcode, the IPA, or repository variables.
+The Supabase `spawn-shared-treasure` Edge Function uses the same `MAPBOX_PUBLIC_ACCESS_TOKEN` through its Supabase secret environment. The token is public by design; do not use a Mapbox Downloads credential here.
 
 Publishable keys are safe to ship with the app; service-role/database credentials must never be included in the app.
 
@@ -45,8 +46,8 @@ GitHub Actions requires these encrypted secrets for the production migration job
 - `SUPABASE_PROJECT_ID` (`ezxelewutisuyxniozfh`)
 - `SUPABASE_DB_PASSWORD`
 - `SUPABASE_RELEASE_PUBLISHABLE_KEY`
-- `MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN`
-- `MAPBOX_SEARCH_TOKEN`
+- `MAPBOX_PUBLIC_ACCESS_TOKEN`
+- `MAPBOX_DOWNLOADS_TOKEN` (Mapbox Downloads:READ token for binary SDK packages)
 
 Pull requests replay all migrations against a local Supabase instance. Pushes to `main` preview and apply pending migrations to the linked production project before the IPA/AltStore publish job runs.
 

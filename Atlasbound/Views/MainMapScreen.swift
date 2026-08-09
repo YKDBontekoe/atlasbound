@@ -782,16 +782,10 @@ struct MainMapScreen: View {
 
     private func recenter() {
         followsUser = true
-        guard let location = recorder.lastLocation else { return }
-        let span = controller.isRecording
-            ? AtlasTheme.mapSpanRecordingMeters
-            : AtlasTheme.mapSpanIdleMeters
+        guard recorder.lastLocation != nil else { return }
         withAnimation(AtlasMotion.camera) {
-            _ = span
-            position = .camera(
-                center: location.coordinate,
-                zoom: uses3DMap ? 16 : 15,
-                bearing: 0,
+            position = .followPuck(
+                zoom: controller.isRecording ? 16 : 15,
                 pitch: uses3DMap ? 58 : 0
             )
         }

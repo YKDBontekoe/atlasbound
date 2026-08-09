@@ -443,7 +443,6 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				MAPBOX_PUBLIC_ACCESS_TOKEN = "$(MAPBOX_DEBUG_PUBLIC_ACCESS_TOKEN)";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lsqlite3",
@@ -484,7 +483,6 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				MAPBOX_PUBLIC_ACCESS_TOKEN = "$(MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN)";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lsqlite3",

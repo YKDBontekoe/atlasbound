@@ -30,7 +30,7 @@ fi
 # produce a release IPA with an unresolved SUPABASE_* build setting. The key
 # is safe for a public client; service-role credentials must never be used here.
 SUPABASE_KEY="${SUPABASE_PUBLISHABLE_KEY:-${SUPABASE_RELEASE_PUBLISHABLE_KEY:-}}"
-MAPBOX_TOKEN="${MAPBOX_PUBLIC_ACCESS_TOKEN:-${MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN:-}}"
+MAPBOX_TOKEN="${MAPBOX_PUBLIC_ACCESS_TOKEN:-}"
 CONFIG_FLAGS=()
 if [[ -n "$SUPABASE_KEY" ]]; then
   CONFIG_FLAGS+=("SUPABASE_PUBLISHABLE_KEY=${SUPABASE_KEY}")
@@ -44,7 +44,7 @@ if [[ "$REQUIRE_SUPABASE_CONFIG" == "true" && -z "$SUPABASE_KEY" ]]; then
   exit 1
 fi
 if [[ "$REQUIRE_MAPBOX_CONFIG" == "true" && -z "$MAPBOX_TOKEN" ]]; then
-  echo "error: MAPBOX_PUBLIC_ACCESS_TOKEN is required for this IPA. Set MAPBOX_RELEASE_PUBLIC_ACCESS_TOKEN in the build environment." >&2
+  echo "error: MAPBOX_PUBLIC_ACCESS_TOKEN is required for this IPA." >&2
   exit 1
 fi
 
