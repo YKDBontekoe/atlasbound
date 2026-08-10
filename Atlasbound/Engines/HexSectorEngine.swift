@@ -1,4 +1,5 @@
 import Foundation
+import CoreLocation
 
 /// Groups each tile grid into deterministic coarse sectors derived at runtime.
 struct HexSectorEngine: Sendable {
@@ -64,6 +65,41 @@ struct HexSectorEngine: Sendable {
             }
         }
         return boundary
+    }
+
+    /// Monotone-chain hull for a small sector footprint. Longitude and latitude
+    /// are intentionally treated as planar coordinates here: the largest sector
+    /// spans well below a kilometre, where that approximation is stable.
+    func convexHull(of coordinates: [CLLocationCoordinate2D]) -> [CLLocationCoordinate2D] {
+        let sorted = coordinates.sorted { lhs, rhs in
+            lhs.longitude == rhs.longitude ? lhs.latitude < rhs.latitude : lhs.longitude < rhs.longitude
+        }
+        guard sorted.count > 2 else { return sorted }
+
+        func cross(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D, _ c: CLLocationCoordinate2D) -> Double {
+            (b.longitude - a.longitude) * (c.latitude - a.latitude)
+                - (b.latitude - a.latitude) * (c.longitude - a.longitude)
+        }
+
+        var lower: [CLLocationCoordinate2D] = []
+        for point in sorted {
+            while lower.count >= 2,
+                  cross(lower[lower.count - 2], lower[lower.count - 1], point) <= 0 {
+                lower.removeLast()
+            }
+            lower.append(point)
+        }
+
+        var upper: [CLLocationCoordinate2D] = []
+        for point in sorted.reversed() {
+            while upper.count >= 2,
+                  cross(upper[upper.count - 2], upper[upper.count - 1], point) <= 0 {
+                upper.removeLast()
+            }
+            upper.append(point)
+        }
+
+        return Array(lower.dropLast() + upper.dropLast())
     }
 
     func completionFraction(

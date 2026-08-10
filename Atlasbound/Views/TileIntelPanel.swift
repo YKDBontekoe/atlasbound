@@ -1,5 +1,4 @@
 import SwiftUI
-import CoreLocation
 
 /// Compact, movement-friendly inspector for the selected atlas hex.
 struct TileIntelPanel: View {
@@ -13,60 +12,54 @@ struct TileIntelPanel: View {
         store.tiles[tileID]
     }
 
-    private var coordinate: TileCoordinate? {
-        controller.tileEngine.parseTileID(tileID)
-    }
-
-    private var state: TileState {
-        tile?.state ?? .fogged
-    }
-
-    private var distanceLabel: String? {
-        guard let coordinate, let location = controller.recorder.lastLocation else { return nil }
-        let target = controller.tileEngine.centerCoordinate(for: coordinate)
-        let meters = location.distance(from: CLLocation(latitude: target.latitude, longitude: target.longitude))
-        if meters < 1_000 { return "\(Int(meters.rounded())) m away" }
-        return String(format: "%.1f km away", meters / 1_000)
-    }
-
-    private var structureName: String? {
-        guard let structure = factoryController.structures.first(where: { $0.tileID == tileID }) else { return nil }
-        return FactoryCatalog.byID[structure.definitionID]?.name
+    private var presentation: TileIntelPresentation {
+        TileIntelPresentation(
+            tileID: tileID,
+            tile: tile,
+            tileEngine: controller.tileEngine,
+            playerLocation: controller.recorder.lastLocation,
+            structures: factoryController.structures
+        )
     }
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: tile?.state.markerSymbol ?? "hexagon.fill")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(state.mapBrandColor)
-                .frame(width: 38, height: 38)
-                .background(state.mapBrandColor.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            HStack(spacing: 12) {
+                Image(systemName: tile?.state.markerSymbol ?? "hexagon.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(presentation.state.mapBrandColor)
+                    .frame(width: 38, height: 38)
+                    .background(presentation.state.mapBrandColor.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(state.displayName)
-                        .font(.subheadline.weight(.bold))
-                    if let distanceLabel {
-                        Text("· \(distanceLabel)")
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(presentation.state.displayName)
+                            .font(.subheadline.weight(.bold))
+                        if let distanceLabel = presentation.distanceLabel {
+                            Text("· \(distanceLabel)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if let tile {
+                        Text("\(tile.masteryXP) mastery XP · \(tile.visitCount) visits")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Uncharted hex · move here to reveal it")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                }
-                if let tile {
-                    Text("\(tile.masteryXP) mastery XP · \(tile.visitCount) visits")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Uncharted hex · move here to reveal it")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if let structureName {
-                    Label(structureName, systemImage: "gearshape.2.fill")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(AtlasTheme.gold)
+                    if let structureName = presentation.structureName {
+                        Label(structureName, systemImage: "gearshape.2.fill")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(AtlasTheme.gold)
+                    }
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(presentation.state.displayName) tile")
+            .accessibilityValue(tile.map { "\($0.masteryXP) mastery XP, \($0.visitCount) visits" } ?? "Uncharted hex")
 
             Spacer(minLength: 4)
 
@@ -87,8 +80,5 @@ struct TileIntelPanel: View {
                 weight: .regular
             )
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(state.displayName) tile")
-        .accessibilityValue(tile.map { "\($0.masteryXP) mastery XP, \($0.visitCount) visits" } ?? "Uncharted hex")
     }
 }

@@ -23,7 +23,7 @@ struct DiscoveryMapView: View {
     var onLandmarkQuestTap: () -> Void = {}
 
     private var engine: TileEngine { store.tileEngine }
-    private var sectorEngine: HexSectorEngine { HexSectorEngine() }
+    private let sectorEngine = HexSectorEngine()
 
     private var claimedSectorIDs: [String] {
         store.territoryState.claims.map(\.sectorID).sorted()
@@ -34,6 +34,7 @@ struct DiscoveryMapView: View {
     }
 
     @State private var overlays: [MapboxPolygonOverlay] = []
+    @State private var claimedSectorHulls: [String: [CLLocationCoordinate2D]] = [:]
     @State private var mapZoom = 15.0
     @Environment(\.colorScheme) private var colorScheme
 
@@ -58,19 +59,11 @@ struct DiscoveryMapView: View {
             .map { $0 }
     }
 
-    /// A convex hull around the generated sector members gives Mapbox one
-    /// inexpensive, continuous territory shape instead of hundreds of faint
-    /// boundary hex annotations. The vertices are derived at render time from
-    /// the persisted sector ID, so no geometry is stored.
+    /// A cached hull around the generated sector members gives Mapbox one
+    /// inexpensive, continuous territory shape. Geometry remains derived from
+    /// the persisted sector ID and is refreshed only when claims change.
     private func claimedSectorOverlay(for sectorID: String) -> MapboxPolygonOverlay? {
-        guard let parsed = sectorEngine.parseSectorID(sectorID),
-              parsed.sizeMeters == Int(engine.tileSizeMeters.rounded()) else {
-            return nil
-        }
-        let coordinates = sectorEngine.tiles(in: parsed.sector)
-            .flatMap { engine.polygon(for: $0) }
-        let hull = convexHull(of: coordinates)
-        guard hull.count >= 3 else { return nil }
+        guard let hull = claimedSectorHulls[sectorID], hull.count >= 3 else { return nil }
         return MapboxPolygonOverlay(
             id: "sector:\(sectorID)",
             vertices: hull,
@@ -78,41 +71,17 @@ struct DiscoveryMapView: View {
         )
     }
 
-    private func convexHull(of coordinates: [CLLocationCoordinate2D]) -> [CLLocationCoordinate2D] {
-        var sorted = coordinates.map { point in
-            CGPoint(x: point.longitude, y: point.latitude)
-        }
-        sorted.sort { lhs, rhs in
-            lhs.x == rhs.x ? lhs.y < rhs.y : lhs.x < rhs.x
-        }
-        guard sorted.count > 2 else {
-            return sorted.map { CLLocationCoordinate2D(latitude: $0.y, longitude: $0.x) }
-        }
-
-        func cross(_ a: CGPoint, _ b: CGPoint, _ c: CGPoint) -> CGFloat {
-            (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
-        }
-
-        var lower: [CGPoint] = []
-        for point in sorted {
-            while lower.count >= 2,
-                  cross(lower[lower.count - 2], lower[lower.count - 1], point) <= 0 {
-                lower.removeLast()
+    private func refreshClaimedSectorHulls() {
+        claimedSectorHulls = Dictionary(uniqueKeysWithValues: claimedSectorIDs.compactMap { sectorID in
+            guard let parsed = sectorEngine.parseSectorID(sectorID),
+                  parsed.sizeMeters == Int(engine.tileSizeMeters.rounded()) else {
+                return nil
             }
-            lower.append(point)
-        }
-
-        var upper: [CGPoint] = []
-        for point in sorted.reversed() {
-            while upper.count >= 2,
-                  cross(upper[upper.count - 2], upper[upper.count - 1], point) <= 0 {
-                upper.removeLast()
-            }
-            upper.append(point)
-        }
-
-        let hull = lower.dropLast() + upper.dropLast()
-        return hull.map { CLLocationCoordinate2D(latitude: $0.y, longitude: $0.x) }
+            let coordinates = sectorEngine.tiles(in: parsed.sector)
+                .flatMap { engine.polygon(for: $0) }
+            let hull = sectorEngine.convexHull(of: coordinates)
+            return hull.count >= 3 ? (sectorID, hull) : nil
+        })
     }
 
     private func makeOverlays() -> [MapboxPolygonOverlay] {
@@ -357,12 +326,16 @@ struct DiscoveryMapView: View {
             position = .followPuck(zoom: controller.isRecording ? 16 : 15, pitch: 42)
         }
         .onAppear {
+            refreshClaimedSectorHulls()
             overlays = makeOverlays()
             position = .followPuck(zoom: 15, pitch: 42)
         }
         .onChange(of: store.discoveredTiles) { _, _ in overlays = makeOverlays() }
         .onChange(of: controller.frontierEdgeTileIDs) { _, _ in overlays = makeOverlays() }
-        .onChange(of: store.territoryState) { _, _ in overlays = makeOverlays() }
+        .onChange(of: store.territoryState) { _, _ in
+            refreshClaimedSectorHulls()
+            overlays = makeOverlays()
+        }
         .onChange(of: controller.targetSectorBoundaryTileIDs) { _, _ in overlays = makeOverlays() }
         .onChange(of: recorder.lastLocation?.timestamp) { _, _ in overlays = makeOverlays() }
         .onChange(of: controller.isRecording) { _, _ in overlays = makeOverlays() }
