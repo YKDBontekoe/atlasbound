@@ -19,6 +19,8 @@ final class WorldController: ObservableObject {
     @Published private(set) var sessionFrontierScore = 0
     @Published private(set) var frontierScoreCallouts: [FrontierScoreCallout] = []
     @Published private(set) var sessionFeedback: [SessionFeedbackEvent] = []
+    @Published private(set) var discoveryMoments: [DiscoveryMoment] = []
+    @Published private(set) var cameraMoment: MapCameraMoment?
     @Published private(set) var lastSummary: ActivitySummary?
     @Published private(set) var explorationMode: ExplorationMode = .idle
     /// True while landmark search is refining today’s treasure trail destinations.
@@ -43,6 +45,7 @@ final class WorldController: ObservableObject {
     private let explorerProgression = ExplorerProgressionEngine()
     private let dailyChallengeEngine = DailyChallengeEngine()
     private let landmarkResolver: any LandmarkResolving
+    private let landmarkQuestEngine = LandmarkQuestEngine()
 
     /// Tiles mutated during the active session (merged into store on stop).
     private var sessionTiles: [String: WorldTile] = [:]
@@ -135,6 +138,16 @@ final class WorldController: ObservableObject {
         guard let target = treasureStore.currentTarget,
               let axial = tileEngine.parseTileID(target.tileID) else { return nil }
         return tileEngine.centerCoordinate(for: axial)
+    }
+
+    /// A map-first presentation of the active named trail target. Completion
+    /// continues to be owned by TreasureStore, so quest rewards cannot double.
+    var landmarkQuest: LandmarkQuest? {
+        landmarkQuestEngine.makeQuest(
+            target: treasureStore.currentTarget,
+            playerCoordinate: recorder.lastLocation?.coordinate,
+            tileEngine: tileEngine
+        )
     }
 
     var discoveredTileCount: Int { store.discoveredTileCount }
@@ -281,18 +294,6 @@ final class WorldController: ObservableObject {
             let tile = store.tiles[id]
             return tile == nil || tile?.state == .fogged
         }.count
-    }
-
-    func nearbyFogTiles(around coordinate: CLLocationCoordinate2D?, radius: Int = 5) -> [TileCoordinate] {
-        guard let coordinate else { return [] }
-        let engine = tileEngine
-        let center = engine.axialCoordinate(for: coordinate)
-        let effectiveRadius = radius + (inventoryStore.hasFogLanternActive ? FieldFindConstants.fogLanternRadiusBonus : 0)
-        return engine.ring(around: center, radius: effectiveRadius).filter { axial in
-            let id = TileEngine.makeTileID(q: axial.q, r: axial.r, sizeMeters: engine.tileSizeMeters)
-            let tile = sessionTiles[id] ?? store.tiles[id]
-            return tile == nil || tile?.state == .fogged
-        }
     }
 
     var fieldFindPreviews: [FieldFindPreview] {
@@ -457,6 +458,15 @@ final class WorldController: ObservableObject {
         refreshFrontierPresentation()
     }
 
+    /// Frames the active landmark with a deliberate fly-to moment. This is
+    /// explicit user intent, unlike normal GPS discoveries, so it never makes
+    /// exploration feel like the camera is fighting the player.
+    func focusLandmarkQuest() {
+        guard let target = landmarkQuest?.target else { return }
+        cameraMoment = MapCameraMoment(kind: .landmarkQuest, tileID: target.tileID)
+        AtlasHaptics.select()
+    }
+
     @discardableResult
     func claimCurrentSector() -> Bool {
         guard let sectorID = territoryPresence.playerSectorID else { return false }
@@ -475,6 +485,13 @@ final class WorldController: ObservableObject {
             return false
         }
         store.updateTerritoryState { _ in next }
+        if let parsed = sectorEngine.parseSectorID(sectorID) {
+            let center = sectorEngine.centerTile(for: parsed.sector)
+            cameraMoment = MapCameraMoment(
+                kind: .territoryClaim,
+                tileID: TileEngine.makeTileID(q: center.q, r: center.r, sizeMeters: tileEngine.tileSizeMeters)
+            )
+        }
         AtlasHaptics.success()
         objectWillChange.send()
         return true
@@ -895,6 +912,7 @@ final class WorldController: ObservableObject {
             discoveryXP: modified.discovery,
             familiarityXP: territoryFamiliarity
         )
+        emitDiscoveryMoments(for: discoveryCandidates.filter { updated[$0]?.isDiscovered == true })
         treasureStore.processVisitedTileIDs(newIDs)
         treasureStore.claimSharedEvents(matching: newIDs, at: recorder.lastLocation?.coordinate ?? Self.debugDefaultCoordinate)
         let territoryForFinds = store.territoryState
@@ -983,6 +1001,7 @@ final class WorldController: ObservableObject {
             }
         }
         sessionDiscoveredIDs = discovered
+        emitDiscoveryMoments(for: discoveryCandidates.filter { sessionTiles[$0]?.isDiscovered == true })
 
         sessionProgress.tilesVisited = sessionVisitedTileIDs.count
         sessionProgress.tilesDiscovered += progress.tilesDiscovered
@@ -1187,6 +1206,17 @@ final class WorldController: ObservableObject {
         guard !events.isEmpty else { return }
         sessionFeedback.append(contentsOf: events)
         pruneSessionFeedback(after: events.map(\.id))
+    }
+
+    private func emitDiscoveryMoments(for tileIDs: some Sequence<String>) {
+        let moments = tileIDs.prefix(8).map { DiscoveryMoment(tileID: $0) }
+        guard !moments.isEmpty else { return }
+        discoveryMoments.append(contentsOf: moments)
+        let ids = Set(moments.map(\.id))
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.7))
+            discoveryMoments.removeAll { ids.contains($0.id) }
+        }
     }
 
     private func pruneSessionFeedback(after ids: [UUID]) {

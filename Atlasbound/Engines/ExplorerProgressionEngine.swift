@@ -5,7 +5,6 @@ import Foundation
 struct ExplorerProgressionEngine: Sendable {
     /// Legacy soft milestone kept for UI copy that still references the classic arc.
     static let classicArcLevel = 50
-    static let threeDMapRequiredLevel = 4
 
     /// Epithet pools for procedural titles past Atlas Legend.
     private static let epithetNouns = [
@@ -107,10 +106,6 @@ struct ExplorerProgressionEngine: Sendable {
         }
     }
 
-    func is3DMapUnlocked(atLevel level: Int) -> Bool {
-        level >= Self.threeDMapRequiredLevel
-    }
-
     // MARK: - Private
 
     private func proceduralTitle(forLevel level: Int) -> String {
@@ -164,14 +159,6 @@ struct ExplorerProgressionEngine: Sendable {
                     name: "Visit Heat",
                     detail: "Highlight the routes you know best",
                     symbolName: "flame.fill"
-                ))
-            case Self.threeDMapRequiredLevel:
-                rewards.append(.init(
-                    level: level,
-                    kind: .mapStyle,
-                    name: "3D Terrain",
-                    detail: "Tilt the live atlas into an elevated perspective",
-                    symbolName: "cube.fill"
                 ))
             default:
                 break

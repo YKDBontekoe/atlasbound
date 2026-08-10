@@ -171,7 +171,6 @@ final class MapTileLODTests: XCTestCase {
 
         XCTAssertEqual(MapTileLOD.far.markerCap, 0)
         XCTAssertGreaterThan(MapTileLOD.near.markerCap, MapTileLOD.mid.markerCap)
-        XCTAssertGreaterThan(MapTileLOD.near.fogCap, MapTileLOD.far.fogCap)
     }
 
     func testDrawPolicyFlags() {

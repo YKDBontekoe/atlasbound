@@ -139,10 +139,8 @@ final class ExplorerProgressionEngineTests: XCTestCase {
         XCTAssertTrue(snapshot.rewards.contains { $0.level == 2 && $0.kind == .mapLayer })
     }
 
-    func testMapRewardsUnlockAtTheirRequiredLevels() {
-        XCTAssertFalse(engine.is3DMapUnlocked(atLevel: 3))
-        XCTAssertTrue(engine.is3DMapUnlocked(atLevel: 4))
-        XCTAssertTrue(
+    func testMapPresentationHasNo3DUnlockReward() {
+        XCTAssertFalse(
             engine.snapshot(
                 metrics: ExplorerProgressionMetrics(
                     totalXP: engine.xpRequired(forLevel: 4),

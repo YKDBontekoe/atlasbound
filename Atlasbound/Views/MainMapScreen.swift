@@ -11,8 +11,9 @@ struct MainMapScreen: View {
     @ObservedObject private var treasureStore: TreasureStore
     @ObservedObject private var inventoryStore: InventoryStore
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var position: Viewport = .followPuck(zoom: 15, pitch: 0)
+    @State private var position: Viewport = .followPuck(zoom: 15, pitch: 42)
     @State private var followsUser = true
     @State private var showSettings = false
     @State private var showActivityPicker = false
@@ -24,14 +25,13 @@ struct MainMapScreen: View {
     @State private var showIdleScoutsSheet = false
     @State private var showFactoryBuildSheet = false
     @State private var factoryPreviewTileID: String?
+    @State private var selectedTileID: String?
     @State private var presentedSummary: ActivitySummary?
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
     @AppStorage(OnboardingPreference.storageKey) private var onboardingVersion = 0
     @AppStorage("map.dataLayer") private var mapDataLayerRaw = LiveMapDataLayer.mastery.rawValue
-    @AppStorage("map.uses3D") private var prefers3DMap = false
     @AppStorage("map.layer.mastery") private var showsMasteryLayer = true
     @AppStorage("map.layer.places") private var showsPlacesLayer = true
-    @AppStorage("map.layer.fog") private var showsFogLayer = true
     @AppStorage("map.layer.frontier") private var showsFrontierLayer = true
     @AppStorage("map.layer.factory") private var showsFactoryLayer = true
     @State private var onboardingStep = 0
@@ -81,16 +81,15 @@ struct MainMapScreen: View {
                 recorder: recorder,
                 position: $position,
                 followsUser: $followsUser,
+                selectedTileID: $selectedTileID,
                 dataLayer: availableMapDataLayer,
-                is3DEnabled: uses3DMap,
                 showsMasteryLayer: showsMasteryLayer,
                 showsPlacesLayer: showsPlacesLayer,
-                showsFogLayer: showsFogLayer,
                 showsFrontierLayer: showsFrontierLayer,
                 showsFactoryLayer: showsFactoryLayer,
                 factoryController: factoryController,
                 factoryPreviewTileID: $factoryPreviewTileID,
-                onTreasureTap: { showTreasureSheet = true }
+                onLandmarkQuestTap: { controller.focusLandmarkQuest() }
             )
             .ignoresSafeArea()
 
@@ -123,6 +122,17 @@ struct MainMapScreen: View {
             #endif
 
             VStack(spacing: 12) {
+                if let selectedTileID, !factoryController.isBuildModeActive {
+                    TileIntelPanel(
+                        tileID: selectedTileID,
+                        store: store,
+                        controller: controller,
+                        factoryController: factoryController,
+                        onDismiss: { self.selectedTileID = nil }
+                    )
+                    .padding(.horizontal, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
                 if factoryController.isBuildModeActive, let tileID = factoryPreviewTileID {
                     factoryBuildPreview(tileID: tileID)
                         .padding(.horizontal, 12)
@@ -161,6 +171,7 @@ struct MainMapScreen: View {
             .animation(AtlasMotion.panel, value: isIdleAdventureExpanded)
             .animation(AtlasMotion.fade, value: controller.sessionFeedback.map(\.id))
             .animation(AtlasMotion.fade, value: inventoryStore.primaryActiveEffect?.id)
+            .animation(AtlasMotion.panel, value: selectedTileID)
         }
         .overlay {
             if onboardingVersion < OnboardingPreference.currentVersion {
@@ -180,6 +191,10 @@ struct MainMapScreen: View {
                 presentedSummary = controller.lastSummary
             }
         }
+        .onChange(of: controller.cameraMoment?.id) { _, _ in
+            guard let moment = controller.cameraMoment else { return }
+            playCameraMoment(moment)
+        }
         .sheet(isPresented: $showSettings) {
             SettingsSheet(
                 auth: auth,
@@ -197,10 +212,8 @@ struct MainMapScreen: View {
         .sheet(isPresented: $showMapOptions) {
             LiveMapOptionsSheet(
                 selectedDataLayerRaw: $mapDataLayerRaw,
-                uses3DMap: $prefers3DMap,
                 showsMastery: $showsMasteryLayer,
                 showsPlaces: $showsPlacesLayer,
-                showsFog: $showsFogLayer,
                 showsFrontier: $showsFrontierLayer,
                 showsFactory: $showsFactoryLayer,
                 explorerLevel: ExplorerProgressionEngine().level(
@@ -282,6 +295,10 @@ struct MainMapScreen: View {
             #endif
         }
         .onAppear {
+            // The map is the default exploration surface. Start foreground
+            // location monitoring here so live discovery, landmark quests,
+            // and the frontier all have an actual player anchor.
+            controller.prepareLocation()
             controller.catchUpIdleOnForeground()
             factoryController.updatePlayerLocation(recorder.lastLocation)
             factoryController.advance()
@@ -357,6 +374,16 @@ struct MainMapScreen: View {
                         showTreasureSheet = true
                     }
                     .padding(.horizontal, 12)
+
+                    if let quest = controller.landmarkQuest {
+                        LandmarkQuestCard(
+                            quest: quest,
+                            isVault: treasureStore.weeklyVault.isUnlocked,
+                            onFocus: { controller.focusLandmarkQuest() }
+                        )
+                        .padding(.horizontal, 12)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
 
                     MapMissionsStrip(
                         controller: controller,
@@ -607,25 +634,6 @@ struct MainMapScreen: View {
                 .buttonStyle(GlassButtonStyle(shape: .circle))
                 .opacity(controller.isRecording ? 0 : 1)
 
-                if explorerLevel >= ExplorerProgressionEngine.threeDMapRequiredLevel {
-                    Button {
-                        prefers3DMap.toggle()
-                        AtlasHaptics.select()
-                    } label: {
-                        Image(systemName: "cube.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(uses3DMap ? AtlasTheme.blue : .secondary)
-                            .frame(width: 42, height: 42)
-                            .rotation3DEffect(
-                                .degrees(uses3DMap ? 18 : 0),
-                                axis: (x: 1, y: 1, z: 0)
-                            )
-                            .animation(AtlasMotion.camera, value: uses3DMap)
-                    }
-                    .buttonStyle(GlassButtonStyle(shape: .circle))
-                    .accessibilityLabel(uses3DMap ? "Disable 3D map" : "Enable 3D map")
-                }
-
                 Button {
                     showFactoryBuildSheet = true
                     AtlasHaptics.select()
@@ -658,10 +666,8 @@ struct MainMapScreen: View {
 
     private var hasCustomMapPresentation: Bool {
         mapDataLayerRaw != LiveMapDataLayer.mastery.rawValue ||
-            uses3DMap ||
             !showsMasteryLayer ||
             !showsPlacesLayer ||
-            !showsFogLayer ||
             !showsFrontierLayer ||
             !showsFactoryLayer
     }
@@ -675,10 +681,6 @@ struct MainMapScreen: View {
     private var availableMapDataLayer: LiveMapDataLayer {
         let selected = LiveMapDataLayer(rawValue: mapDataLayerRaw) ?? .mastery
         return selected.requiredLevel <= explorerLevel ? selected : .mastery
-    }
-
-    private var uses3DMap: Bool {
-        prefers3DMap && explorerLevel >= ExplorerProgressionEngine.threeDMapRequiredLevel
     }
 
     private func factoryBuildPreview(tileID: String) -> some View {
@@ -786,8 +788,25 @@ struct MainMapScreen: View {
         withAnimation(AtlasMotion.camera) {
             position = .followPuck(
                 zoom: controller.isRecording ? 16 : 15,
-                pitch: uses3DMap ? 58 : 0
+                pitch: 42
             )
+        }
+    }
+
+    private func playCameraMoment(_ moment: MapCameraMoment) {
+        guard let axial = controller.tileEngine.parseTileID(moment.tileID) else { return }
+        followsUser = false
+        let destination = Viewport.camera(
+            center: controller.tileEngine.centerCoordinate(for: axial),
+            zoom: CGFloat(moment.kind.zoom),
+            pitch: CGFloat(moment.kind.pitch)
+        )
+        if reduceMotion {
+            position = destination
+        } else {
+            withViewportAnimation(.fly(duration: moment.kind == .territoryClaim ? 1.75 : 1.35)) {
+                position = destination
+            }
         }
     }
 

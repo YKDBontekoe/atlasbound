@@ -13,14 +13,6 @@ enum AtlasTheme {
     static let finishRed = Color(red: 0.92, green: 0.30, blue: 0.30)
     /// Soft page background behind cards.
     static let canvas = Color(red: 0.96, green: 0.97, blue: 0.98)
-    /// Fog wash over unexplored map / fogged state fill.
-    static let fog = Color.white.opacity(0.55)
-
-    /// Fog hex wash under discovered fills (light so basemap labels stay readable).
-    static let fogWashFill = Color.white.opacity(0.32)
-    static let fogWashStroke = Color.white.opacity(0.20)
-    static let fogWashStrokeWidth: CGFloat = 0.5
-
     /// Soft gold wash for undiscovered frontier neighbors (fill-only; territory stroke carries the edge).
     static let frontierWashFill = Color(red: 0.95, green: 0.75, blue: 0.20).opacity(0.10)
 
@@ -50,16 +42,10 @@ enum AtlasTheme {
 
     /// Soft-cap for discovered polygon annotations inside the viewport.
     static let maxVisiblePolygons = 320
-    /// Soft-cap for nearby fog wash hexes.
-    static let maxFogPolygons = 120
     /// Cap for mastery marker annotations among visible tiles.
     static let maxVisibleMarkers = 40
     /// Extra span fraction so pans don’t pop tiles at the edge.
     static let viewportPaddingFraction = 0.12
-    /// Local fog ring around the player (not full-viewport fill).
-    static let fogRadiusIdle = 4
-    static let fogRadiusRecording = 6
-
     static let cardRadius: CGFloat = 20
     static let pillRadius: CGFloat = 22
 

@@ -1,4 +1,5 @@
 import XCTest
+import CoreLocation
 @testable import Atlasbound
 
 final class HexSectorEngineTests: XCTestCase {
@@ -61,5 +62,24 @@ final class HexSectorEngineTests: XCTestCase {
         let parsed = engine.parseSectorID(id)
         XCTAssertEqual(parsed?.sector, SectorCoordinate(q: -2, r: 3))
         XCTAssertEqual(parsed?.sizeMeters, 25)
+    }
+
+    func testConvexHullDropsInteriorAndCollinearCoordinates() {
+        let coordinates = [
+            CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            CLLocationCoordinate2D(latitude: 0, longitude: 2),
+            CLLocationCoordinate2D(latitude: 2, longitude: 2),
+            CLLocationCoordinate2D(latitude: 2, longitude: 0),
+            CLLocationCoordinate2D(latitude: 1, longitude: 1),
+            CLLocationCoordinate2D(latitude: 0, longitude: 1),
+        ]
+
+        let hull = engine.convexHull(of: coordinates)
+
+        XCTAssertEqual(hull.count, 4)
+        XCTAssertEqual(
+            Set(hull.map { "\($0.latitude),\($0.longitude)" }),
+            ["0.0,0.0", "0.0,2.0", "2.0,2.0", "2.0,0.0"]
+        )
     }
 }
