@@ -34,6 +34,7 @@ struct FactorySimulationEngine: Sendable {
             structures: state.structures,
             tileEngine: tileEngine
         )
+        let freshWeatherByCell = weatherByCell.filter { $0.value.expiresAt > date }
         let speed = max(1, speedMultiplier)
         for _ in 0..<minutes {
             simulateMinute(
@@ -42,7 +43,7 @@ struct FactorySimulationEngine: Sendable {
                 cachedPaths: paths,
                 tileEngine: tileEngine,
                 speedMultiplier: speed,
-                weatherByCell: weatherByCell
+                weatherByCell: freshWeatherByCell
             )
         }
         state.lastSimulatedAt = totalMinutes > Self.maximumOfflineMinutes
@@ -177,9 +178,9 @@ struct FactorySimulationEngine: Sendable {
                         amount = 3
                     }
                     if state.unlockedResearchIDs.contains("extraction_3") && structure.tier >= 3 {
-                        amount = 3
+                        amount = max(amount, 3)
                     } else if state.unlockedResearchIDs.contains("extraction_2") && structure.tier >= 2 {
-                        amount = 2
+                        amount = max(amount, 2)
                     }
                     // Soft Artifice speed occasionally yields an extra unit.
                     if speedMultiplier > 1.25, StableHash.fnv1a64("extract:\(id):\(structure.extractedUnits)") % 4 == 0 {
@@ -241,7 +242,10 @@ struct FactorySimulationEngine: Sendable {
                         let weather = weatherModifier(for: id, tileEngine: tileEngine, weatherByCell: weatherByCell)
                         var outputs = recipe.outputs
                         if definition.kind == .farm {
-                            outputs = outputs.map { ItemAmount(itemID: $0.itemID, quantity: max(1, Int((Double($0.quantity) * weather.cropYield).rounded()))) }
+                            let cropYield = definition.id == "greenhouse"
+                                ? max(1, weather.cropYield)
+                                : weather.cropYield
+                            outputs = outputs.map { ItemAmount(itemID: $0.itemID, quantity: max(1, Int((Double($0.quantity) * cropYield).rounded()))) }
                         }
                         add(outputs, to: &structure.outputBuffer)
                         for output in outputs {

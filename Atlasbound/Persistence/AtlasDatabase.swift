@@ -202,7 +202,7 @@ final class AtlasDatabase {
                 );
                 """
             )
-            setMetaValue("\(Self.schemaVersion)", for: "schema_version")
+            setMetaValue("6", for: "schema_version")
         }
 
         let afterV6 = Int(metaValue(for: "schema_version") ?? "0") ?? 0
@@ -215,7 +215,7 @@ final class AtlasDatabase {
                 );
                 """
             )
-            setMetaValue("\(Self.schemaVersion)", for: "schema_version")
+            setMetaValue("7", for: "schema_version")
         }
     }
 
@@ -516,7 +516,7 @@ final class AtlasDatabase {
                 "tiles", "progress", "frontier", "territory_state",
                 "activity_sessions", "activity_aggregates", "region_cells",
                 "treasure_state", "pinpoint_games", "pinpoint_stats",
-                "inventory_state", "factory_state", "idle_state", "skill_state", "pulse_state"
+                "inventory_state", "factory_state", "idle_state", "skill_state", "pulse_state", "weather_state"
             ] {
                 guard tableExists(table) else { continue }
                 try db.execute("DELETE FROM \(table);")

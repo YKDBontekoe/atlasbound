@@ -10,6 +10,7 @@ struct MainMapScreen: View {
     @ObservedObject var factoryController: FactoryController
     @ObservedObject private var recorder: ActivityRecorder
     @ObservedObject private var treasureStore: TreasureStore
+    @ObservedObject private var weatherStore: WeatherStore
     @ObservedObject private var inventoryStore: InventoryStore
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -53,6 +54,7 @@ struct MainMapScreen: View {
         self.factoryController = factoryController
         self._recorder = ObservedObject(wrappedValue: controller.recorder)
         self._treasureStore = ObservedObject(wrappedValue: controller.treasureStore)
+        self._weatherStore = ObservedObject(wrappedValue: controller.weatherStore)
         self._inventoryStore = ObservedObject(wrappedValue: controller.inventoryStore)
     }
 
@@ -352,7 +354,7 @@ struct MainMapScreen: View {
     }
 
     private var weatherHeader: some View {
-        let snapshot = controller.weatherStore.snapshots.values
+        let snapshot = weatherStore.snapshots.values
             .filter { !$0.isStale }
             .sorted { $0.observedAt > $1.observedAt }
             .first

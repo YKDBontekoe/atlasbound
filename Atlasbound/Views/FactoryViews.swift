@@ -14,6 +14,7 @@ struct FactoryTabView: View {
 struct FactoryHubView: View {
     @ObservedObject var controller: FactoryController
     @ObservedObject private var store: FactoryStore
+    @ObservedObject private var weatherStore: WeatherStore
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(FactoryTutorialPreference.storageKey) private var tutorialVersion = 0
     @State private var showsTutorial = false
@@ -23,6 +24,7 @@ struct FactoryHubView: View {
     init(controller: FactoryController) {
         self.controller = controller
         self._store = ObservedObject(wrappedValue: controller.store)
+        self._weatherStore = ObservedObject(wrappedValue: controller.weatherStore)
     }
 
     var body: some View {
@@ -125,7 +127,7 @@ struct FactoryHubView: View {
     }
 
     private var weatherCard: some View {
-        let snapshot = controller.weatherStore.snapshots.values
+        let snapshot = weatherStore.snapshots.values
             .filter { !$0.isStale }
             .sorted { $0.observedAt > $1.observedAt }
             .first

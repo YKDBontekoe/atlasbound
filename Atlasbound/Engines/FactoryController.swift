@@ -193,7 +193,7 @@ final class FactoryController: ObservableObject {
     private func weatherSnapshot(for tileID: String) -> WeatherSnapshot? {
         guard let tile = tileStore.tileEngine.parseTileID(tileID) else { return nil }
         let cell = WeatherCellEngine().cellID(for: tile, tileEngine: tileStore.tileEngine)
-        return weatherStore.snapshots[cell]
+        return weatherStore.snapshot(for: cell)
     }
 
     private func availableItemCount(_ itemID: String, in network: FactoryNetworkSnapshot) -> Int {
@@ -296,7 +296,7 @@ final class FactoryController: ObservableObject {
             to: date,
             tileEngine: tileStore.tileEngine,
             speedMultiplier: skillStore.modifiers().factorySpeedMultiplier,
-            weatherByCell: weatherStore.snapshots
+            weatherByCell: weatherStore.snapshots.filter { $0.value.expiresAt > date }
         )
         store.replaceState(next)
     }
