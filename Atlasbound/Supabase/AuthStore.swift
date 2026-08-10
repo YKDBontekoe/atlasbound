@@ -11,6 +11,9 @@ final class AuthStore: ObservableObject {
     @Published private(set) var displayName = ""
     @Published private(set) var needsProfileSetup = false
     var onSessionEnded: (@MainActor () -> Void)?
+    /// Set by the guest sign-in flow when cancelling should return to the
+    /// existing local atlas instead of clearing it.
+    var preserveLocalStateOnSignOut = false
 
     let client: SupabaseClient?
     private let dataClient: SupabaseClient?

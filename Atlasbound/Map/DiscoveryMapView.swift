@@ -21,6 +21,7 @@ struct DiscoveryMapView: View {
     @ObservedObject var factoryController: FactoryController
     @Binding var factoryPreviewTileID: String?
     var onLandmarkQuestTap: () -> Void = {}
+    var onPulseTap: (AtlasPulse) -> Void = { _ in }
 
     private var engine: TileEngine { store.tileEngine }
     private let sectorEngine = HexSectorEngine()
@@ -161,6 +162,18 @@ struct DiscoveryMapView: View {
             ForEvery(frontierSignalTiles, id: \.self) { tile in
                 MapViewAnnotation(coordinate: engine.centerCoordinate(for: tile)) {
                     FrontierSignalView()
+                }
+            }
+
+            ForEvery(controller.activePulses) { pulse in
+                if let axial = engine.parseTileID(pulse.anchorTileID) {
+                    MapViewAnnotation(coordinate: engine.centerCoordinate(for: axial)) {
+                        Button { onPulseTap(pulse) } label: {
+                            PulseMapMarker(pulse: pulse)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open \(pulse.kind.title), \(pulse.phase.displayName)")
+                    }
                 }
             }
 
@@ -498,6 +511,36 @@ private struct FrontierSignalView: View {
             }
         }
         .allowsHitTesting(false)
+    }
+}
+
+private struct PulseMapMarker: View {
+    let pulse: AtlasPulse
+    @State private var isBreathing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.atlasForceSettledMotion) private var forceSettledMotion
+
+    var body: some View {
+        let breathing = isBreathing || forceSettledMotion
+        ZStack {
+            Circle()
+                .fill(AtlasTheme.gold.opacity(breathing ? 0.08 : 0.24))
+                .frame(width: breathing ? 60 : 42, height: breathing ? 60 : 42)
+            Image(systemName: pulse.kind.symbolName)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(AtlasTheme.gold))
+                .overlay(Circle().stroke(.white.opacity(0.9), lineWidth: 1.5))
+        }
+        .onAppear {
+            AtlasMotion.withOptionalAnimation(
+                AtlasMotion.ambient.repeatForever(autoreverses: true),
+                reduceMotion: reduceMotion || forceSettledMotion
+            ) {
+                isBreathing = true
+            }
+        }
     }
 }
 

@@ -103,6 +103,8 @@ struct IdleScoutsSheet: View {
                         lastWatchCard(report)
                     }
 
+                    scoutStanceCard
+
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Roster")
                             .font(.headline)
@@ -142,6 +144,38 @@ struct IdleScoutsSheet: View {
             .font(.caption.weight(.semibold))
             .foregroundStyle(AtlasTheme.teal)
         }
+    }
+
+    private var scoutStanceCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Scout stance")
+                .font(.subheadline.weight(.semibold))
+            Text(controller.scoutStance.detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(ScoutStance.allCases, id: \.self) { stance in
+                        Button {
+                            controller.setScoutStance(stance)
+                        } label: {
+                            Text(stance.title)
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(
+                                    stance == controller.scoutStance ? AtlasTheme.teal.opacity(0.2) : Color.secondary.opacity(0.1),
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func lastWatchCard(_ report: IdleAdvanceReport) -> some View {

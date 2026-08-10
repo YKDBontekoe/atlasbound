@@ -16,6 +16,7 @@ Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily l
 - **Skill tree** — Pathfinding, Surveying, Cartography, and Artifice disciplines with infinite ranks spent via Skill Points
 - **Scout Circuit** — three fresh daily goals for discovery, revisits, and route coverage, with a claimable daily material chest
 - **Idle Scouts / Home Camp** — hire a scout roster through Waykeeper; capped AFK discoveries near Home/claims plus Home material drip (8 h offline cap)
+- **Living Atlas / Atlas Pulse** — temporary signal, fog, and resource phenomena evolve around the player; scouts report while away and nearby Pulses can be observed, stabilized, or harvested
 - **Frontier Expeditions** — weekly missions, combo scoring, Game Center leaderboards
 - **Treasure trails** — three daily landmark clues, route choices, collectible relics, and weekly vaults
 - **Field finds** — deterministic tile pickups into a stackable inventory (materials, boosts, charges); assemble, salvage, use, and activate

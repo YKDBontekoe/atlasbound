@@ -96,7 +96,12 @@ enum AutomaticExplorationPreference {
 
 enum OnboardingPreference {
     static let storageKey = "atlasbound.onboardingVersion"
-    static let currentVersion = 2
+    static let currentVersion = 3
+}
+
+enum WelcomePreference {
+    static let completedKey = "atlasbound.welcomeCompleted"
+    static let explorationStartedKey = "atlasbound.explorationStarted"
 }
 
 struct LocationSample: Sendable {

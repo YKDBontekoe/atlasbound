@@ -44,6 +44,31 @@ final class TileStore: ObservableObject {
         tiles.values.lazy.filter(\.isDiscovered).count
     }
 
+    /// True when this installation has guest or account progress worth protecting
+    /// before switching to a different cloud account.
+    var hasLocalProgress: Bool {
+        discoveredTileCount > 0
+            || discoveryXPTotal > 0
+            || familiarityXPTotal > 0
+            || activitiesCompleted > 0
+    }
+
+    func hasRemoteCloudRecord() async -> Bool {
+        await cloudRepository.loadWorld()?.hasRemoteRecord == true
+    }
+
+    /// Mark the complete local atlas for the next authenticated upload. This is
+    /// used when a guest explicitly chooses to keep this device's progress.
+    func queueFullCloudUpload() {
+        dirtyTileIDs = Set(tiles.keys)
+        progressDirty = true
+        frontierDirty = true
+        territoryDirty = true
+        pendingClear = true
+        cloudRevision &+= 1
+        persistToDisk(force: true)
+    }
+
     var isDeferringPersistence: Bool { deferPersistence }
 
     var databaseURL: URL { database.fileURL }
