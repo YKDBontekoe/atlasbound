@@ -150,7 +150,7 @@ struct IdleScoutsSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Scout stance")
                 .font(.subheadline.weight(.semibold))
-            Text(controller.scoutStance.detail)
+            Text(PulsePresentation.detail(for: controller.scoutStance))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -159,7 +159,7 @@ struct IdleScoutsSheet: View {
                         Button {
                             controller.setScoutStance(stance)
                         } label: {
-                            Text(stance.title)
+                            Text(PulsePresentation.title(for: stance))
                                 .font(.caption.weight(.semibold))
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
@@ -169,6 +169,7 @@ struct IdleScoutsSheet: View {
                                 )
                         }
                         .buttonStyle(.plain)
+                        .accessibilityAddTraits(stance == controller.scoutStance ? .isSelected : [])
                     }
                 }
             }

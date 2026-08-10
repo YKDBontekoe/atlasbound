@@ -26,6 +26,16 @@ final class PulseEngineTests: XCTestCase {
             at: start
         ).first)
 
+        let calendar = PulseEngine.pulseCalendar
+        let hour = calendar.component(.hour, from: start)
+        let slot = hour / PulseEngine.pulseSlotHours
+        let expectedStart = calendar.date(
+            byAdding: .hour,
+            value: slot * PulseEngine.pulseSlotHours,
+            to: calendar.startOfDay(for: start)
+        )
+        XCTAssertEqual(pulse.startedAt, expectedStart)
+
         XCTAssertEqual(pulse.phase(at: pulse.startedAt), .detected)
         XCTAssertEqual(pulse.phase(at: pulse.startedAt.addingTimeInterval(2 * 60 * 60)), .developing)
         XCTAssertEqual(pulse.phase(at: pulse.startedAt.addingTimeInterval(4 * 60 * 60)), .peak)

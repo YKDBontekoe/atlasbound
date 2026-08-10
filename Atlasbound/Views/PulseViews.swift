@@ -15,7 +15,7 @@ struct PulseWorldCard: View {
                             Circle()
                                 .fill(AtlasTheme.gold.opacity(0.18))
                                 .frame(width: 38, height: 38)
-                            Image(systemName: pulse.kind.symbolName)
+                            Image(systemName: PulsePresentation.symbolName(for: pulse.kind))
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(AtlasTheme.gold)
                         }
@@ -23,9 +23,9 @@ struct PulseWorldCard: View {
                             Text("World now")
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.secondary)
-                            Text(pulse.kind.title)
+                            Text(PulsePresentation.title(for: pulse.kind))
                                 .font(.subheadline.weight(.semibold))
-                            Text("\(pulse.phase.displayName) · \(remainingLabel(for: pulse))")
+                            Text("\(PulsePresentation.name(for: pulse.phase)) · \(remainingLabel(for: pulse))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -44,7 +44,7 @@ struct PulseWorldCard: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("worldNowCard")
-                .accessibilityLabel("World now, \(pulse.kind.title), \(pulse.phase.displayName)")
+                .accessibilityLabel("World now, \(PulsePresentation.title(for: pulse.kind)), \(PulsePresentation.name(for: pulse.phase))")
             }
         }
         .padding(.horizontal, 12)
@@ -70,7 +70,7 @@ struct PulseDetailSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     header
-                    Text(pulse.kind.detail)
+                    Text(PulsePresentation.detail(for: pulse.kind))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
@@ -120,15 +120,15 @@ struct PulseDetailSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Image(systemName: pulse.kind.symbolName)
+            Image(systemName: PulsePresentation.symbolName(for: pulse.kind))
                 .font(.system(size: 23, weight: .semibold))
                 .foregroundStyle(AtlasTheme.gold)
                 .frame(width: 46, height: 46)
                 .background(AtlasTheme.gold.opacity(0.15), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text(pulse.kind.title)
+                Text(PulsePresentation.title(for: pulse.kind))
                     .font(.title3.weight(.bold))
-                Text("\(pulse.phase.displayName) · \(timeRemaining)")
+                Text("\(PulsePresentation.name(for: pulse.phase)) · \(timeRemaining)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AtlasTheme.gold)
             }
@@ -153,9 +153,9 @@ struct PulseDetailSheet: View {
                 Image(systemName: action == .observe ? "eye.fill" : action == .stabilize ? "wand.and.stars" : "shippingbox.fill")
                     .foregroundStyle(AtlasTheme.teal)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(action.title)
+                        Text(PulsePresentation.title(for: action))
                         .font(.subheadline.weight(.semibold))
-                    Text(action.detail)
+                        Text(PulsePresentation.detail(for: action))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
@@ -174,7 +174,7 @@ struct PulseDetailSheet: View {
 struct WorldBriefingSheet: View {
     let briefing: WorldBriefing
     @ObservedObject var controller: WorldController
-    var onFocusPulse: (String) -> Void
+    var onFocusPulse: (String) -> Bool
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -203,8 +203,9 @@ struct WorldBriefingSheet: View {
 
                 if let recommended = briefing.recommendedPulseID {
                     Button("See the nearby signal") {
-                        onFocusPulse(recommended)
-                        dismiss()
+                        if onFocusPulse(recommended) {
+                            dismiss()
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(AtlasTheme.teal)

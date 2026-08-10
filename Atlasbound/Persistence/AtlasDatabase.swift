@@ -975,6 +975,8 @@ struct LegacyInventorySave: Codable {
     var activeEffects: [ActiveItemEffect]
     var cartographerPins: [CartographerPin]
     var lifetimeFindsCollected: Int
+    /// Added after the original inventory payload; optional keeps older saves decodable.
+    var appliedPulseRewardIDs: [String]?
 }
 
 struct LegacyFactorySave: Codable {

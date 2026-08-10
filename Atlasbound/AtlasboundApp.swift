@@ -228,10 +228,16 @@ struct AtlasboundApp: App {
     @MainActor
     private func cancelAccountTransition() {
         auth.preserveLocalStateOnSignOut = true
-        Task { await auth.signOut() }
-        accountTransitionUserID = nil
-        cloudBootstrapStarted = false
-        accountTransitionCheckedUserID = nil
+        Task { @MainActor in
+            await auth.signOut()
+            if auth.session == nil {
+                accountTransitionUserID = nil
+                cloudBootstrapStarted = false
+                accountTransitionCheckedUserID = nil
+            } else {
+                auth.preserveLocalStateOnSignOut = false
+            }
+        }
     }
 
     @MainActor

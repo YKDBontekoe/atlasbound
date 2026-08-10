@@ -42,6 +42,9 @@ final class PulseStoreTests: XCTestCase {
         let reloaded = PulseStore(database: database, now: now)
         XCTAssertEqual(reloaded.state.interactions.count, 1)
         XCTAssertEqual(reloaded.state.interactions.first?.pulseID, pulse.id)
+
+        reloaded.advance(at: now.addingTimeInterval(60 * 60))
+        reloaded.refresh(around: anchor, tileEngine: tileEngine, at: now.addingTimeInterval(60 * 60))
+        XCTAssertFalse(reloaded.activePulses.contains { $0.id == pulse.id })
     }
 }
-

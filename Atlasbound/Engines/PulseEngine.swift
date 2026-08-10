@@ -5,6 +5,12 @@ struct PulseEngine: Sendable {
     static let interactionRangeTiles = 4
     static let maximumActivePulses = 3
     static let pulseSlotHours = 6
+    static let pulseCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }()
 
     private let kinds: [PulseKind] = [.signalDrift, .fogFront, .resourceBloom]
 
@@ -14,7 +20,7 @@ struct PulseEngine: Sendable {
         at date: Date,
         existing: [AtlasPulse] = []
     ) -> [AtlasPulse] {
-        let calendar = Calendar.current
+        let calendar = Self.pulseCalendar
         let hour = calendar.component(.hour, from: date)
         let slot = hour / Self.pulseSlotHours
         let dayKey = DateFormatter.pulseDayKey.string(from: date)
@@ -26,7 +32,7 @@ struct PulseEngine: Sendable {
                     < StableHash.fnv1a64("\(slotSeed):\(rhs.q):\(rhs.r)")
             }
 
-        let start = calendar.dateInterval(of: .hour, for: date)?.start ?? date
+        let start = calendar.startOfDay(for: date)
         let slotStart = calendar.date(byAdding: .hour, value: slot * Self.pulseSlotHours, to: start) ?? date
         let existingByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
 
@@ -147,11 +153,10 @@ struct PulseEngine: Sendable {
 private extension DateFormatter {
     static let pulseDayKey: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.calendar = PulseEngine.pulseCalendar
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
+        formatter.timeZone = PulseEngine.pulseCalendar.timeZone
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
 }
-

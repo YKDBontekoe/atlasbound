@@ -88,6 +88,7 @@ final class WorldController: ObservableObject {
         self.landmarkResolver = landmarkResolver
         restoreSelectedActivityType()
         syncRecorderSettings()
+        replayPendingPulseRewards()
 
         self.recorder.onSample = { [weak self] sample in
             self?.handleSample(sample)
@@ -445,6 +446,7 @@ final class WorldController: ObservableObject {
     /// Refreshes the local living-world cache around the latest accepted location.
     /// This stays local until the authenticated Pulse repository is introduced.
     func refreshPulseWorld(showBriefing: Bool = false, at date: Date = .now) {
+        replayPendingPulseRewards()
         guard let playerTileCoordinate else { return }
         pulseStore.advance(at: date)
         pulseStore.refresh(around: playerTileCoordinate, tileEngine: tileEngine, at: date)
@@ -474,9 +476,9 @@ final class WorldController: ObservableObject {
             tileEngine: tileEngine
         )
         if case .completed(let interaction) = result {
-            if let itemID = interaction.outcome.rewardItemID, interaction.outcome.rewardQuantity > 0 {
-                inventoryStore.deposit([ItemAmount(itemID: itemID, quantity: interaction.outcome.rewardQuantity)])
-            }
+            PulseNotificationCoordinator.shared.cancel(for: interaction.pulseID)
+            replayPendingPulseRewards()
+            pulseStore.complete(pulseID: interaction.pulseID)
             AtlasHaptics.success()
             objectWillChange.send()
         }
@@ -486,6 +488,17 @@ final class WorldController: ObservableObject {
     func setScoutStance(_ stance: ScoutStance) {
         pulseStore.setScoutStance(stance)
         objectWillChange.send()
+    }
+
+    private func replayPendingPulseRewards() {
+        for grant in pulseStore.pendingRewardGrants {
+            inventoryStore.depositPulseReward(
+                grantID: grant.id,
+                amounts: [ItemAmount(itemID: grant.itemID, quantity: grant.quantity)]
+            )
+            pulseStore.markRewardGranted(grant.id)
+            pulseStore.complete(pulseID: grant.pulseID)
+        }
     }
 
     func setActivityType(_ type: ActivityType) {
@@ -646,7 +659,7 @@ final class WorldController: ObservableObject {
                     id: "scout-report:\(Int(date.timeIntervalSince1970 / 1800))",
                     createdAt: date,
                     stance: stance,
-                    title: "Scout report · \(stance.title)",
+                    title: "Scout report · \(PulsePresentation.title(for: stance))",
                     detail: scoutReportDetail(for: report, stance: stance),
                     pulseID: lead?.id,
                     sectorID: lead.flatMap { pulse in

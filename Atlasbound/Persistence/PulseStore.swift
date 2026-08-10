@@ -32,27 +32,30 @@ final class PulseStore: ObservableObject {
     }
 
     var activePulses: [AtlasPulse] {
-        state.activePulses.filter { $0.phase != .resolved }
+        let interacted = Set(state.interactions.map(\.pulseID))
+        return state.activePulses.filter { $0.phase != .resolved && !interacted.contains($0.id) }
     }
     var reports: [ScoutReport] { state.reports }
     var scoutStance: ScoutStance { state.scoutStance }
     var claimConditions: [String: ClaimConditionState] { state.claimConditions }
+    var pendingRewardGrants: [PulseRewardGrant] { state.pendingRewardGrants }
 
     func refresh(
         around playerTile: TileCoordinate,
         tileEngine: TileEngine,
         at date: Date = .now
     ) {
+        let interacted = Set(state.interactions.map(\.pulseID))
         let local = engine.localPulses(
             around: playerTile,
             tileEngine: tileEngine,
             at: date,
             existing: state.activePulses
-        )
+        ).filter { !interacted.contains($0.id) }
         var next = state
         next.activePulses = engine.rankedPulses(
             local + state.activePulses.filter { pulse in
-                !local.contains(where: { $0.id == pulse.id })
+                !interacted.contains(pulse.id) && !local.contains(where: { $0.id == pulse.id })
             },
             playerTile: playerTile,
             tileEngine: tileEngine,
@@ -100,17 +103,42 @@ final class PulseStore: ObservableObject {
             outcome: outcome
         )
         var next = state
-        var resolved = pulse
-        resolved.resolvedAction = action
-        resolved.phase = .resolved
-        next.activePulses[index] = resolved
         next.interactions.append(interaction)
+        if let itemID = outcome.rewardItemID, outcome.rewardQuantity > 0 {
+            next.pendingRewardGrants.append(
+                PulseRewardGrant(
+                    id: "pulse-reward:\(pulseID)",
+                    pulseID: pulseID,
+                    itemID: itemID,
+                    quantity: outcome.rewardQuantity,
+                    createdAt: date
+                )
+            )
+        }
         if let condition = engine.condition(for: pulse, action: action, at: date),
            let sectorID = tileEngine.parseTileID(pulse.anchorTileID).map({ HexSectorEngine().sectorID(for: $0, sizeMeters: tileEngine.tileSizeMeters) }) {
             next.claimConditions[sectorID] = condition
         }
         replaceState(next)
         return .completed(interaction)
+    }
+
+    func markRewardGranted(_ grantID: String) {
+        guard state.pendingRewardGrants.contains(where: { $0.id == grantID }) else { return }
+        var next = state
+        next.pendingRewardGrants.removeAll { $0.id == grantID }
+        replaceState(next)
+    }
+
+    func complete(pulseID: String) {
+        guard let interaction = state.interactions.first(where: { $0.pulseID == pulseID }),
+              let index = state.activePulses.firstIndex(where: { $0.id == pulseID }) else { return }
+        var next = state
+        var pulse = next.activePulses[index]
+        pulse.resolvedAction = interaction.action
+        pulse.phase = .resolved
+        next.activePulses[index] = pulse
+        replaceState(next)
     }
 
     func setScoutStance(_ stance: ScoutStance) {
@@ -127,7 +155,10 @@ final class PulseStore: ObservableObject {
     }
 
     func makeBriefing(at date: Date = .now) -> WorldBriefing? {
-        let nextPulses = state.activePulses.filter { $0.phase(at: date) != .resolved && $0.expiresAt > date }
+        let interacted = Set(state.interactions.map(\.pulseID))
+        let nextPulses = state.activePulses.filter {
+            !interacted.contains($0.id) && $0.phase(at: date) != .resolved && $0.expiresAt > date
+        }
         guard !nextPulses.isEmpty else { return nil }
         if let last = state.lastBriefingAt, date.timeIntervalSince(last) < 30 * 60 {
             return nil
@@ -135,7 +166,7 @@ final class PulseStore: ObservableObject {
         let recommended = nextPulses.first
         let summary: String
         if let recommended {
-            summary = "The atlas moved while you were away. \(recommended.kind.title) is \(recommended.phase(at: date).displayName.lowercased()) nearby."
+            summary = "The atlas moved while you were away. \(PulsePresentation.title(for: recommended.kind)) is \(PulsePresentation.name(for: recommended.phase(at: date)).lowercased()) nearby."
         } else {
             summary = "The atlas moved while you were away."
         }
@@ -155,6 +186,10 @@ final class PulseStore: ObservableObject {
     func clear() {
         state = .empty()
         database.savePulseState(state)
+    }
+
+    func clearCloudState() {
+        clear()
     }
 
     func resetLocalSession() {

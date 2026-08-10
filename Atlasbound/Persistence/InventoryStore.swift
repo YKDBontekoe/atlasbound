@@ -9,6 +9,7 @@ final class InventoryStore: ObservableObject {
     @Published private(set) var findsClaimedToday = 0
     @Published private(set) var lifetimeFindsCollected = 0
     @Published private(set) var claimedFindIDs: Set<String> = []
+    private(set) var appliedPulseRewardIDs: Set<String> = []
     @Published var latestPickup: ItemPickup?
     @Published var latestActionMessage: String?
 
@@ -64,6 +65,7 @@ final class InventoryStore: ObservableObject {
         activeEffects = save.activeEffects
         cartographerPins = save.cartographerPins
         lifetimeFindsCollected = max(0, save.lifetimeFindsCollected)
+        appliedPulseRewardIDs = Set(save.appliedPulseRewardIDs ?? [])
         latestPickup = nil
         latestActionMessage = nil
         persist()
@@ -89,6 +91,7 @@ final class InventoryStore: ObservableObject {
         findsClaimedToday = 0
         lifetimeFindsCollected = 0
         claimedFindIDs = []
+        appliedPulseRewardIDs = []
         claimedFindDayKey = ""
         latestPickup = nil
         latestActionMessage = nil
@@ -436,6 +439,16 @@ final class InventoryStore: ObservableObject {
         }
     }
 
+    /// Applies a Pulse reward exactly once, including across an interrupted retry.
+    func depositPulseReward(grantID: String, amounts: [ItemAmount]) {
+        guard !appliedPulseRewardIDs.contains(grantID) else { return }
+        for amount in amounts where amount.quantity > 0 {
+            addQuantity(amount.itemID, amount: amount.quantity)
+        }
+        appliedPulseRewardIDs.insert(grantID)
+        persist()
+    }
+
     // MARK: - Private
 
     private func addQuantity(_ itemID: String, amount: Int) {
@@ -486,6 +499,7 @@ final class InventoryStore: ObservableObject {
         guard let save = database.loadInventory() else { return }
         stacks = save.stacks.filter { ItemCatalog.definition(for: $0.itemID) != nil && $0.quantity > 0 }
         claimedFindIDs = Set(save.claimedFindIDs)
+        appliedPulseRewardIDs = Set(save.appliedPulseRewardIDs ?? [])
         claimedFindDayKey = save.claimedFindDayKey
         findsClaimedToday = save.findsClaimedToday
         activeEffects = save.activeEffects
@@ -503,7 +517,8 @@ final class InventoryStore: ObservableObject {
                 findsClaimedToday: findsClaimedToday,
                 activeEffects: activeEffects,
                 cartographerPins: cartographerPins,
-                lifetimeFindsCollected: lifetimeFindsCollected
+                lifetimeFindsCollected: lifetimeFindsCollected,
+                appliedPulseRewardIDs: Array(appliedPulseRewardIDs).sorted()
             )
         )
     }

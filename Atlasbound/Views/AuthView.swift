@@ -43,7 +43,7 @@ struct AuthView: View {
                     Section {
                         Label("Check your inbox", systemImage: "envelope.badge")
                             .foregroundStyle(.green)
-                        Text("We sent a sign-in link to (email.trimmingCharacters(in: .whitespacesAndNewlines)). Return here after tapping it. You can resend if it does not arrive.")
+                        Text("We sent a sign-in link to \(email.trimmingCharacters(in: .whitespacesAndNewlines)). Return here after tapping it. You can resend if it does not arrive.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

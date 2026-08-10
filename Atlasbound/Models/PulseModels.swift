@@ -9,38 +9,6 @@ enum PulseKind: String, Codable, Sendable, CaseIterable, Hashable {
     case landmarkResonance
     case relayInstability
 
-    var title: String {
-        switch self {
-        case .signalDrift: "Signal drift"
-        case .fogFront: "Fog front"
-        case .resourceBloom: "Resource bloom"
-        case .surveyEcho: "Survey echo"
-        case .landmarkResonance: "Landmark resonance"
-        case .relayInstability: "Relay instability"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .signalDrift: "A roaming signal is crossing the nearby atlas."
-        case .fogFront: "The local fog is thinning and revealing a temporary pattern."
-        case .resourceBloom: "A short-lived vein is brightening beneath the route."
-        case .surveyEcho: "Old visits are resolving into a shape worth revisiting."
-        case .landmarkResonance: "A nearby landmark is carrying an unusual atlas echo."
-        case .relayInstability: "A field relay is asking for attention before the signal fades."
-        }
-    }
-
-    var symbolName: String {
-        switch self {
-        case .signalDrift: "dot.radiowaves.left.and.right"
-        case .fogFront: "cloud.fog.fill"
-        case .resourceBloom: "sparkles"
-        case .surveyEcho: "waveform.path.ecg"
-        case .landmarkResonance: "mappin.and.ellipse"
-        case .relayInstability: "bolt.trianglebadge.exclamationmark.fill"
-        }
-    }
 }
 
 enum PulsePhase: String, Codable, Sendable, CaseIterable, Hashable {
@@ -49,14 +17,6 @@ enum PulsePhase: String, Codable, Sendable, CaseIterable, Hashable {
     case peak
     case resolved
 
-    var displayName: String {
-        switch self {
-        case .detected: "Detected"
-        case .developing: "Developing"
-        case .peak: "At peak"
-        case .resolved: "Resolved"
-        }
-    }
 }
 
 enum PulseAction: String, Codable, Sendable, CaseIterable, Hashable {
@@ -64,21 +24,6 @@ enum PulseAction: String, Codable, Sendable, CaseIterable, Hashable {
     case stabilize
     case harvest
 
-    var title: String {
-        switch self {
-        case .observe: "Observe"
-        case .stabilize: "Stabilize"
-        case .harvest: "Harvest"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .observe: "Record what changed and keep the signal for the atlas."
-        case .stabilize: "Use a field tool to leave the area in a better state."
-        case .harvest: "Take the immediate materials before the opportunity fades."
-        }
-    }
 }
 
 enum ClaimCondition: String, Codable, Sendable, CaseIterable, Hashable {
@@ -89,38 +34,6 @@ enum ClaimCondition: String, Codable, Sendable, CaseIterable, Hashable {
     case watched
     case unstable
 
-    var title: String {
-        switch self {
-        case .quiet: "Quiet"
-        case .awake: "Awake"
-        case .overgrown: "Overgrown"
-        case .charged: "Charged"
-        case .watched: "Watched"
-        case .unstable: "Unstable"
-        }
-    }
-
-    var symbolName: String {
-        switch self {
-        case .quiet: "moon.stars.fill"
-        case .awake: "sunrise.fill"
-        case .overgrown: "leaf.fill"
-        case .charged: "bolt.fill"
-        case .watched: "eye.fill"
-        case .unstable: "exclamationmark.triangle.fill"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .quiet: "The sector is resting at its normal rhythm."
-        case .awake: "Discovery signals are easier to notice here."
-        case .overgrown: "Revisits and survey tools find more texture here."
-        case .charged: "Factory and relay signals are unusually strong here."
-        case .watched: "Scouts are returning sharper reports from this sector."
-        case .unstable: "A voluntary field action could shape what happens next."
-        }
-    }
 }
 
 struct ClaimConditionState: Codable, Hashable, Sendable {
@@ -154,7 +67,7 @@ struct AtlasPulse: Codable, Hashable, Sendable, Identifiable {
 
     func refreshed(at date: Date) -> AtlasPulse {
         var next = self
-        next.phase = phase(at: date)
+        next.phase = resolvedAction == nil ? phase(at: date) : .resolved
         return next
     }
 }
@@ -165,6 +78,14 @@ struct PulseInteraction: Codable, Hashable, Sendable, Identifiable {
     let action: PulseAction
     let createdAt: Date
     let outcome: PulseOutcome
+}
+
+struct PulseRewardGrant: Codable, Hashable, Sendable, Identifiable {
+    let id: String
+    let pulseID: String
+    let itemID: String
+    let quantity: Int
+    let createdAt: Date
 }
 
 enum PulseActionResult: Sendable, Equatable {
@@ -186,23 +107,6 @@ enum ScoutStance: String, Codable, Sendable, CaseIterable, Hashable {
     case tend
     case salvage
 
-    var title: String {
-        switch self {
-        case .chart: "Chart"
-        case .listen: "Listen"
-        case .tend: "Tend"
-        case .salvage: "Salvage"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .chart: "Favor fog-edge discoveries and route reports."
-        case .listen: "Favor early signals and landmark echoes."
-        case .tend: "Favor claim conditions and Home Base reports."
-        case .salvage: "Favor resource and factory reports."
-        }
-    }
 }
 
 struct ScoutReport: Codable, Hashable, Sendable, Identifiable {
@@ -229,6 +133,7 @@ struct PulseState: Codable, Hashable, Sendable {
 
     var activePulses: [AtlasPulse]
     var interactions: [PulseInteraction]
+    var pendingRewardGrants: [PulseRewardGrant]
     var claimConditions: [String: ClaimConditionState]
     var scoutStance: ScoutStance
     var reports: [ScoutReport]
@@ -239,11 +144,49 @@ struct PulseState: Codable, Hashable, Sendable {
         PulseState(
             activePulses: [],
             interactions: [],
+            pendingRewardGrants: [],
             claimConditions: [:],
             scoutStance: .listen,
             reports: [],
             lastBriefingAt: nil,
             lastRefreshAt: date
         )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case activePulses, interactions, pendingRewardGrants, claimConditions
+        case scoutStance, reports, lastBriefingAt, lastRefreshAt
+    }
+
+    init(
+        activePulses: [AtlasPulse],
+        interactions: [PulseInteraction],
+        pendingRewardGrants: [PulseRewardGrant] = [],
+        claimConditions: [String: ClaimConditionState],
+        scoutStance: ScoutStance,
+        reports: [ScoutReport],
+        lastBriefingAt: Date?,
+        lastRefreshAt: Date
+    ) {
+        self.activePulses = activePulses
+        self.interactions = interactions
+        self.pendingRewardGrants = pendingRewardGrants
+        self.claimConditions = claimConditions
+        self.scoutStance = scoutStance
+        self.reports = reports
+        self.lastBriefingAt = lastBriefingAt
+        self.lastRefreshAt = lastRefreshAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        activePulses = try container.decode([AtlasPulse].self, forKey: .activePulses)
+        interactions = try container.decode([PulseInteraction].self, forKey: .interactions)
+        pendingRewardGrants = try container.decodeIfPresent([PulseRewardGrant].self, forKey: .pendingRewardGrants) ?? []
+        claimConditions = try container.decode([String: ClaimConditionState].self, forKey: .claimConditions)
+        scoutStance = try container.decode(ScoutStance.self, forKey: .scoutStance)
+        reports = try container.decode([ScoutReport].self, forKey: .reports)
+        lastBriefingAt = try container.decodeIfPresent(Date.self, forKey: .lastBriefingAt)
+        lastRefreshAt = try container.decode(Date.self, forKey: .lastRefreshAt)
     }
 }

@@ -29,7 +29,7 @@ final class PulseNotificationCoordinator {
               let peak = pulse.phaseEndsAt[.peak], peak > date else { return }
         let content = UNMutableNotificationContent()
         content.title = "Atlasbound · World now"
-        content.body = "(pulse.kind.title) is reaching its peak nearby."
+        content.body = "\(PulsePresentation.title(for: pulse.kind)) is reaching its peak nearby."
         content.sound = .default
         content.userInfo = ["pulseID": pulse.id]
 
@@ -45,8 +45,7 @@ final class PulseNotificationCoordinator {
         center.add(request)
     }
 
-    func cancel(for pulse: AtlasPulse) {
-        center.removePendingNotificationRequests(withIdentifiers: ["atlasbound.pulse.peak.\(pulse.id)"])
+    func cancel(for pulseID: String) {
+        center.removePendingNotificationRequests(withIdentifiers: ["atlasbound.pulse.peak.\(pulseID)"])
     }
 }
-

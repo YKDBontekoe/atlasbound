@@ -60,10 +60,13 @@ final class CloudStateSync: ObservableObject {
             if let save = Self.decode(row.factory, as: LegacyFactorySave.self) { factory.replaceState(save.state) } else { factory.clear() }
             if let save = Self.decode(row.idle, as: LegacyIdleSave.self) { idle.replaceState(save.state) } else { idle.clear() }
             if let save = Self.decode(row.skills, as: LegacySkillSave.self) { skills.replaceState(save.state) } else { skills.clear() }
-            if let pulse,
-               let payload = row.pulse,
-               let save = Self.decode(payload, as: PersistedPulseSave.self) {
-                pulse.replaceState(save.state)
+            if let pulse {
+                if let payload = row.pulse,
+                   let save = Self.decode(payload, as: PersistedPulseSave.self) {
+                    pulse.replaceState(save.state)
+                } else {
+                    pulse.clearCloudState()
+                }
             }
             lastUploadedSnapshot = nil
             return true
@@ -264,7 +267,8 @@ private struct CloudStateRow: Encodable {
             findsClaimedToday: inventory.findsClaimedToday,
             activeEffects: inventory.activeEffects,
             cartographerPins: inventory.cartographerPins,
-            lifetimeFindsCollected: inventory.lifetimeFindsCollected
+            lifetimeFindsCollected: inventory.lifetimeFindsCollected,
+            appliedPulseRewardIDs: Array(inventory.appliedPulseRewardIDs).sorted()
         ))
         self.factory = Self.json(factory.state)
         self.idle = Self.json(idle.state)
@@ -296,6 +300,7 @@ private struct CloudInventorySnapshot: Codable {
     let activeEffects: [ActiveItemEffect]
     let cartographerPins: [CartographerPin]
     let lifetimeFindsCollected: Int
+    let appliedPulseRewardIDs: [String]
 }
 
 private struct RemoteCloudState: Decodable {

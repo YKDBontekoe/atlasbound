@@ -172,7 +172,7 @@ struct DiscoveryMapView: View {
                             PulseMapMarker(pulse: pulse)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Open \(pulse.kind.title), \(pulse.phase.displayName)")
+                        .accessibilityLabel("Open \(PulsePresentation.title(for: pulse.kind)), \(PulsePresentation.name(for: pulse.phase))")
                     }
                 }
             }
@@ -526,7 +526,7 @@ private struct PulseMapMarker: View {
             Circle()
                 .fill(AtlasTheme.gold.opacity(breathing ? 0.08 : 0.24))
                 .frame(width: breathing ? 60 : 42, height: breathing ? 60 : 42)
-            Image(systemName: pulse.kind.symbolName)
+            Image(systemName: PulsePresentation.symbolName(for: pulse.kind))
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 36, height: 36)

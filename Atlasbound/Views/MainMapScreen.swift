@@ -295,7 +295,11 @@ struct MainMapScreen: View {
         }
         .sheet(item: $controller.latestWorldBriefing) { briefing in
             WorldBriefingSheet(briefing: briefing, controller: controller) { pulseID in
-                selectedPulse = controller.activePulses.first { $0.id == pulseID }
+                guard let pulse = controller.activePulses.first(where: { $0.id == pulseID }) else {
+                    return false
+                }
+                selectedPulse = pulse
+                return true
             }
             .presentationDetents([.medium, .large])
         }
