@@ -29,6 +29,7 @@ final class CloudStateSync: ObservableObject {
         idle: IdleStore,
         skills: SkillStore,
         pulse: PulseStore? = nil,
+        weather: WeatherStore? = nil,
         isSessionActive: @escaping @MainActor () -> Bool = { true }
     ) async -> Bool {
         guard let client,
@@ -68,6 +69,14 @@ final class CloudStateSync: ObservableObject {
                     pulse.clearCloudState()
                 }
             }
+            if let weather {
+                if let payload = row.weather,
+                   let save = Self.decode(payload, as: PersistedWeatherSave.self) {
+                    weather.replaceCloudState(save.state)
+                } else {
+                    weather.clear()
+                }
+            }
             lastUploadedSnapshot = nil
             return true
         } catch {
@@ -85,7 +94,8 @@ final class CloudStateSync: ObservableObject {
         factory: FactoryStore,
         idle: IdleStore,
         skills: SkillStore,
-        pulse: PulseStore? = nil
+        pulse: PulseStore? = nil,
+        weather: WeatherStore? = nil
     ) {
         guard task == nil else { return }
         task = Task { [weak self] in
@@ -99,7 +109,8 @@ final class CloudStateSync: ObservableObject {
                     factory: factory,
                     idle: idle,
                     skills: skills,
-                    pulse: pulse
+                    pulse: pulse,
+                    weather: weather
                 )
                 try? await Task.sleep(for: .seconds(10))
             }
@@ -139,7 +150,8 @@ final class CloudStateSync: ObservableObject {
         factory: FactoryStore,
         idle: IdleStore,
         skills: SkillStore,
-        pulse: PulseStore? = nil
+        pulse: PulseStore? = nil,
+        weather: WeatherStore? = nil
     ) async {
         await persist(
             treasure: treasure,
@@ -150,7 +162,8 @@ final class CloudStateSync: ObservableObject {
             factory: factory,
             idle: idle,
             skills: skills,
-            pulse: pulse
+            pulse: pulse,
+            weather: weather
         )
     }
 
@@ -163,7 +176,8 @@ final class CloudStateSync: ObservableObject {
         factory: FactoryStore,
         idle: IdleStore,
         skills: SkillStore,
-        pulse: PulseStore? = nil
+        pulse: PulseStore? = nil,
+        weather: WeatherStore? = nil
     ) async {
         guard let client,
               let authClient,
@@ -179,7 +193,8 @@ final class CloudStateSync: ObservableObject {
             factory: factory,
             idle: idle,
             skills: skills,
-            pulse: pulse
+            pulse: pulse,
+            weather: weather
         )
         guard let snapshot = try? JSONEncoder().encode(row), snapshot != lastUploadedSnapshot else { return }
         do {
@@ -227,13 +242,14 @@ private struct CloudStateRow: Encodable {
     let idle: AnyJSON
     let skills: AnyJSON
     let pulse: AnyJSON
+    let weather: AnyJSON
     let activityHistory: AnyJSON
     let regions: AnyJSON
 
     enum CodingKeys: String, CodingKey {
         case userID = "user_id"
         case frontier, territory, treasure, inventory, factory, idle, skills
-        case pulse
+        case pulse, weather
         case activityHistory = "activity_history"
         case regions
     }
@@ -249,7 +265,8 @@ private struct CloudStateRow: Encodable {
         factory: FactoryStore,
         idle: IdleStore,
         skills: SkillStore,
-        pulse: PulseStore? = nil
+        pulse: PulseStore? = nil,
+        weather: WeatherStore? = nil
     ) {
         self.userID = userID
         frontier = Self.json(PersistedFrontierRecord(from: tileStore.frontierState))
@@ -274,6 +291,7 @@ private struct CloudStateRow: Encodable {
         self.idle = Self.json(idle.state)
         self.skills = Self.json(skills.state)
         self.pulse = Self.json(pulse?.state ?? .empty())
+        self.weather = Self.json(PersistedWeatherSave(version: WeatherCacheState.schemaVersion, state: weather?.state ?? .empty()))
         self.activityHistory = Self.json(LegacyActivitySave(
             version: JSONFileStore.currentSchemaVersion,
             sessions: activityHistory.sessions,
@@ -310,11 +328,12 @@ private struct RemoteCloudState: Decodable {
     let idle: AnyJSON
     let skills: AnyJSON
     let pulse: AnyJSON?
+    let weather: AnyJSON?
     let activityHistory: AnyJSON
     let regions: AnyJSON
 
     enum CodingKeys: String, CodingKey {
-        case treasure, inventory, factory, idle, skills, pulse
+        case treasure, inventory, factory, idle, skills, pulse, weather
         case activityHistory = "activity_history"
         case regions
     }

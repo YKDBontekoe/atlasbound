@@ -101,6 +101,10 @@ enum ItemCatalog {
         ItemDefinition(id: "amber_resin", name: "Amber Resin", detail: "Sticky resin that catches atlas dust.", category: .material, rarity: .uncommon, symbolName: "seal.fill", effectKind: nil, isConsumable: false, canSalvage: false),
         ItemDefinition(id: "copper_wire", name: "Copper Wire", detail: "A short coil useful for instruments.", category: .material, rarity: .uncommon, symbolName: "link", effectKind: nil, isConsumable: false, canSalvage: false),
         ItemDefinition(id: "copper_ore", name: "Copper Ore", detail: "Raw copper-bearing stone from an atlas deposit.", category: .material, rarity: .common, symbolName: "circle.hexagongrid.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "water", name: "Raw Water", detail: "Collected water awaiting treatment.", category: .material, rarity: .common, symbolName: "drop.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "seed_stock", name: "Seed Stock", detail: "A hardy seed reserve for an atlas field.", category: .material, rarity: .common, symbolName: "leaf.circle.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "grain", name: "Atlas Grain", detail: "A durable crop harvested from a field plot.", category: .material, rarity: .common, symbolName: "square.grid.2x2.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "crop_fiber", name: "Crop Fiber", detail: "Strong plant fiber for resilient construction.", category: .material, rarity: .uncommon, symbolName: "leaf.fill", effectKind: nil, isConsumable: false, canSalvage: false),
     ]
 
     static let components: [ItemDefinition] = [
@@ -109,6 +113,7 @@ enum ItemCatalog {
         ItemDefinition(id: "waystone_plate", name: "Waystone Plate", detail: "A resonant plate cut from paired shards.", category: .component, rarity: .rare, symbolName: "diamond.inset.filled", effectKind: nil, isConsumable: false, canSalvage: false),
         ItemDefinition(id: "mechanism", name: "Brass Mechanism", detail: "A compact drive for automated atlas works.", category: .component, rarity: .rare, symbolName: "gearshape.2.fill", effectKind: nil, isConsumable: false, canSalvage: false),
         ItemDefinition(id: "atlas_insight", name: "Atlas Insight", detail: "A bound observation consumed by factory research.", category: .component, rarity: .rare, symbolName: "lightbulb.max.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "treated_water", name: "Treated Water", detail: "Clean water ready for irrigation.", category: .component, rarity: .common, symbolName: "drop.circle.fill", effectKind: nil, isConsumable: false, canSalvage: false),
     ]
 
     // Consumable boosts
@@ -150,6 +155,13 @@ enum ItemCatalog {
         ItemDefinition(id: "gearworks_kit", name: "Gearworks Kit", detail: "Places a workshop for brass mechanisms.", category: .construction, rarity: .rare, symbolName: "gearshape.2.fill", effectKind: nil, isConsumable: false, canSalvage: false),
         ItemDefinition(id: "assembly_hall_kit", name: "Assembly Hall Kit", detail: "Places an automated construction hall.", category: .construction, rarity: .legendary, symbolName: "building.2.fill", effectKind: nil, isConsumable: false, canSalvage: false),
         ItemDefinition(id: "grand_depot_kit", name: "Grand Depot Kit", detail: "Places a high-capacity logistics depot.", category: .construction, rarity: .legendary, symbolName: "shippingbox.and.arrow.backward.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "rain_catcher_kit", name: "Rain Catcher Kit", detail: "Places a weather-aware water collector.", category: .construction, rarity: .uncommon, symbolName: "cloud.rain.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "reservoir_kit", name: "Reservoir Kit", detail: "Places a water buffer and treatment works.", category: .construction, rarity: .rare, symbolName: "drop.triangle.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "solar_array_kit", name: "Solar Array Kit", detail: "Places a weather-aware solar generator.", category: .construction, rarity: .uncommon, symbolName: "sun.max.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "wind_turbine_kit", name: "Wind Turbine Kit", detail: "Places a wind-powered generator.", category: .construction, rarity: .uncommon, symbolName: "wind", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "field_plot_kit", name: "Field Plot Kit", detail: "Places an exposed crop plot.", category: .construction, rarity: .uncommon, symbolName: "leaf.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "greenhouse_kit", name: "Greenhouse Kit", detail: "Places a protected crop building.", category: .construction, rarity: .rare, symbolName: "building.columns.fill", effectKind: nil, isConsumable: false, canSalvage: false),
+        ItemDefinition(id: "deep_mine_kit", name: "Deep Mine Kit", detail: "Places a high-capacity drill on a deposit.", category: .construction, rarity: .rare, symbolName: "mountain.2.fill", effectKind: nil, isConsumable: false, canSalvage: false),
     ]
 }
 

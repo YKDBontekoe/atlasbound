@@ -31,6 +31,9 @@ struct FactoryHubView: View {
                 heroCard
                     .staggeredAppear(index: 0)
 
+                weatherCard
+                    .staggeredAppear(index: 1)
+
                 if let message = controller.latestMessage {
                     StatSectionCard {
                         FactoryMessageBanner(message: message) {
@@ -118,6 +121,30 @@ struct FactoryHubView: View {
                 }
                 Spacer(minLength: 0)
             }
+        }
+    }
+
+    private var weatherCard: some View {
+        let snapshot = controller.weatherStore.snapshots.values
+            .filter { !$0.isStale }
+            .sorted { $0.observedAt > $1.observedAt }
+            .first
+        return StatSectionCard {
+            HStack(spacing: AtlasTheme.Space.md) {
+                Image(systemName: snapshot?.condition.symbolName ?? "cloud.sun.fill")
+                    .font(.title2)
+                    .foregroundStyle(AtlasTheme.blue)
+                VStack(alignment: .leading, spacing: AtlasTheme.Space.xs) {
+                    Text(snapshot.map { "Regional weather · \($0.condition.displayName)" } ?? "Regional weather")
+                        .font(.headline)
+                    Text(snapshot.map { "\(Int($0.temperatureC.rounded()))°C · \(Int($0.windKPH.rounded())) km/h wind · refreshes hourly" } ?? "Move near a discovered site to fetch live conditions.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(snapshot.map { "Regional weather, \($0.condition.displayName), \(Int($0.temperatureC.rounded())) degrees Celsius" } ?? "Regional weather unavailable")
         }
     }
 
@@ -759,7 +786,9 @@ struct FactoryStructureInspector: View {
                     if definition.kind == .depot
                         || definition.kind == .generator
                         || definition.kind == .processor
-                        || definition.kind == .research {
+                        || definition.kind == .research
+                        || definition.kind == .water
+                        || definition.kind == .farm {
                         Section("Load from backpack") {
                             let transferable = inventory.sortedStacks.filter {
                                 $0.quantity > 0

@@ -13,6 +13,7 @@ final class FactoryController: ObservableObject {
     let tileStore: TileStore
     let inventoryStore: InventoryStore
     let skillStore: SkillStore
+    let weatherStore: WeatherStore
 
     private let constructionEngine = ConstructionEngine()
     private let networkEngine = FactoryNetworkEngine()
@@ -25,12 +26,14 @@ final class FactoryController: ObservableObject {
         store: FactoryStore,
         tileStore: TileStore,
         inventoryStore: InventoryStore,
-        skillStore: SkillStore? = nil
+        skillStore: SkillStore? = nil,
+        weatherStore: WeatherStore? = nil
     ) {
         self.store = store
         self.tileStore = tileStore
         self.inventoryStore = inventoryStore
         self.skillStore = skillStore ?? SkillStore()
+        self.weatherStore = weatherStore ?? WeatherStore()
     }
 
     var structures: [PlacedFactoryStructure] {
@@ -110,6 +113,9 @@ final class FactoryController: ObservableObject {
                 ? .running
                 : .missingInputs
         }
+        if definition.kind == .renewable || definition.kind == .water && definition.id == "rain_catcher" {
+            return .running
+        }
         if let recipeID = structure.selectedRecipeID,
            let recipe = FactoryRecipeCatalog.byID[recipeID] {
             let available = Dictionary(grouping: recipe.inputs, by: \.itemID).mapValues {
@@ -126,7 +132,8 @@ final class FactoryController: ObservableObject {
 
     private func metrics(for network: FactoryNetworkSnapshot) -> FactoryNetworkMetrics {
         let generatorIDs = network.buildingTileIDs.filter {
-            store.structures[$0].flatMap { FactoryCatalog.byID[$0.definitionID] }?.kind == .generator
+            let kind = store.structures[$0].flatMap { FactoryCatalog.byID[$0.definitionID] }?.kind
+            return kind == .generator || kind == .renewable
         }
         let amberAvailable = availableItemCount("amber_resin", in: network)
         var unreservedAmber = amberAvailable
@@ -134,6 +141,12 @@ final class FactoryController: ObservableObject {
         for generatorID in generatorIDs.sorted() {
             guard let generator = store.structures[generatorID],
                   let definition = FactoryCatalog.byID[generator.definitionID] else { continue }
+            if definition.kind == .renewable {
+                let modifier = WeatherEngine().modifiers(for: weatherSnapshot(for: generator.tileID))
+                let base = definition.id == "solar_array" ? 18.0 * modifier.solarPower : 16.0 * modifier.windPower
+                supply += Int(base.rounded())
+                continue
+            }
             let canRun: Bool
             if generator.fueledMinutes > 0 || (generator.inputBuffer["amber_resin"] ?? 0) > 0 {
                 canRun = true
@@ -177,6 +190,12 @@ final class FactoryController: ObservableObject {
         )
     }
 
+    private func weatherSnapshot(for tileID: String) -> WeatherSnapshot? {
+        guard let tile = tileStore.tileEngine.parseTileID(tileID) else { return nil }
+        let cell = WeatherCellEngine().cellID(for: tile, tileEngine: tileStore.tileEngine)
+        return weatherStore.snapshots[cell]
+    }
+
     private func availableItemCount(_ itemID: String, in network: FactoryNetworkSnapshot) -> Int {
         network.buildingTileIDs.reduce(0) { total, tileID in
             guard let structure = store.structures[tileID],
@@ -187,6 +206,14 @@ final class FactoryController: ObservableObject {
 
     func updatePlayerLocation(_ location: CLLocation?) {
         playerLocation = location
+        if let location {
+            let coordinate = location.coordinate
+            let tileEngine = tileStore.tileEngine
+            Task { @MainActor [weak self] in
+                await self?.weatherStore.refresh(around: coordinate, tileEngine: tileEngine)
+                self?.advance()
+            }
+        }
     }
 
     func selectBuildDefinition(_ definitionID: String?) {
@@ -268,7 +295,8 @@ final class FactoryController: ObservableObject {
             state: store.state,
             to: date,
             tileEngine: tileStore.tileEngine,
-            speedMultiplier: skillStore.modifiers().factorySpeedMultiplier
+            speedMultiplier: skillStore.modifiers().factorySpeedMultiplier,
+            weatherByCell: weatherStore.snapshots
         )
         store.replaceState(next)
     }
@@ -462,6 +490,12 @@ final class FactoryController: ObservableObject {
                 .compactMap { FactoryRecipeCatalog.byID[$0] }
                 .flatMap(\.inputs)
                 .contains { $0.itemID == itemID }
+        case .water:
+            return definition.allowedRecipeIDs.compactMap { FactoryRecipeCatalog.byID[$0] }.flatMap(\.inputs).contains { $0.itemID == itemID }
+        case .farm:
+            return definition.allowedRecipeIDs.compactMap { FactoryRecipeCatalog.byID[$0] }.flatMap(\.inputs).contains { $0.itemID == itemID }
+        case .renewable:
+            return false
         case .road, .extractor:
             return false
         }
