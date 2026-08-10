@@ -38,15 +38,6 @@ enum MapTileLOD: Int, Sendable, Comparable {
         }
     }
 
-    /// Soft-cap for local fog wash hexes.
-    var fogCap: Int {
-        switch self {
-        case .near: AtlasTheme.maxFogPolygons
-        case .mid: min(80, AtlasTheme.maxFogPolygons)
-        case .far: min(40, AtlasTheme.maxFogPolygons)
-        }
-    }
-
     /// Soft-cap for mastery marker annotations.
     var markerCap: Int {
         switch self {

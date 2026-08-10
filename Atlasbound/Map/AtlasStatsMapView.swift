@@ -33,6 +33,7 @@ struct AtlasStatsMapView: View {
 
     @State private var viewport: Viewport = .styleDefault
     @State private var overlays: [StatsPolygon] = []
+    @Environment(\.colorScheme) private var colorScheme
 
     private func makeOverlays() -> [StatsPolygon] {
         let engine = TileEngine(tileSizeMeters: 20)
@@ -107,7 +108,7 @@ struct AtlasStatsMapView: View {
                     .fillOutlineColor(StyleColor(overlay.color))
             }
         }
-        .mapStyle(.standard)
+        .mapStyle(AtlasMapStyle.standard(for: colorScheme))
         .allowsHitTesting(interactive)
         .frame(minWidth: 1, minHeight: 1)
     }

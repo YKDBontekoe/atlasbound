@@ -2,10 +2,8 @@ import SwiftUI
 
 struct LiveMapOptionsSheet: View {
     @Binding var selectedDataLayerRaw: String
-    @Binding var uses3DMap: Bool
     @Binding var showsMastery: Bool
     @Binding var showsPlaces: Bool
-    @Binding var showsFog: Bool
     @Binding var showsFrontier: Bool
     @Binding var showsFactory: Bool
     let explorerLevel: Int
@@ -15,30 +13,19 @@ struct LiveMapOptionsSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Terrain") {
-                    Toggle(isOn: $uses3DMap) {
-                        Label {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("3D terrain")
-                                Text(
-                                    explorerLevel >= ExplorerProgressionEngine.threeDMapRequiredLevel
-                                        ? "Pitch the camera with realistic elevation"
-                                        : "Unlocks at explorer level \(ExplorerProgressionEngine.threeDMapRequiredLevel)"
-                                )
+                Section("Atlas basemap") {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Elevated atlas")
+                                .font(.subheadline.weight(.semibold))
+                            Text("3D terrain is always on. Shops, transit, and commercial POIs are hidden so your discoveries stay legible.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            }
-                        } icon: {
-                            Image(systemName: "cube.fill")
-                                .foregroundStyle(
-                                    explorerLevel >= ExplorerProgressionEngine.threeDMapRequiredLevel
-                                        ? AtlasTheme.blue
-                                        : Color.secondary
-                                )
                         }
+                    } icon: {
+                        Image(systemName: "cube.fill")
+                            .foregroundStyle(AtlasTheme.blue)
                     }
-                    .disabled(explorerLevel < ExplorerProgressionEngine.threeDMapRequiredLevel)
-                    .tint(AtlasTheme.blue)
                 }
 
                 Section("Atlas layers") {
@@ -77,12 +64,6 @@ struct LiveMapOptionsSheet: View {
                         detail: "Label resolved cities and localities",
                         symbol: "mappin.circle.fill",
                         isOn: $showsPlaces
-                    )
-                    layerToggle(
-                        "Nearby fog",
-                        detail: "Reveal the hex grid around you",
-                        symbol: "cloud.fog.fill",
-                        isOn: $showsFog
                     )
                     layerToggle(
                         "Frontier",
