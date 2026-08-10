@@ -334,6 +334,9 @@ jobs:
       - name: Deploy shared treasure function
         run: supabase functions deploy spawn-shared-treasure --project-ref "$SUPABASE_PROJECT_ID"
 
+      - name: Deploy shared weather function
+        run: supabase functions deploy weather-atlas --project-ref "$SUPABASE_PROJECT_ID"
+
   publish:
     name: Release + AltStore source
     needs: [validate, test-unit, test-ui, build, migrate-database]

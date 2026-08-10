@@ -172,7 +172,6 @@ struct AtlasboundApp: App {
                     idle: idleStore,
                     skills: skillStore,
                     pulse: pulseStore,
-                    weather: weatherStore,
                     isSessionActive: isSessionActive
                 ) else {
                     guard !Task.isCancelled, isSessionActive() else { return }
@@ -223,8 +222,7 @@ struct AtlasboundApp: App {
                     factory: factoryStore,
                     idle: idleStore,
                     skills: skillStore,
-                    pulse: pulseStore,
-                    weather: weatherStore
+                    pulse: pulseStore
                 )
             }
         }
@@ -291,8 +289,7 @@ struct AtlasboundApp: App {
                 factory: factoryStore,
                 idle: idleStore,
                 skills: skillStore,
-                pulse: pulseStore,
-                weather: weatherStore
+                pulse: pulseStore
             )
         }
     }
