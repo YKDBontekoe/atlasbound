@@ -28,6 +28,7 @@ final class CloudStateSync: ObservableObject {
         factory: FactoryStore,
         idle: IdleStore,
         skills: SkillStore,
+        pulse: PulseStore? = nil,
         isSessionActive: @escaping @MainActor () -> Bool = { true }
     ) async -> Bool {
         guard let client,
@@ -59,6 +60,14 @@ final class CloudStateSync: ObservableObject {
             if let save = Self.decode(row.factory, as: LegacyFactorySave.self) { factory.replaceState(save.state) } else { factory.clear() }
             if let save = Self.decode(row.idle, as: LegacyIdleSave.self) { idle.replaceState(save.state) } else { idle.clear() }
             if let save = Self.decode(row.skills, as: LegacySkillSave.self) { skills.replaceState(save.state) } else { skills.clear() }
+            if let pulse {
+                if let payload = row.pulse,
+                   let save = Self.decode(payload, as: PersistedPulseSave.self) {
+                    pulse.replaceState(save.state)
+                } else {
+                    pulse.clearCloudState()
+                }
+            }
             lastUploadedSnapshot = nil
             return true
         } catch {
@@ -75,7 +84,8 @@ final class CloudStateSync: ObservableObject {
         inventory: InventoryStore,
         factory: FactoryStore,
         idle: IdleStore,
-        skills: SkillStore
+        skills: SkillStore,
+        pulse: PulseStore? = nil
     ) {
         guard task == nil else { return }
         task = Task { [weak self] in
@@ -88,7 +98,8 @@ final class CloudStateSync: ObservableObject {
                     inventory: inventory,
                     factory: factory,
                     idle: idle,
-                    skills: skills
+                    skills: skills,
+                    pulse: pulse
                 )
                 try? await Task.sleep(for: .seconds(10))
             }
@@ -101,6 +112,48 @@ final class CloudStateSync: ObservableObject {
         lastUploadedSnapshot = nil
     }
 
+    func hasRemoteState() async -> Bool {
+        guard let client,
+              let authClient,
+              let userID = try? await authClient.auth.session.user.id else { return false }
+        do {
+            let rows: [RemoteCloudState] = try await client
+                .from("player_state")
+                .select()
+                .eq("user_id", value: userID.uuidString)
+                .limit(1)
+                .execute()
+                .value
+            return !rows.isEmpty
+        } catch {
+            return false
+        }
+    }
+
+    func syncNow(
+        tileStore: TileStore,
+        activityHistory: ActivityHistoryStore,
+        regionLookup: RegionLookupStore,
+        treasure: TreasureStore,
+        inventory: InventoryStore,
+        factory: FactoryStore,
+        idle: IdleStore,
+        skills: SkillStore,
+        pulse: PulseStore? = nil
+    ) async {
+        await persist(
+            treasure: treasure,
+            tileStore: tileStore,
+            activityHistory: activityHistory,
+            regionLookup: regionLookup,
+            inventory: inventory,
+            factory: factory,
+            idle: idle,
+            skills: skills,
+            pulse: pulse
+        )
+    }
+
     private func persist(
         treasure: TreasureStore,
         tileStore: TileStore,
@@ -109,7 +162,8 @@ final class CloudStateSync: ObservableObject {
         inventory: InventoryStore,
         factory: FactoryStore,
         idle: IdleStore,
-        skills: SkillStore
+        skills: SkillStore,
+        pulse: PulseStore? = nil
     ) async {
         guard let client,
               let authClient,
@@ -124,7 +178,8 @@ final class CloudStateSync: ObservableObject {
             inventory: inventory,
             factory: factory,
             idle: idle,
-            skills: skills
+            skills: skills,
+            pulse: pulse
         )
         guard let snapshot = try? JSONEncoder().encode(row), snapshot != lastUploadedSnapshot else { return }
         do {
@@ -171,12 +226,14 @@ private struct CloudStateRow: Encodable {
     let factory: AnyJSON
     let idle: AnyJSON
     let skills: AnyJSON
+    let pulse: AnyJSON
     let activityHistory: AnyJSON
     let regions: AnyJSON
 
     enum CodingKeys: String, CodingKey {
         case userID = "user_id"
         case frontier, territory, treasure, inventory, factory, idle, skills
+        case pulse
         case activityHistory = "activity_history"
         case regions
     }
@@ -191,7 +248,8 @@ private struct CloudStateRow: Encodable {
         inventory: InventoryStore,
         factory: FactoryStore,
         idle: IdleStore,
-        skills: SkillStore
+        skills: SkillStore,
+        pulse: PulseStore? = nil
     ) {
         self.userID = userID
         frontier = Self.json(PersistedFrontierRecord(from: tileStore.frontierState))
@@ -209,11 +267,13 @@ private struct CloudStateRow: Encodable {
             findsClaimedToday: inventory.findsClaimedToday,
             activeEffects: inventory.activeEffects,
             cartographerPins: inventory.cartographerPins,
-            lifetimeFindsCollected: inventory.lifetimeFindsCollected
+            lifetimeFindsCollected: inventory.lifetimeFindsCollected,
+            appliedPulseRewardIDs: Array(inventory.appliedPulseRewardIDs).sorted()
         ))
         self.factory = Self.json(factory.state)
         self.idle = Self.json(idle.state)
         self.skills = Self.json(skills.state)
+        self.pulse = Self.json(pulse?.state ?? .empty())
         self.activityHistory = Self.json(LegacyActivitySave(
             version: JSONFileStore.currentSchemaVersion,
             sessions: activityHistory.sessions,
@@ -240,6 +300,7 @@ private struct CloudInventorySnapshot: Codable {
     let activeEffects: [ActiveItemEffect]
     let cartographerPins: [CartographerPin]
     let lifetimeFindsCollected: Int
+    let appliedPulseRewardIDs: [String]
 }
 
 private struct RemoteCloudState: Decodable {
@@ -248,11 +309,12 @@ private struct RemoteCloudState: Decodable {
     let factory: AnyJSON
     let idle: AnyJSON
     let skills: AnyJSON
+    let pulse: AnyJSON?
     let activityHistory: AnyJSON
     let regions: AnyJSON
 
     enum CodingKeys: String, CodingKey {
-        case treasure, inventory, factory, idle, skills
+        case treasure, inventory, factory, idle, skills, pulse
         case activityHistory = "activity_history"
         case regions
     }

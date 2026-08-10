@@ -10,7 +10,7 @@ final class SmokeUITests: XCTestCase {
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US",
             "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryM",
-            "-atlasbound.onboardingVersion", "2",
+            "-atlasbound.onboardingVersion", "3",
             "-atlasbound.factoryTutorialVersion", "1",
         ]
         // Avoid first-run permission races; CI also grants via simctl.

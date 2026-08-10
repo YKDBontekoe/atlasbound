@@ -103,3 +103,9 @@ Discovered tile centers are quantized into ~2 km cache cells and reverse-geocode
 - Nearby players can manually load or unload machine buffers, while connected depots automate transfers.
 - Depot stock can be **remote-collected** into the backpack from Workshop → Factory without standing nearby.
 - The factory has its own schema version inside SQLite so a factory reset or incompatibility cannot erase the canonical atlas.
+
+## Living Atlas / Atlas Pulse
+
+Atlas Pulse is a local-first living-world layer over the canonical 20 m atlas. Pulses are temporary, deterministic phenomena anchored to tile IDs: signal drift, fog fronts, and resource blooms currently refresh in six-hour local slots around the latest accepted player location. Each Pulse advances through detected, developing, peak, and resolved phases and can be resolved once at close range with an observe, stabilize, or harvest action. Rewards use existing inventory items; claim conditions and scout reports are additive and never remove atlas progress.
+
+Pulse state persists as IDs, phases, dates, interactions, claim conditions, scout stance, and reports in the SQLite `pulse_state` blob. Geometry remains derived from `TileEngine`. The current client schedules optional local peak alerts only for Pulses already known to the device; server-authored refreshes, remote notifications, widgets, and Horizon aggregation remain extension points for the authenticated live-ops layer.

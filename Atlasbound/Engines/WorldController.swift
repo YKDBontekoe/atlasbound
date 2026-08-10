@@ -27,6 +27,8 @@ final class WorldController: ObservableObject {
     @Published private(set) var isPreparingTreasureTrail = false
     /// Fresh offline watch gains awaiting a reopen sheet (cleared on dismiss).
     @Published var latestIdleWatch: IdleWatchSummary?
+    /// Living-world changes awaiting a reopen sheet (cleared on dismiss).
+    @Published var latestWorldBriefing: WorldBriefing?
 
     let recorder: ActivityRecorder
     let store: TileStore
@@ -37,6 +39,7 @@ final class WorldController: ObservableObject {
     let inventoryStore: InventoryStore
     let idleStore: IdleStore
     let skillStore: SkillStore
+    let pulseStore: PulseStore
     private let progression = ProgressionEngine()
     private let frontierEngine = FrontierEngine()
     private let sectorEngine = HexSectorEngine()
@@ -68,6 +71,7 @@ final class WorldController: ObservableObject {
         inventoryStore: InventoryStore? = nil,
         idleStore: IdleStore? = nil,
         skillStore: SkillStore? = nil,
+        pulseStore: PulseStore? = nil,
         recorder: ActivityRecorder? = nil,
         landmarkResolver: any LandmarkResolving = LandmarkResolver()
     ) {
@@ -79,10 +83,12 @@ final class WorldController: ObservableObject {
         self.inventoryStore = inventoryStore ?? InventoryStore()
         self.idleStore = idleStore ?? IdleStore()
         self.skillStore = skillStore ?? SkillStore()
+        self.pulseStore = pulseStore ?? PulseStore()
         self.recorder = recorder ?? ActivityRecorder()
         self.landmarkResolver = landmarkResolver
         restoreSelectedActivityType()
         syncRecorderSettings()
+        replayPendingPulseRewards()
 
         self.recorder.onSample = { [weak self] sample in
             self?.handleSample(sample)
@@ -104,6 +110,12 @@ final class WorldController: ObservableObject {
     var frontierState: FrontierState { store.frontierState }
 
     var territoryState: TerritoryState { store.territoryState }
+
+    var activePulses: [AtlasPulse] { pulseStore.activePulses }
+
+    var scoutStance: ScoutStance { pulseStore.scoutStance }
+
+    var currentPlayerTile: TileCoordinate? { playerTileCoordinate }
 
     var activeExpedition: ExpeditionOffer? { store.frontierState.activeOffer }
 
@@ -427,7 +439,66 @@ final class WorldController: ObservableObject {
         store.applyWeeklyChargeResetIfNeeded()
         refreshFrontierPresentation()
         prepareTreasureTrail()
+        refreshPulseWorld(showBriefing: true)
         gameCenterManager.authenticate()
+    }
+
+    /// Refreshes the local living-world cache around the latest accepted location.
+    /// This stays local until the authenticated Pulse repository is introduced.
+    func refreshPulseWorld(showBriefing: Bool = false, at date: Date = .now) {
+        replayPendingPulseRewards()
+        guard let playerTileCoordinate else { return }
+        pulseStore.advance(at: date)
+        pulseStore.refresh(around: playerTileCoordinate, tileEngine: tileEngine, at: date)
+        for pulse in pulseStore.activePulses {
+            PulseNotificationCoordinator.shared.schedulePeak(for: pulse, at: date)
+        }
+        if showBriefing, latestWorldBriefing == nil {
+            latestWorldBriefing = pulseStore.makeBriefing(at: date)
+        }
+        objectWillChange.send()
+    }
+
+    func dismissWorldBriefing() {
+        latestWorldBriefing = nil
+    }
+
+    func enableWorldAlerts() async -> Bool {
+        await PulseNotificationCoordinator.shared.requestAuthorization()
+    }
+
+    @discardableResult
+    func resolvePulse(_ pulseID: String, action: PulseAction) -> PulseActionResult {
+        let result = pulseStore.perform(
+            pulseID: pulseID,
+            action: action,
+            playerTile: playerTileCoordinate,
+            tileEngine: tileEngine
+        )
+        if case .completed(let interaction) = result {
+            PulseNotificationCoordinator.shared.cancel(for: interaction.pulseID)
+            replayPendingPulseRewards()
+            pulseStore.complete(pulseID: interaction.pulseID)
+            AtlasHaptics.success()
+            objectWillChange.send()
+        }
+        return result
+    }
+
+    func setScoutStance(_ stance: ScoutStance) {
+        pulseStore.setScoutStance(stance)
+        objectWillChange.send()
+    }
+
+    private func replayPendingPulseRewards() {
+        for grant in pulseStore.pendingRewardGrants {
+            inventoryStore.depositPulseReward(
+                grantID: grant.id,
+                amounts: [ItemAmount(itemID: grant.itemID, quantity: grant.quantity)]
+            )
+            pulseStore.markRewardGranted(grant.id)
+            pulseStore.complete(pulseID: grant.pulseID)
+        }
     }
 
     func setActivityType(_ type: ActivityType) {
@@ -580,8 +651,43 @@ final class WorldController: ObservableObject {
         if !report.scoutTileIDs.isEmpty {
             applyIdleVisits(report.scoutTileIDs, at: date)
         }
+        if report.hasGatheredRewards {
+            let stance = pulseStore.scoutStance
+            let lead = pulseStore.activePulses.first
+            pulseStore.addScoutReport(
+                ScoutReport(
+                    id: "scout-report:\(Int(date.timeIntervalSince1970 / 1800))",
+                    createdAt: date,
+                    stance: stance,
+                    title: "Scout report · \(PulsePresentation.title(for: stance))",
+                    detail: scoutReportDetail(for: report, stance: stance),
+                    pulseID: lead?.id,
+                    sectorID: lead.flatMap { pulse in
+                        guard let tile = tileEngine.parseTileID(pulse.anchorTileID) else { return nil }
+                        return sectorEngine.sectorID(for: tile, sizeMeters: tileEngine.tileSizeMeters)
+                    }
+                )
+            )
+        }
         objectWillChange.send()
         return report
+    }
+
+    private func scoutReportDetail(for report: IdleAdvanceReport, stance: ScoutStance) -> String {
+        let discoveries = report.scoutDiscoveriesGranted
+        let goods = report.homeDripItems.reduce(0) { $0 + $1.quantity }
+        switch stance {
+        case .chart:
+            return discoveries > 0
+                ? "The roster pressed \(discoveries) tile\(discoveries == 1 ? "" : "s") into the fog."
+                : "The charting team found no clear edge, but camp supplies arrived."
+        case .listen:
+            return "A faint signal was logged while the scouts listened. \(goods) camp good\(goods == 1 ? "" : "s") came home with them."
+        case .tend:
+            return "The scouts checked the nearest claim and returned with \(goods) camp good\(goods == 1 ? "" : "s") to support it."
+        case .salvage:
+            return "The salvage team searched for useful fragments and returned with \(goods) camp good\(goods == 1 ? "" : "s")."
+        }
     }
 
     /// Foreground/reopen catch-up that presents a watch report when something was gathered.
@@ -594,6 +700,7 @@ final class WorldController: ObservableObject {
                 scoutDiscoveriesToday: idleStore.state.scoutDiscoveriesToday
             )
         }
+        refreshPulseWorld(showBriefing: latestWorldBriefing == nil, at: date)
         return report
     }
 
@@ -873,6 +980,7 @@ final class WorldController: ObservableObject {
         }
         automaticPreviousSample = sample
         processAutomaticTileIDs(ids, at: sample.timestamp)
+        refreshPulseWorld(at: sample.timestamp)
         prepareTreasureTrail()
     }
 
@@ -1058,6 +1166,7 @@ final class WorldController: ObservableObject {
             discoveryXP: modified.discovery,
             familiarityXP: territoryFamiliarity
         )
+        refreshPulseWorld(at: date)
     }
 
     private func processFrontierScoring(newDiscoveryIDs: [String], at date: Date) {

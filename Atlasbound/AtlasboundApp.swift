@@ -15,12 +15,17 @@ struct AtlasboundApp: App {
     @StateObject private var factoryStore = FactoryStore()
     @StateObject private var idleStore = IdleStore()
     @StateObject private var skillStore = SkillStore()
+    @StateObject private var pulseStore = PulseStore()
     @StateObject private var controllerHolder = ControllerHolder()
     @StateObject private var factoryHolder = FactoryHolder()
     @StateObject private var cloudStateSync = CloudStateSync()
     @State private var cloudBootstrapStarted = false
     @State private var cloudBootstrapError: String?
     @State private var cloudBootstrapTask: Task<Void, Never>?
+    @State private var accountTransitionUserID: UUID?
+    @State private var accountTransitionCheckedUserID: UUID?
+    @State private var showAuthSheet = false
+    @AppStorage(WelcomePreference.completedKey) private var welcomeCompleted = false
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
 
     private var isUITestMode: Bool {
@@ -32,8 +37,17 @@ struct AtlasboundApp: App {
             Group {
                 if auth.isLoading && !isUITestMode {
                     LoadingWorldView()
-                } else if auth.session == nil && !isUITestMode {
-                    AuthView(auth: auth)
+                } else if accountTransitionUserID != nil && !isUITestMode {
+                    AccountTransitionView(
+                        chooseCloud: { finishAccountTransition(.cloud) },
+                        chooseDevice: { finishAccountTransition(.device) },
+                        cancel: { cancelAccountTransition() }
+                    )
+                } else if auth.session == nil && !welcomeCompleted && !isUITestMode {
+                    GuestWelcomeView(
+                        startExploring: startGuestExperience,
+                        signIn: { showAuthSheet = true }
+                    )
                 } else if auth.needsProfileSetup && !isUITestMode {
                     ProfileSetupView(auth: auth)
                 } else if let cloudBootstrapError, !isUITestMode {
@@ -66,9 +80,14 @@ struct AtlasboundApp: App {
                 let sessionFactory = factoryStore
                 let sessionIdle = idleStore
                 let sessionSkills = skillStore
+                let sessionPulses = pulseStore
                 let sessionCloudSync = cloudStateSync
+                let sessionAuth = auth
                 auth.onSessionEnded = { @MainActor in
                     sessionCloudSync.stop()
+                    guard !sessionAuth.preserveLocalStateOnSignOut else {
+                        return
+                    }
                     sessionStore.resetLocalSession()
                     sessionActivityHistory.resetLocalSession()
                     sessionRegionLookup.resetLocalSession()
@@ -77,12 +96,22 @@ struct AtlasboundApp: App {
                     sessionFactory.resetLocalSession()
                     sessionIdle.resetLocalSession()
                     sessionSkills.resetLocalSession()
+                    sessionPulses.resetLocalSession()
                 }
                 bootstrapWorldIfAuthenticated()
             }
             .onChange(of: auth.session?.user.id) { oldValue, newValue in
                 guard oldValue != newValue else { return }
-                resetLocalSession()
+                if newValue == nil {
+                    if auth.preserveLocalStateOnSignOut {
+                        auth.preserveLocalStateOnSignOut = false
+                    } else {
+                        resetLocalSession()
+                    }
+                } else if oldValue != nil {
+                    resetLocalSession()
+                    accountTransitionUserID = nil
+                }
                 if newValue != nil {
                     bootstrapWorldIfAuthenticated()
                 }
@@ -90,12 +119,16 @@ struct AtlasboundApp: App {
             .onOpenURL { url in
                 Task { await auth.handle(url: url) }
             }
+            .sheet(isPresented: $showAuthSheet) {
+                AuthView(auth: auth)
+                    .presentationDetents([.medium, .large])
+            }
         }
     }
 
     @MainActor
     private func bootstrapWorldIfAuthenticated() {
-        guard auth.session != nil || isUITestMode else { return }
+        guard auth.session != nil || isUITestMode || welcomeCompleted else { return }
         guard !cloudBootstrapStarted else { return }
         cloudBootstrapStarted = true
         cloudBootstrapError = nil
@@ -105,6 +138,21 @@ struct AtlasboundApp: App {
             if let startingUserID {
                 let isSessionActive: @MainActor () -> Bool = {
                     authStore.session?.user.id == startingUserID
+                }
+                if accountTransitionCheckedUserID != startingUserID,
+                   store.hasLocalProgress {
+                    let hasRemoteCloud = await store.hasRemoteCloudRecord()
+                    let hasRemoteState = hasRemoteCloud
+                        ? true
+                        : await cloudStateSync.hasRemoteState()
+                    let hasRemote = hasRemoteCloud || hasRemoteState
+                    guard !Task.isCancelled, isSessionActive() else { return }
+                    if hasRemote {
+                        accountTransitionUserID = startingUserID
+                        cloudBootstrapStarted = false
+                        return
+                    }
+                    accountTransitionCheckedUserID = startingUserID
                 }
                 guard await store.hydrateFromCloud(isSessionActive: isSessionActive) else {
                     guard !Task.isCancelled, isSessionActive() else { return }
@@ -120,6 +168,7 @@ struct AtlasboundApp: App {
                     factory: factoryStore,
                     idle: idleStore,
                     skills: skillStore,
+                    pulse: pulseStore,
                     isSessionActive: isSessionActive
                 ) else {
                     guard !Task.isCancelled, isSessionActive() else { return }
@@ -131,6 +180,63 @@ struct AtlasboundApp: App {
                   startingUserID == nil || authStore.session?.user.id == startingUserID
             else { return }
             bootstrapControllers()
+        }
+    }
+
+    private enum AccountTransitionChoice { case cloud, device }
+
+    private func startGuestExperience() {
+        welcomeCompleted = true
+        UserDefaults.standard.set(true, forKey: WelcomePreference.explorationStartedKey)
+        showAuthSheet = false
+        bootstrapWorldIfAuthenticated()
+    }
+
+    @MainActor
+    private func finishAccountTransition(_ choice: AccountTransitionChoice) {
+        guard let userID = accountTransitionUserID,
+              auth.session?.user.id == userID else { return }
+        accountTransitionUserID = nil
+        if choice == .cloud {
+            accountTransitionCheckedUserID = userID
+            resetLocalSession()
+            accountTransitionUserID = nil
+            cloudBootstrapStarted = false
+            bootstrapWorldIfAuthenticated()
+        } else {
+            accountTransitionCheckedUserID = userID
+            accountTransitionUserID = nil
+            cloudBootstrapStarted = true
+            bootstrapControllers()
+            store.queueFullCloudUpload()
+            Task {
+                await cloudStateSync.syncNow(
+                    tileStore: store,
+                    activityHistory: activityHistory,
+                    regionLookup: regionLookup,
+                    treasure: treasureStore,
+                    inventory: inventoryStore,
+                    factory: factoryStore,
+                    idle: idleStore,
+                    skills: skillStore,
+                    pulse: pulseStore
+                )
+            }
+        }
+    }
+
+    @MainActor
+    private func cancelAccountTransition() {
+        auth.preserveLocalStateOnSignOut = true
+        Task { @MainActor in
+            await auth.signOut()
+            if auth.session == nil {
+                accountTransitionUserID = nil
+                cloudBootstrapStarted = false
+                accountTransitionCheckedUserID = nil
+            } else {
+                auth.preserveLocalStateOnSignOut = false
+            }
         }
     }
 
@@ -149,6 +255,9 @@ struct AtlasboundApp: App {
 
     @MainActor
     private func bootstrapControllers() {
+        if auth.session != nil {
+            UserDefaults.standard.set(true, forKey: WelcomePreference.explorationStartedKey)
+        }
         controllerHolder.bootstrap(
             store: store,
             activityHistory: activityHistory,
@@ -156,7 +265,8 @@ struct AtlasboundApp: App {
             treasureStore: treasureStore,
             inventoryStore: inventoryStore,
             idleStore: idleStore,
-            skillStore: skillStore
+            skillStore: skillStore,
+            pulseStore: pulseStore
         )
         factoryHolder.bootstrap(
             store: factoryStore,
@@ -173,7 +283,8 @@ struct AtlasboundApp: App {
                 inventory: inventoryStore,
                 factory: factoryStore,
                 idle: idleStore,
-                skills: skillStore
+                skills: skillStore,
+                pulse: pulseStore
             )
         }
     }
@@ -191,6 +302,7 @@ struct AtlasboundApp: App {
         factoryStore.resetLocalSession()
         idleStore.resetLocalSession()
         skillStore.resetLocalSession()
+        pulseStore.resetLocalSession()
         controllerHolder.reset()
         factoryHolder.reset()
         cloudBootstrapStarted = false
@@ -238,7 +350,8 @@ final class ControllerHolder: ObservableObject {
         treasureStore: TreasureStore,
         inventoryStore: InventoryStore,
         idleStore: IdleStore,
-        skillStore: SkillStore
+        skillStore: SkillStore,
+        pulseStore: PulseStore
     ) {
         guard controller == nil else { return }
         controller = WorldController(
@@ -248,7 +361,8 @@ final class ControllerHolder: ObservableObject {
             treasureStore: treasureStore,
             inventoryStore: inventoryStore,
             idleStore: idleStore,
-            skillStore: skillStore
+            skillStore: skillStore,
+            pulseStore: pulseStore
         )
     }
 }

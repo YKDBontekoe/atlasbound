@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import UIKit
 import MapboxMaps
 
 struct MainMapScreen: View {
@@ -16,6 +17,7 @@ struct MainMapScreen: View {
     @State private var position: Viewport = .followPuck(zoom: 15, pitch: 42)
     @State private var followsUser = true
     @State private var showSettings = false
+    @State private var showAuthSheet = false
     @State private var showActivityPicker = false
     @State private var showExpeditionSheet = false
     @State private var showMapOptions = false
@@ -24,11 +26,13 @@ struct MainMapScreen: View {
     @State private var showTerritorySheet = false
     @State private var showIdleScoutsSheet = false
     @State private var showFactoryBuildSheet = false
+    @State private var selectedPulse: AtlasPulse?
     @State private var factoryPreviewTileID: String?
     @State private var selectedTileID: String?
     @State private var presentedSummary: ActivitySummary?
     @AppStorage("debug.showSimGPSControls") private var showSimGPSControls = false
     @AppStorage(OnboardingPreference.storageKey) private var onboardingVersion = 0
+    @AppStorage(WelcomePreference.explorationStartedKey) private var explorationStarted = false
     @AppStorage("map.dataLayer") private var mapDataLayerRaw = LiveMapDataLayer.mastery.rawValue
     @AppStorage("map.layer.mastery") private var showsMasteryLayer = true
     @AppStorage("map.layer.places") private var showsPlacesLayer = true
@@ -89,7 +93,8 @@ struct MainMapScreen: View {
                 showsFactoryLayer: showsFactoryLayer,
                 factoryController: factoryController,
                 factoryPreviewTileID: $factoryPreviewTileID,
-                onLandmarkQuestTap: { controller.focusLandmarkQuest() }
+                onLandmarkQuestTap: { controller.focusLandmarkQuest() },
+                onPulseTap: { selectedPulse = $0 }
             )
             .ignoresSafeArea()
 
@@ -105,6 +110,13 @@ struct MainMapScreen: View {
                     .allowsHitTesting(false)
             }
             .animation(AtlasMotion.chrome, value: controller.isRecording)
+
+            if recorder.authorizationStatus == .denied || recorder.authorizationStatus == .restricted {
+                locationPermissionBanner
+                    .padding(.horizontal, 16)
+                    .padding(.top, 70)
+                    .frame(maxHeight: .infinity, alignment: .top)
+            }
 
             mapSideControls
                 .padding(.trailing, 16)
@@ -205,6 +217,10 @@ struct MainMapScreen: View {
             )
             .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showAuthSheet) {
+            AuthView(auth: auth)
+                .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: $showActivityPicker) {
             ActivityPickerSheet(controller: controller, startsTrackingOnSelection: true)
                 .presentationDetents([.medium, .large])
@@ -277,6 +293,20 @@ struct MainMapScreen: View {
             }
             .presentationDetents([.medium])
         }
+        .sheet(item: $controller.latestWorldBriefing) { briefing in
+            WorldBriefingSheet(briefing: briefing, controller: controller) { pulseID in
+                guard let pulse = controller.activePulses.first(where: { $0.id == pulseID }) else {
+                    return false
+                }
+                selectedPulse = pulse
+                return true
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $selectedPulse) { pulse in
+            PulseDetailSheet(controller: controller, pulse: pulse)
+                .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: $showExpeditionSheet) {
             ExpeditionSheet(controller: controller, store: store)
                 .presentationDetents([.medium, .large])
@@ -298,7 +328,9 @@ struct MainMapScreen: View {
             // The map is the default exploration surface. Start foreground
             // location monitoring here so live discovery, landmark quests,
             // and the frontier all have an actual player anchor.
-            controller.prepareLocation()
+            if explorationStarted || auth.session != nil {
+                controller.prepareLocation()
+            }
             controller.catchUpIdleOnForeground()
             factoryController.updatePlayerLocation(recorder.lastLocation)
             factoryController.advance()
@@ -316,6 +348,29 @@ struct MainMapScreen: View {
             try? await Task.sleep(for: .seconds(5))
             recorder.clearError()
         }
+    }
+
+    private var locationPermissionBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "location.slash.fill")
+                .foregroundStyle(AtlasTheme.gold)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Location is paused")
+                    .font(.subheadline.weight(.semibold))
+                Text("Allow location in Settings to reveal nearby tiles and treasure arrivals.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 4)
+            Button("Settings") {
+                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                UIApplication.shared.open(url)
+            }
+            .font(.caption.weight(.semibold))
+        }
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityIdentifier("locationPermissionBanner")
     }
 
     // MARK: - Idle chrome
@@ -367,6 +422,14 @@ struct MainMapScreen: View {
         Group {
             if isIdleAdventureExpanded {
                 VStack(spacing: 12) {
+                    PulseWorldCard(controller: controller) { pulse in
+                        selectedPulse = pulse
+                    }
+
+                    if auth.session == nil {
+                        sharedAdventurePrompt
+                            .padding(.horizontal, 12)
+                    }
                     TreasureAdventureCard(
                         store: treasureStore,
                         isPreparing: controller.isPreparingTreasureTrail
@@ -446,6 +509,33 @@ struct MainMapScreen: View {
                 ))
             }
         }
+    }
+
+    private var sharedAdventurePrompt: some View {
+        Button {
+            showAuthSheet = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "person.2.fill")
+                    .foregroundStyle(AtlasTheme.blue)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Unlock shared treasure")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Sign in to see nearby community caches and sync this atlas.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(12)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("sharedAdventurePrompt")
     }
 
     /// Trailing space so expanded adventure cards leave a clear column for map side controls.
@@ -826,6 +916,7 @@ struct SettingsSheet: View {
     @AppStorage(AutomaticExplorationPreference.backgroundKey) private var automaticBackgroundEnabled = false
     @Environment(\.dismiss) private var dismiss
     @State private var showingDeleteConfirmation = false
+    @State private var showingAuth = false
 
     private var appearanceBinding: Binding<AppearancePreference> {
         Binding(
@@ -838,12 +929,20 @@ struct SettingsSheet: View {
         NavigationStack {
             Form {
                 Section("Account") {
-                    LabeledContent("Signed in as", value: auth.displayName)
-                    Button("Sign out") {
-                        Task { await auth.signOut() }
-                    }
-                    Button("Delete account and all progress", role: .destructive) {
-                        showingDeleteConfirmation = true
+                    if auth.session == nil {
+                        Label("Guest mode", systemImage: "person.crop.circle.badge.questionmark")
+                        Text("Your atlas is saved on this device. Sign in when you want cloud sync or shared treasure.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Button("Sign in to sync") { showingAuth = true }
+                    } else {
+                        LabeledContent("Signed in as", value: auth.displayName)
+                        Button("Sign out") {
+                            Task { await auth.signOut() }
+                        }
+                        Button("Delete account and all progress", role: .destructive) {
+                            showingDeleteConfirmation = true
+                        }
                     }
                 }
 
@@ -919,6 +1018,10 @@ struct SettingsSheet: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingAuth) {
+                AuthView(auth: auth)
+                    .presentationDetents([.medium, .large])
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

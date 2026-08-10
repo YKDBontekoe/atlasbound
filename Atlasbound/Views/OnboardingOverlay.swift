@@ -17,12 +17,7 @@ struct OnboardingOverlay: View {
         (
             "map.fill",
             "Follow treasure trails",
-            "Chase three nearby landmark clues each day. Choose a quick route or a longer detour with better rare-relic odds."
-        ),
-        (
-            "lock.open.fill",
-            "Unlock the weekly vault",
-            "Daily trails earn keys. Collect three to reveal a weekly vault and a guaranteed rare-or-better relic."
+            "Chase nearby landmark clues each day. Longer detours improve your rare-relic odds."
         ),
         (
             "location.fill",
@@ -32,7 +27,7 @@ struct OnboardingOverlay: View {
     ]
 
     private var artName: String {
-        ["FieldKitMark", "TreasureCacheMark", "FactoryMark", "FieldKitMark"][step]
+        ["FieldKitMark", "TreasureCacheMark", "FieldKitMark"][step]
     }
 
     var body: some View {
@@ -118,6 +113,13 @@ struct OnboardingOverlay: View {
                     .frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 24)
+
+                Button("Skip tutorial") {
+                    AtlasHaptics.select()
+                    onComplete()
+                }
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(.secondary)
                 .padding(.bottom, 32)
             }
         }
