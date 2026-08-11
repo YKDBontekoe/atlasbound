@@ -6,7 +6,7 @@ import os
 /// Geometry is never stored — tiles keep IDs + mastery fields only.
 @MainActor
 final class AtlasDatabase {
-    static let schemaVersion = 6
+    static let schemaVersion = 7
     static let fileName = "atlasbound.sqlite"
 
     private static let logger = Logger(subsystem: "com.atlasbound.app", category: "database")
@@ -202,7 +202,20 @@ final class AtlasDatabase {
                 );
                 """
             )
-            setMetaValue("\(Self.schemaVersion)", for: "schema_version")
+            setMetaValue("6", for: "schema_version")
+        }
+
+        let afterV6 = Int(metaValue(for: "schema_version") ?? "0") ?? 0
+        if afterV6 < 7 {
+            try db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS weather_state (
+                  id INTEGER PRIMARY KEY CHECK (id = 1),
+                  payload TEXT NOT NULL
+                );
+                """
+            )
+            setMetaValue("7", for: "schema_version")
         }
     }
 
@@ -503,7 +516,7 @@ final class AtlasDatabase {
                 "tiles", "progress", "frontier", "territory_state",
                 "activity_sessions", "activity_aggregates", "region_cells",
                 "treasure_state", "pinpoint_games", "pinpoint_stats",
-                "inventory_state", "factory_state", "idle_state", "skill_state", "pulse_state"
+                "inventory_state", "factory_state", "idle_state", "skill_state", "pulse_state", "weather_state"
             ] {
                 guard tableExists(table) else { continue }
                 try db.execute("DELETE FROM \(table);")
@@ -911,6 +924,19 @@ final class AtlasDatabase {
         )
     }
 
+    func loadWeatherState() -> WeatherCacheState? {
+        guard let save = loadBlob(table: "weather_state", as: PersistedWeatherSave.self),
+              save.version == WeatherCacheState.schemaVersion else { return nil }
+        return save.state
+    }
+
+    func saveWeatherState(_ state: WeatherCacheState) {
+        saveBlob(
+            table: "weather_state",
+            value: PersistedWeatherSave(version: WeatherCacheState.schemaVersion, state: state)
+        )
+    }
+
     private func loadBlob<T: Decodable>(table: String, as type: T.Type) -> T? {
         guard let statement = try? db.prepare("SELECT payload FROM \(table) WHERE id = 1;") else {
             return nil
@@ -940,6 +966,11 @@ final class AtlasDatabase {
 struct PersistedPulseSave: Codable, Sendable {
     let version: Int
     let state: PulseState
+}
+
+struct PersistedWeatherSave: Codable, Sendable {
+    let version: Int
+    let state: WeatherCacheState
 }
 
 // MARK: - Legacy JSON shapes (migration + blob codec)

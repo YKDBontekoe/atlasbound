@@ -35,6 +35,8 @@ enum SupabaseClientProvider {
     /// `auth` on a client configured with `auth.accessToken`.
     static let authenticatedClient: SupabaseClient? = {
         guard let key = SupabaseConfiguration.publishableKey else { return nil }
+        let functionsDecoder = JSONDecoder()
+        functionsDecoder.dateDecodingStrategy = .iso8601
         return SupabaseClient(
             supabaseURL: SupabaseConfiguration.projectURL,
             supabaseKey: key,
@@ -42,7 +44,8 @@ enum SupabaseClientProvider {
                 auth: .init(accessToken: {
                     guard let authClient = SupabaseClientProvider.client else { return nil }
                     return try await authClient.auth.session.accessToken
-                })
+                }),
+                functions: .init(decoder: functionsDecoder)
             )
         )
     }()

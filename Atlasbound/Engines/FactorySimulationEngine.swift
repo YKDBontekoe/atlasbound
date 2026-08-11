@@ -11,7 +11,8 @@ struct FactorySimulationEngine: Sendable {
         state initialState: FactoryState,
         to date: Date,
         tileEngine: TileEngine,
-        speedMultiplier: Double = 1
+        speedMultiplier: Double = 1,
+        weatherByCell: [String: WeatherSnapshot] = [:]
     ) -> FactoryState {
         var state = initialState
         let elapsed = date.timeIntervalSince(state.lastSimulatedAt)
@@ -33,6 +34,7 @@ struct FactorySimulationEngine: Sendable {
             structures: state.structures,
             tileEngine: tileEngine
         )
+        let freshWeatherByCell = weatherByCell.filter { $0.value.expiresAt > date }
         let speed = max(1, speedMultiplier)
         for _ in 0..<minutes {
             simulateMinute(
@@ -40,7 +42,8 @@ struct FactorySimulationEngine: Sendable {
                 networks: networks,
                 cachedPaths: paths,
                 tileEngine: tileEngine,
-                speedMultiplier: speed
+                speedMultiplier: speed,
+                weatherByCell: freshWeatherByCell
             )
         }
         state.lastSimulatedAt = totalMinutes > Self.maximumOfflineMinutes
@@ -54,7 +57,8 @@ struct FactorySimulationEngine: Sendable {
         networks: [FactoryNetworkSnapshot],
         cachedPaths: [String: [String]],
         tileEngine: TileEngine,
-        speedMultiplier: Double
+        speedMultiplier: Double,
+        weatherByCell: [String: WeatherSnapshot]
     ) {
         for network in networks {
             simulate(
@@ -62,7 +66,8 @@ struct FactorySimulationEngine: Sendable {
                 state: &state,
                 cachedPaths: cachedPaths,
                 tileEngine: tileEngine,
-                speedMultiplier: speedMultiplier
+                speedMultiplier: speedMultiplier,
+                weatherByCell: weatherByCell
             )
         }
     }
@@ -72,7 +77,8 @@ struct FactorySimulationEngine: Sendable {
         state: inout FactoryState,
         cachedPaths: [String: [String]],
         tileEngine: TileEngine,
-        speedMultiplier: Double
+        speedMultiplier: Double,
+        weatherByCell: [String: WeatherSnapshot]
     ) {
         var remainingRoadCapacity = Dictionary(uniqueKeysWithValues: network.roadTileIDs.map { roadID in
             let tier = state.structures[roadID]
@@ -81,6 +87,8 @@ struct FactorySimulationEngine: Sendable {
             if state.unlockedResearchIDs.contains("logistics_3") {
                 capacity = Int((Double(capacity) * 1.25).rounded())
             }
+            let weather = weatherModifier(for: roadID, tileEngine: tileEngine, weatherByCell: weatherByCell)
+            capacity = max(1, Int((Double(capacity) * weather.roadThroughput).rounded()))
             return (roadID, capacity)
         })
 
@@ -89,14 +97,16 @@ struct FactorySimulationEngine: Sendable {
             state.structures[$0].flatMap { FactoryCatalog.byID[$0.definitionID] }?.kind == .depot
         }
         let generatorIDs = buildingIDs.filter {
-            state.structures[$0].flatMap { FactoryCatalog.byID[$0.definitionID] }?.kind == .generator
+            let kind = state.structures[$0].flatMap { FactoryCatalog.byID[$0.definitionID] }?.kind
+            return kind == .generator || kind == .renewable
         }
 
         var availablePower = 0
         for id in generatorIDs {
             guard var generator = state.structures[id],
                   let definition = FactoryCatalog.byID[generator.definitionID] else { continue }
-            if generator.fueledMinutes <= 0 {
+            let definitionKind = FactoryCatalog.byID[generator.definitionID]?.kind
+            if definitionKind == .generator && generator.fueledMinutes <= 0 {
                 _ = pull(
                     itemID: "amber_resin",
                     quantity: 1,
@@ -113,7 +123,14 @@ struct FactorySimulationEngine: Sendable {
                     generator.fueledMinutes = 10
                 }
             }
-            if generator.fueledMinutes > 0 {
+            if definitionKind == .renewable {
+                let modifier = weatherModifier(for: generator.tileID, tileEngine: tileEngine, weatherByCell: weatherByCell)
+                if FactoryCatalog.byID[generator.definitionID]?.id == "solar_array" {
+                    availablePower += Int((18.0 * modifier.solarPower).rounded())
+                } else {
+                    availablePower += Int((16.0 * modifier.windPower).rounded())
+                }
+            } else if generator.fueledMinutes > 0 {
                 if generator.tier >= 3 {
                     availablePower += 80
                 } else if generator.tier >= 2 {
@@ -157,15 +174,20 @@ struct FactorySimulationEngine: Sendable {
                 let deposit = constructionEngine.deposit(for: id)
                 if let itemID = deposit.kind.outputItemID, structure.extractedUnits < deposit.capacity {
                     var amount = 1
-                    if state.unlockedResearchIDs.contains("extraction_3") && structure.tier >= 3 {
+                    if definition.id == "deep_mine" {
                         amount = 3
+                    }
+                    if state.unlockedResearchIDs.contains("extraction_3") && structure.tier >= 3 {
+                        amount = max(amount, 3)
                     } else if state.unlockedResearchIDs.contains("extraction_2") && structure.tier >= 2 {
-                        amount = 2
+                        amount = max(amount, 2)
                     }
                     // Soft Artifice speed occasionally yields an extra unit.
                     if speedMultiplier > 1.25, StableHash.fnv1a64("extract:\(id):\(structure.extractedUnits)") % 4 == 0 {
                         amount += 1
                     }
+                    let weather = weatherModifier(for: id, tileEngine: tileEngine, weatherByCell: weatherByCell)
+                    amount = max(1, Int((Double(amount) * weather.extractionYield).rounded()))
                     let remaining = deposit.capacity - structure.extractedUnits
                     let produced = min(amount, remaining)
                     if totalQuantity(structure.outputBuffer) + produced <= Self.defaultBufferCapacity {
@@ -174,7 +196,16 @@ struct FactorySimulationEngine: Sendable {
                         state.lifetimeProduced[itemID, default: 0] += produced
                     }
                 }
-            case .processor, .research:
+            case .processor, .research, .farm, .water:
+                if definition.kind == .water && definition.id == "rain_catcher" {
+                    let weather = weatherModifier(for: id, tileEngine: tileEngine, weatherByCell: weatherByCell)
+                    let snapshot = weatherSnapshot(for: id, tileEngine: tileEngine, weatherByCell: weatherByCell)
+                    let amount = max(0, Int(((snapshot?.precipitationMM ?? 0) * 0.25 * weather.cropYield).rounded()))
+                    if amount > 0 && totalQuantity(structure.outputBuffer) + amount <= Self.defaultBufferCapacity {
+                        structure.outputBuffer["water", default: 0] += amount
+                        state.lifetimeProduced["water", default: 0] += amount
+                    }
+                }
                 guard let recipeID = structure.selectedRecipeID,
                       let recipe = FactoryRecipeCatalog.byID[recipeID],
                       definition.allowedRecipeIDs.contains(recipeID),
@@ -208,14 +239,22 @@ struct FactorySimulationEngine: Sendable {
                     )
                     if structure.recipeProgressMinutes >= effectiveDuration {
                         subtract(recipe.inputs, from: &structure.inputBuffer)
-                        add(recipe.outputs, to: &structure.outputBuffer)
-                        for output in recipe.outputs {
+                        let weather = weatherModifier(for: id, tileEngine: tileEngine, weatherByCell: weatherByCell)
+                        var outputs = recipe.outputs
+                        if definition.kind == .farm {
+                            let cropYield = definition.id == "greenhouse"
+                                ? max(1, weather.cropYield)
+                                : weather.cropYield
+                            outputs = outputs.map { ItemAmount(itemID: $0.itemID, quantity: max(1, Int((Double($0.quantity) * cropYield).rounded()))) }
+                        }
+                        add(outputs, to: &structure.outputBuffer)
+                        for output in outputs {
                             state.lifetimeProduced[output.itemID, default: 0] += output.quantity
                         }
                         structure.recipeProgressMinutes = 0
                     }
                 }
-            case .road, .depot, .generator:
+            case .road, .depot, .generator, .renewable:
                 break
             }
             state.structures[id] = structure
@@ -229,6 +268,15 @@ struct FactorySimulationEngine: Sendable {
                 tileEngine: tileEngine
             )
         }
+    }
+
+    private func weatherSnapshot(for tileID: String, tileEngine: TileEngine, weatherByCell: [String: WeatherSnapshot]) -> WeatherSnapshot? {
+        guard let tile = tileEngine.parseTileID(tileID) else { return nil }
+        return weatherByCell[WeatherCellEngine().cellID(for: tile, tileEngine: tileEngine)]
+    }
+
+    private func weatherModifier(for tileID: String, tileEngine: TileEngine, weatherByCell: [String: WeatherSnapshot]) -> WeatherModifiers {
+        WeatherEngine().modifiers(for: weatherSnapshot(for: tileID, tileEngine: tileEngine, weatherByCell: weatherByCell))
     }
 
     private func pull(

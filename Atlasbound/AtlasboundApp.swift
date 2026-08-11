@@ -16,6 +16,7 @@ struct AtlasboundApp: App {
     @StateObject private var idleStore = IdleStore()
     @StateObject private var skillStore = SkillStore()
     @StateObject private var pulseStore = PulseStore()
+    @StateObject private var weatherStore = WeatherStore()
     @StateObject private var controllerHolder = ControllerHolder()
     @StateObject private var factoryHolder = FactoryHolder()
     @StateObject private var cloudStateSync = CloudStateSync()
@@ -81,6 +82,7 @@ struct AtlasboundApp: App {
                 let sessionIdle = idleStore
                 let sessionSkills = skillStore
                 let sessionPulses = pulseStore
+                let sessionWeather = weatherStore
                 let sessionCloudSync = cloudStateSync
                 let sessionAuth = auth
                 auth.onSessionEnded = { @MainActor in
@@ -97,6 +99,7 @@ struct AtlasboundApp: App {
                     sessionIdle.resetLocalSession()
                     sessionSkills.resetLocalSession()
                     sessionPulses.resetLocalSession()
+                    sessionWeather.resetLocalSession()
                 }
                 bootstrapWorldIfAuthenticated()
             }
@@ -266,13 +269,15 @@ struct AtlasboundApp: App {
             inventoryStore: inventoryStore,
             idleStore: idleStore,
             skillStore: skillStore,
-            pulseStore: pulseStore
+            pulseStore: pulseStore,
+            weatherStore: weatherStore
         )
         factoryHolder.bootstrap(
             store: factoryStore,
             tileStore: store,
             inventoryStore: inventoryStore,
-            skillStore: skillStore
+            skillStore: skillStore,
+            weatherStore: weatherStore
         )
         if auth.session != nil {
             cloudStateSync.start(
@@ -303,6 +308,7 @@ struct AtlasboundApp: App {
         idleStore.resetLocalSession()
         skillStore.resetLocalSession()
         pulseStore.resetLocalSession()
+        weatherStore.resetLocalSession()
         controllerHolder.reset()
         factoryHolder.reset()
         cloudBootstrapStarted = false
@@ -322,14 +328,16 @@ final class FactoryHolder: ObservableObject {
         store: FactoryStore,
         tileStore: TileStore,
         inventoryStore: InventoryStore,
-        skillStore: SkillStore
+        skillStore: SkillStore,
+        weatherStore: WeatherStore
     ) {
         guard controller == nil else { return }
         controller = FactoryController(
             store: store,
             tileStore: tileStore,
             inventoryStore: inventoryStore,
-            skillStore: skillStore
+            skillStore: skillStore,
+            weatherStore: weatherStore
         )
         controller?.advance()
     }
@@ -351,7 +359,8 @@ final class ControllerHolder: ObservableObject {
         inventoryStore: InventoryStore,
         idleStore: IdleStore,
         skillStore: SkillStore,
-        pulseStore: PulseStore
+        pulseStore: PulseStore,
+        weatherStore: WeatherStore
     ) {
         guard controller == nil else { return }
         controller = WorldController(
@@ -362,7 +371,8 @@ final class ControllerHolder: ObservableObject {
             inventoryStore: inventoryStore,
             idleStore: idleStore,
             skillStore: skillStore,
-            pulseStore: pulseStore
+            pulseStore: pulseStore,
+            weatherStore: weatherStore
         )
     }
 }

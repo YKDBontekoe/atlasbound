@@ -1,4 +1,5 @@
 import XCTest
+import SQLite3
 @testable import Atlasbound
 
 @MainActor
@@ -78,5 +79,41 @@ final class AtlasDatabaseTests: XCTestCase {
         let keys = Set(Mirror(reflecting: PersistedTileRecord(from: loaded!)).children.compactMap(\.label))
         XCTAssertFalse(keys.contains("polygon"))
         XCTAssertFalse(keys.contains("latitude"))
+    }
+
+    func testVersionFiveDatabaseRunsPulseAndWeatherMigrationsAndClearsWeather() throws {
+        do {
+            let bootstrap = try SQLiteDatabase(fileURL: tempURL)
+            try bootstrap.execute("CREATE TABLE meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);")
+            try bootstrap.execute("INSERT INTO meta(key, value) VALUES ('schema_version', '5');")
+        }
+
+        let database = AtlasDatabase(fileURL: tempURL, importLegacyJSON: false)
+        let snapshot = WeatherSnapshot(
+            cellID: "weather:20:0:0",
+            condition: .clear,
+            temperatureC: 20,
+            precipitationMM: 0,
+            windKPH: 4,
+            cloudCover: 0,
+            observedAt: .now,
+            expiresAt: .now.addingTimeInterval(3600)
+        )
+        database.saveWeatherState(WeatherCacheState(snapshots: [snapshot.cellID: snapshot], lastRefreshAt: .now))
+        XCTAssertNotNil(database.loadWeatherState())
+        database.clearAllLocalState()
+        XCTAssertNil(database.loadWeatherState())
+
+        let verifier = try SQLiteDatabase(fileURL: tempURL)
+        XCTAssertEqual(try scalar(verifier, "SELECT value FROM meta WHERE key = 'schema_version';"), "7")
+        XCTAssertEqual(try scalar(verifier, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pulse_state';"), "pulse_state")
+        XCTAssertEqual(try scalar(verifier, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'weather_state';"), "weather_state")
+    }
+
+    private func scalar(_ database: SQLiteDatabase, _ sql: String) throws -> String? {
+        let statement = try database.prepare(sql)
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        return SQLiteDatabase.columnText(statement, index: 0)
     }
 }

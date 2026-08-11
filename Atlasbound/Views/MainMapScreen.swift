@@ -10,6 +10,7 @@ struct MainMapScreen: View {
     @ObservedObject var factoryController: FactoryController
     @ObservedObject private var recorder: ActivityRecorder
     @ObservedObject private var treasureStore: TreasureStore
+    @ObservedObject private var weatherStore: WeatherStore
     @ObservedObject private var inventoryStore: InventoryStore
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -53,6 +54,7 @@ struct MainMapScreen: View {
         self.factoryController = factoryController
         self._recorder = ObservedObject(wrappedValue: controller.recorder)
         self._treasureStore = ObservedObject(wrappedValue: controller.treasureStore)
+        self._weatherStore = ObservedObject(wrappedValue: controller.weatherStore)
         self._inventoryStore = ObservedObject(wrappedValue: controller.inventoryStore)
     }
 
@@ -99,6 +101,7 @@ struct MainMapScreen: View {
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
+                weatherHeader
                 if controller.isRecording {
                     activeHeader
                         .transition(.move(edge: .top).combined(with: .opacity))
@@ -347,6 +350,29 @@ struct MainMapScreen: View {
             guard recorder.lastErrorMessage != nil else { return }
             try? await Task.sleep(for: .seconds(5))
             recorder.clearError()
+        }
+    }
+
+    private var weatherHeader: some View {
+        let snapshot = weatherStore.snapshots.values
+            .filter { !$0.isStale }
+            .sorted { $0.observedAt > $1.observedAt }
+            .first
+        return Group {
+            if let snapshot {
+                HStack(spacing: 8) {
+                    Image(systemName: snapshot.condition.symbolName)
+                    Text("\(snapshot.condition.displayName) · \(Int(snapshot.temperatureC.rounded()))°C")
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.black.opacity(0.62), in: Capsule())
+                .padding(.top, 10)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Regional weather: \(snapshot.condition.displayName), \(Int(snapshot.temperatureC.rounded())) degrees Celsius")
+            }
         }
     }
 

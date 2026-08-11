@@ -40,6 +40,7 @@ final class WorldController: ObservableObject {
     let idleStore: IdleStore
     let skillStore: SkillStore
     let pulseStore: PulseStore
+    let weatherStore: WeatherStore
     private let progression = ProgressionEngine()
     private let frontierEngine = FrontierEngine()
     private let sectorEngine = HexSectorEngine()
@@ -72,6 +73,7 @@ final class WorldController: ObservableObject {
         idleStore: IdleStore? = nil,
         skillStore: SkillStore? = nil,
         pulseStore: PulseStore? = nil,
+        weatherStore: WeatherStore? = nil,
         recorder: ActivityRecorder? = nil,
         landmarkResolver: any LandmarkResolving = LandmarkResolver()
     ) {
@@ -84,6 +86,7 @@ final class WorldController: ObservableObject {
         self.idleStore = idleStore ?? IdleStore()
         self.skillStore = skillStore ?? SkillStore()
         self.pulseStore = pulseStore ?? PulseStore()
+        self.weatherStore = weatherStore ?? WeatherStore()
         self.recorder = recorder ?? ActivityRecorder()
         self.landmarkResolver = landmarkResolver
         restoreSelectedActivityType()
@@ -946,6 +949,10 @@ final class WorldController: ObservableObject {
     }
 
     private func handleSample(_ sample: LocationSample) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await weatherStore.refresh(around: sample.coordinate, tileEngine: tileEngine, at: sample.timestamp)
+        }
         liveRoute.append(sample.coordinate)
         let engine = tileEngine
 
@@ -969,6 +976,10 @@ final class WorldController: ObservableObject {
 
     private func handleAutomaticSample(_ sample: LocationSample) {
         guard recorder.automaticExplorationEnabled, !recorder.isRecording else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await weatherStore.refresh(around: sample.coordinate, tileEngine: tileEngine, at: sample.timestamp)
+        }
         explorationMode = .automatic
         store.applyWeeklyChargeResetIfNeeded()
         let engine = tileEngine
