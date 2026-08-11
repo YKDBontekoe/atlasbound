@@ -6,6 +6,7 @@ struct WorkshopTabView: View {
     enum Pane: String, CaseIterable, Identifiable {
         case journal
         case factory
+        case decks
 
         var id: String { rawValue }
 
@@ -13,6 +14,7 @@ struct WorkshopTabView: View {
             switch self {
             case .journal: "Journal"
             case .factory: "Factory"
+            case .decks: "Decks"
             }
         }
     }
@@ -22,6 +24,7 @@ struct WorkshopTabView: View {
     @ObservedObject var activityHistory: ActivityHistoryStore
     @ObservedObject var treasureStore: TreasureStore
     @ObservedObject var factoryController: FactoryController
+    @ObservedObject var cardStore: CardStore
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var pane: Pane = .journal
@@ -51,6 +54,8 @@ struct WorkshopTabView: View {
                         )
                     case .factory:
                         FactoryHubView(controller: factoryController)
+                    case .decks:
+                        DeckWorkshopView(cardStore: cardStore, inventory: controller.inventoryStore)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

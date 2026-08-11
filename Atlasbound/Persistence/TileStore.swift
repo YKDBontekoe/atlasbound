@@ -441,6 +441,37 @@ final class TileStore: ObservableObject {
     }
 }
 
+#if DEBUG
+extension TileStore {
+    /// Seeds canonical, fully mastered tiles for simulator and UI verification only.
+    func debugUnlockAtlas(around center: TileCoordinate, radius: Int = 8, date: Date = .now) {
+        let unlocked = tileEngine.ring(around: center, radius: radius).map { coordinate in
+            WorldTile(
+                id: TileEngine.makeTileID(q: coordinate.q, r: coordinate.r, sizeMeters: tileEngine.tileSizeMeters),
+                coordinate: coordinate,
+                state: .legendary,
+                masteryXP: 500,
+                visitCount: 12,
+                uniqueVisitDays: 7,
+                activityStamps: [.walk, .hike],
+                firstVisitedAt: date,
+                lastVisitedAt: date,
+                weeklyCharge: 0,
+                regionIDs: []
+            )
+        }
+        upsertMany(unlocked)
+        addXP(discovery: unlocked.count * 100, familiarity: unlocked.count * 400)
+    }
+
+    func debugGrantExplorerLevel(_ level: Int) {
+        let target = ExplorerProgressionEngine().xpRequired(forLevel: max(1, level))
+        let current = discoveryXPTotal + familiarityXPTotal
+        addXP(discovery: max(0, target - current), familiarity: 0)
+    }
+}
+#endif
+
 @MainActor
 private struct CloudUpload {
     let tiles: [WorldTile]

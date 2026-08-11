@@ -16,6 +16,7 @@ final class SmokeUITests: XCTestCase {
         // Avoid first-run permission races; CI also grants via simctl.
         app.launchEnvironment["OS_ACTIVITY_MODE"] = "disable"
         app.launchEnvironment["ATLASBOUND_UI_TEST_MODE"] = "1"
+        app.launchEnvironment["ATLASBOUND_ENABLE_DEVELOPER_MODE"] = "true"
         launchAppToleratingSimulatorFlakes()
 
         addUIInterruptionMonitor(withDescription: "System alerts") { alert in
@@ -209,6 +210,33 @@ final class SmokeUITests: XCTestCase {
                     || app.staticTexts["Research tree"].waitForExistence(timeout: 3)
             )
         }
+    }
+
+    func testCrewfrontDecksAndGuardianTraining() throws {
+        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 12))
+        let workshopTab = app.tabBars.buttons["Workshop"]
+        XCTAssertTrue(workshopTab.waitForExistence(timeout: 5))
+        workshopTab.tap()
+
+        let panePicker = app.segmentedControls["workshopPanePicker"]
+        XCTAssertTrue(panePicker.waitForExistence(timeout: 5))
+        panePicker.buttons["Decks"].tap()
+        XCTAssertTrue(app.staticTexts["Deck cards"].waitForExistence(timeout: 5))
+
+        let decksShot = XCTAttachment(screenshot: app.screenshot())
+        decksShot.name = "Crewfront-decks"
+        decksShot.lifetime = .keepAlways
+        add(decksShot)
+
+        let training = app.buttons["Start Guardian training"]
+        XCTAssertTrue(training.waitForExistence(timeout: 5))
+        training.tap()
+        XCTAssertTrue(app.navigationBars["Guardian training"].waitForExistence(timeout: 5))
+
+        let trainingShot = XCTAttachment(screenshot: app.screenshot())
+        trainingShot.name = "Guardian-training"
+        trainingShot.lifetime = .keepAlways
+        add(trainingShot)
     }
 
     func testFrontierExpeditionSelectionAndLeaderboard() throws {

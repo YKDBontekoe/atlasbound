@@ -129,3 +129,8 @@ struct WorldSaveFile: Codable, Sendable {
         self.frontier = frontier
     }
 }
+
+struct PersistedCardSave: Codable, Sendable {
+    let version: Int
+    let state: CardState
+}

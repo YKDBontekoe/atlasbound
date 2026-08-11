@@ -104,3 +104,11 @@ final class FactoryStore: ObservableObject {
         }
     }
 }
+
+#if DEBUG
+extension FactoryStore {
+    func debugUnlockAllResearch() {
+        update { $0.unlockedResearchIDs = Set(FactoryResearchCatalog.all.map(\.id)) }
+    }
+}
+#endif

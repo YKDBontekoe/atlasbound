@@ -1,0 +1,4 @@
+interface:
+  display_name: "Simulator Dev Validation"
+  short_description: "Exercise Atlasbound debug unlocks in iOS Simulator."
+  default_prompt: "Use $simulator-developer-validation to launch Atlasbound in Simulator and validate the developer unlock flow."

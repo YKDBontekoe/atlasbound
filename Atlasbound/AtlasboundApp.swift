@@ -17,6 +17,8 @@ struct AtlasboundApp: App {
     @StateObject private var skillStore = SkillStore()
     @StateObject private var pulseStore = PulseStore()
     @StateObject private var weatherStore = WeatherStore()
+    @StateObject private var cardStore = CardStore()
+    @StateObject private var crewStore = CrewStore()
     @StateObject private var controllerHolder = ControllerHolder()
     @StateObject private var factoryHolder = FactoryHolder()
     @StateObject private var cloudStateSync = CloudStateSync()
@@ -63,7 +65,9 @@ struct AtlasboundApp: App {
                         store: store,
                         activityHistory: activityHistory,
                         regionLookup: regionLookup,
-                        factoryController: factoryController
+                        factoryController: factoryController,
+                        cardStore: cardStore,
+                        crewStore: crewStore
                     )
                 } else {
                     LoadingWorldView()
@@ -83,6 +87,8 @@ struct AtlasboundApp: App {
                 let sessionSkills = skillStore
                 let sessionPulses = pulseStore
                 let sessionWeather = weatherStore
+                let sessionCards = cardStore
+                let sessionCrew = crewStore
                 let sessionCloudSync = cloudStateSync
                 let sessionAuth = auth
                 auth.onSessionEnded = { @MainActor in
@@ -100,6 +106,8 @@ struct AtlasboundApp: App {
                     sessionSkills.resetLocalSession()
                     sessionPulses.resetLocalSession()
                     sessionWeather.resetLocalSession()
+                    sessionCards.resetLocalSession()
+                    sessionCrew.resetLocalSession()
                 }
                 bootstrapWorldIfAuthenticated()
             }
@@ -309,6 +317,8 @@ struct AtlasboundApp: App {
         skillStore.resetLocalSession()
         pulseStore.resetLocalSession()
         weatherStore.resetLocalSession()
+        cardStore.resetLocalSession()
+        crewStore.resetLocalSession()
         controllerHolder.reset()
         factoryHolder.reset()
         cloudBootstrapStarted = false

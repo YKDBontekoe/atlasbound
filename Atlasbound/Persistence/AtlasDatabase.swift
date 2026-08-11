@@ -217,6 +217,19 @@ final class AtlasDatabase {
             )
             setMetaValue("7", for: "schema_version")
         }
+
+        let afterV7 = Int(metaValue(for: "schema_version") ?? "0") ?? 0
+        if afterV7 < 8 {
+            try db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS card_state (
+                  id INTEGER PRIMARY KEY CHECK (id = 1),
+                  payload TEXT NOT NULL
+                );
+                """
+            )
+            setMetaValue("8", for: "schema_version")
+        }
     }
 
     private func metaValue(for key: String) -> String? {
@@ -935,6 +948,16 @@ final class AtlasDatabase {
             table: "weather_state",
             value: PersistedWeatherSave(version: WeatherCacheState.schemaVersion, state: state)
         )
+    }
+
+    func loadCardState() -> CardState? {
+        guard let save = loadBlob(table: "card_state", as: PersistedCardSave.self),
+              save.version == CardState.schemaVersion else { return nil }
+        return save.state
+    }
+
+    func saveCardState(_ state: CardState) {
+        saveBlob(table: "card_state", value: PersistedCardSave(version: CardState.schemaVersion, state: state))
     }
 
     private func loadBlob<T: Decodable>(table: String, as type: T.Type) -> T? {

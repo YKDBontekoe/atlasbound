@@ -63,6 +63,8 @@ In the Supabase Dashboard, enable email OTP/magic-link auth and add `atlasbound:
 
 Simulator / DEBUG Sim GPS: set `ATLASBOUND_ENABLE_SIM_GPS=true` in `.env`, run `python3 scripts/sync-env.py`, rebuild, then enable **Show Sim GPS controls** in Settings. The on-map pad stays hidden otherwise.
 
+For local progression testing, set `ATLASBOUND_ENABLE_DEVELOPER_MODE=true` alongside the Sim GPS flag, sync the env file, rebuild, and open **Settings → Developer → Open developer tools**. The panel is compiled only in Debug, remains hidden without the explicit flag, and changes local test state only; it never writes Crewfront competitive state to Supabase.
+
 ## Project layout conventions
 
 | Path | Put here |

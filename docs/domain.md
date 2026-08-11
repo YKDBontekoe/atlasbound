@@ -109,3 +109,10 @@ Discovered tile centers are quantized into ~2 km cache cells and reverse-geocode
 Atlas Pulse is a local-first living-world layer over the canonical 20 m atlas. Pulses are temporary, deterministic phenomena anchored to tile IDs: signal drift, fog fronts, and resource blooms currently refresh in six-hour local slots around the latest accepted player location. Each Pulse advances through detected, developing, peak, and resolved phases and can be resolved once at close range with an observe, stabilize, or harvest action. Rewards use existing inventory items; claim conditions and scout reports are additive and never remove atlas progress.
 
 Pulse state persists as IDs, phases, dates, interactions, claim conditions, scout stance, and reports in the SQLite `pulse_state` blob. Geometry remains derived from `TileEngine`. The current client schedules optional local peak alerts only for Pulses already known to the device; server-authored refreshes, remote notifications, widgets, and Horizon aggregation remain extension points for the authenticated live-ops layer.
+
+## Crewfront cards and crews
+
+- A **blueprint** is permanent; a **card instance** is a crafted copy with three integrity states. Protected starter copies cannot be staked.
+- Field Decks contain exactly 12 instances and at most two copies of one blueprint. They are validated by `CrewfrontBattleEngine` before an encounter begins.
+- Guardian training uses a deterministic seven-hex board, six rounds, three energy per player, and a seeded tiebreaker. This same pure rules contract is the conformance target for future server-authoritative crew rooms.
+- Crew territory is a separate seasonal overlay on the canonical personal atlas. It persists sector IDs only, never player geometry or exact locations.
