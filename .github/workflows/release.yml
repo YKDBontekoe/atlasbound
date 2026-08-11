@@ -319,9 +319,6 @@ jobs:
       - name: Verify migration history
         run: supabase migration list
 
-      - name: Deploy account deletion function
-        run: supabase functions deploy delete-account --project-ref "$SUPABASE_PROJECT_ID"
-
       - name: Configure Mapbox public token secret
         run: |
           set -euo pipefail
@@ -331,11 +328,29 @@ jobs:
           fi
           supabase secrets set MAPBOX_PUBLIC_ACCESS_TOKEN="$MAPBOX_PUBLIC_ACCESS_TOKEN" --project-ref "$SUPABASE_PROJECT_ID"
 
-      - name: Deploy shared treasure function
-        run: supabase functions deploy spawn-shared-treasure --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Deploy all Edge Functions
+        run: |
+          set -euo pipefail
 
-      - name: Deploy shared weather function
-        run: supabase functions deploy weather-atlas --project-ref "$SUPABASE_PROJECT_ID"
+          function_names=()
+          while IFS= read -r function_dir; do
+            function_name="${function_dir##*/}"
+            # Keep shared implementation modules (for example _shared) out of
+            # the deploy list; only named function directories are deployable.
+            [[ "$function_name" == _* ]] && continue
+            function_names+=("$function_name")
+          done < <(find supabase/functions -mindepth 1 -maxdepth 1 -type d -print | sort)
+
+          if [[ "${#function_names[@]}" -eq 0 ]]; then
+            echo "No Supabase Edge Functions found under supabase/functions" >&2
+            exit 1
+          fi
+
+          printf 'Deploying Edge Functions: %s\n' "${function_names[*]}"
+          for function_name in "${function_names[@]}"; do
+            echo "Deploying $function_name"
+            supabase functions deploy "$function_name" --project-ref "$SUPABASE_PROJECT_ID"
+          done
 
   publish:
     name: Release + AltStore source
