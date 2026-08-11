@@ -40,6 +40,7 @@ struct ActivitySummary: Identifiable, Sendable {
     var frontierContribution: FrontierSessionContribution?
     /// Active recording time, excluding pauses. Older callers and records fall back to wall time.
     var activeDuration: TimeInterval? = nil
+    var journeyTrack: JourneyTrack? = nil
 
     var duration: TimeInterval {
         max(0, activeDuration ?? endedAt.timeIntervalSince(startedAt))
@@ -62,6 +63,7 @@ struct PersistedActivityRecord: Codable, Identifiable, Sendable, Hashable {
     var frontierConnectionBonus: Int?
     var frontierCompletionBonus: Int?
     var frontierWeeklyTotal: Int?
+    var journeyTrack: JourneyTrack?
 
     init(from summary: ActivitySummary) {
         self.id = summary.id
@@ -78,6 +80,7 @@ struct PersistedActivityRecord: Codable, Identifiable, Sendable, Hashable {
             self.frontierCompletionBonus = frontier.completionBonus > 0 ? frontier.completionBonus : nil
             self.frontierWeeklyTotal = frontier.weeklyTotalAfter
         }
+        self.journeyTrack = summary.journeyTrack
     }
 
     var frontierSessionTotal: Int {

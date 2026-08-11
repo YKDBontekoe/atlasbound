@@ -41,6 +41,7 @@ final class WorldController: ObservableObject {
     let skillStore: SkillStore
     let pulseStore: PulseStore
     let weatherStore: WeatherStore
+    let biomeStore: BiomeStore
     private let progression = ProgressionEngine()
     private let frontierEngine = FrontierEngine()
     private let sectorEngine = HexSectorEngine()
@@ -50,6 +51,7 @@ final class WorldController: ObservableObject {
     private let dailyChallengeEngine = DailyChallengeEngine()
     private let landmarkResolver: any LandmarkResolving
     private let landmarkQuestEngine = LandmarkQuestEngine()
+    private let journeyRecorder = JourneyRecorder()
 
     /// Tiles mutated during the active session (merged into store on stop).
     private var sessionTiles: [String: WorldTile] = [:]
@@ -74,6 +76,7 @@ final class WorldController: ObservableObject {
         skillStore: SkillStore? = nil,
         pulseStore: PulseStore? = nil,
         weatherStore: WeatherStore? = nil,
+        biomeStore: BiomeStore? = nil,
         recorder: ActivityRecorder? = nil,
         landmarkResolver: any LandmarkResolving = LandmarkResolver()
     ) {
@@ -87,6 +90,7 @@ final class WorldController: ObservableObject {
         self.skillStore = skillStore ?? SkillStore()
         self.pulseStore = pulseStore ?? PulseStore()
         self.weatherStore = weatherStore ?? WeatherStore()
+        self.biomeStore = biomeStore ?? BiomeStore()
         self.recorder = recorder ?? ActivityRecorder()
         self.landmarkResolver = landmarkResolver
         restoreSelectedActivityType()
@@ -784,6 +788,7 @@ final class WorldController: ObservableObject {
         store.applyWeeklyChargeResetIfNeeded()
         refreshFrontierPresentation()
         liveRoute = []
+        journeyRecorder.begin(at: .now)
         sessionVisitedTileIDs = []
         sessionDiscoveredIDs = []
         sessionDiscoveredCount = 0
@@ -850,7 +855,8 @@ final class WorldController: ObservableObject {
                 familiarityXP: sessionProgress.familiarityXP,
                 activityType: recorder.activityType,
                 frontierContribution: sessionFrontier,
-                activeDuration: result.activeDuration
+                activeDuration: result.activeDuration,
+                journeyTrack: journeyRecorder.finish()
             )
             activityHistory.record(summary)
             lastSummary = summary
@@ -952,6 +958,7 @@ final class WorldController: ObservableObject {
         Task { @MainActor [weak self] in
             guard let self else { return }
             await weatherStore.refresh(around: sample.coordinate, tileEngine: tileEngine, at: sample.timestamp)
+            await biomeStore.refresh(around: sample.coordinate, tileEngine: tileEngine, at: sample.timestamp)
         }
         liveRoute.append(sample.coordinate)
         let engine = tileEngine
@@ -964,10 +971,18 @@ final class WorldController: ObservableObject {
             let ids = line.map {
                 TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: engine.tileSizeMeters)
             }
+            ids.forEach { journeyRecorder.record(tileID: $0, at: sample.timestamp) }
+            if let tileID = ids.last, let tile = engine.parseTileID(tileID) {
+                journeyRecorder.recordEnvironment(tileID: tileID, biome: biomeStore.snapshot(for: tile, tileEngine: engine), weather: weatherStore.snapshot(for: WeatherCellEngine().cellID(for: tile, tileEngine: engine)), at: sample.timestamp)
+            }
             processTileIDs(ids, at: sample.timestamp, activity: recorder.activityType)
         } else {
+            let tileID = engine.tileID(for: sample.coordinate)
+            journeyRecorder.record(tileID: tileID, at: sample.timestamp)
+            let tile = engine.axialCoordinate(for: sample.coordinate)
+            journeyRecorder.recordEnvironment(tileID: tileID, biome: biomeStore.snapshot(for: tile, tileEngine: engine), weather: weatherStore.snapshot(for: WeatherCellEngine().cellID(for: tile, tileEngine: engine)), at: sample.timestamp)
             processTileIDs(
-                [engine.tileID(for: sample.coordinate)],
+                [tileID],
                 at: sample.timestamp,
                 activity: recorder.activityType
             )

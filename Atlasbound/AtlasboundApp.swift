@@ -17,6 +17,7 @@ struct AtlasboundApp: App {
     @StateObject private var skillStore = SkillStore()
     @StateObject private var pulseStore = PulseStore()
     @StateObject private var weatherStore = WeatherStore()
+    @StateObject private var biomeStore = BiomeStore()
     @StateObject private var cardStore = CardStore()
     @StateObject private var crewStore = CrewStore()
     @StateObject private var controllerHolder = ControllerHolder()
@@ -87,6 +88,7 @@ struct AtlasboundApp: App {
                 let sessionSkills = skillStore
                 let sessionPulses = pulseStore
                 let sessionWeather = weatherStore
+                let sessionBiomes = biomeStore
                 let sessionCards = cardStore
                 let sessionCrew = crewStore
                 let sessionCloudSync = cloudStateSync
@@ -106,6 +108,7 @@ struct AtlasboundApp: App {
                     sessionSkills.resetLocalSession()
                     sessionPulses.resetLocalSession()
                     sessionWeather.resetLocalSession()
+                    sessionBiomes.resetLocalSession()
                     sessionCards.resetLocalSession()
                     sessionCrew.resetLocalSession()
                 }
@@ -278,14 +281,16 @@ struct AtlasboundApp: App {
             idleStore: idleStore,
             skillStore: skillStore,
             pulseStore: pulseStore,
-            weatherStore: weatherStore
+            weatherStore: weatherStore,
+            biomeStore: biomeStore
         )
         factoryHolder.bootstrap(
             store: factoryStore,
             tileStore: store,
             inventoryStore: inventoryStore,
             skillStore: skillStore,
-            weatherStore: weatherStore
+            weatherStore: weatherStore,
+            biomeStore: biomeStore
         )
         if auth.session != nil {
             cloudStateSync.start(
@@ -317,6 +322,7 @@ struct AtlasboundApp: App {
         skillStore.resetLocalSession()
         pulseStore.resetLocalSession()
         weatherStore.resetLocalSession()
+        biomeStore.resetLocalSession()
         cardStore.resetLocalSession()
         crewStore.resetLocalSession()
         controllerHolder.reset()
@@ -339,7 +345,8 @@ final class FactoryHolder: ObservableObject {
         tileStore: TileStore,
         inventoryStore: InventoryStore,
         skillStore: SkillStore,
-        weatherStore: WeatherStore
+        weatherStore: WeatherStore,
+        biomeStore: BiomeStore
     ) {
         guard controller == nil else { return }
         controller = FactoryController(
@@ -347,7 +354,8 @@ final class FactoryHolder: ObservableObject {
             tileStore: tileStore,
             inventoryStore: inventoryStore,
             skillStore: skillStore,
-            weatherStore: weatherStore
+            weatherStore: weatherStore,
+            biomeStore: biomeStore
         )
         controller?.advance()
     }
@@ -370,7 +378,8 @@ final class ControllerHolder: ObservableObject {
         idleStore: IdleStore,
         skillStore: SkillStore,
         pulseStore: PulseStore,
-        weatherStore: WeatherStore
+        weatherStore: WeatherStore,
+        biomeStore: BiomeStore
     ) {
         guard controller == nil else { return }
         controller = WorldController(
@@ -382,7 +391,8 @@ final class ControllerHolder: ObservableObject {
             idleStore: idleStore,
             skillStore: skillStore,
             pulseStore: pulseStore,
-            weatherStore: weatherStore
+            weatherStore: weatherStore,
+            biomeStore: biomeStore
         )
     }
 }
