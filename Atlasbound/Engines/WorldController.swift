@@ -52,6 +52,7 @@ final class WorldController: ObservableObject {
     private let landmarkResolver: any LandmarkResolving
     private let landmarkQuestEngine = LandmarkQuestEngine()
     private let journeyRecorder = JourneyRecorder()
+    private var journeySessionID: UUID?
 
     /// Tiles mutated during the active session (merged into store on stop).
     private var sessionTiles: [String: WorldTile] = [:]
@@ -789,6 +790,7 @@ final class WorldController: ObservableObject {
         refreshFrontierPresentation()
         liveRoute = []
         journeyRecorder.begin(at: .now)
+        journeySessionID = UUID()
         sessionVisitedTileIDs = []
         sessionDiscoveredIDs = []
         sessionDiscoveredCount = 0
@@ -861,6 +863,7 @@ final class WorldController: ObservableObject {
             activityHistory.record(summary)
             lastSummary = summary
         }
+        journeySessionID = nil
         frontierCombo = .empty
         frontierScoreCallouts = []
         regionLookup.resolve(tiles: store.discoveredTiles)
@@ -955,36 +958,38 @@ final class WorldController: ObservableObject {
     }
 
     private func handleSample(_ sample: LocationSample) {
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            await weatherStore.refresh(around: sample.coordinate, tileEngine: tileEngine, at: sample.timestamp)
-            await biomeStore.refresh(around: sample.coordinate, tileEngine: tileEngine, at: sample.timestamp)
-        }
         liveRoute.append(sample.coordinate)
         let engine = tileEngine
 
         if let previous = recorder.samples.dropLast().last {
-            let line = TileEngine.hexLine(
-                from: engine.axialCoordinate(for: previous.coordinate),
-                to: engine.axialCoordinate(for: sample.coordinate)
-            )
-            let ids = line.map {
-                TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: engine.tileSizeMeters)
-            }
+            let ids = engine.tileIDsCoveringRoute([previous, sample])
             ids.forEach { journeyRecorder.record(tileID: $0, at: sample.timestamp) }
-            if let tileID = ids.last, let tile = engine.parseTileID(tileID) {
-                journeyRecorder.recordEnvironment(tileID: tileID, biome: biomeStore.snapshot(for: tile, tileEngine: engine), weather: weatherStore.snapshot(for: WeatherCellEngine().cellID(for: tile, tileEngine: engine)), at: sample.timestamp)
-            }
+            scheduleEnvironmentRecording(for: ids.last, sample: sample, engine: engine)
             processTileIDs(ids, at: sample.timestamp, activity: recorder.activityType)
         } else {
             let tileID = engine.tileID(for: sample.coordinate)
             journeyRecorder.record(tileID: tileID, at: sample.timestamp)
-            let tile = engine.axialCoordinate(for: sample.coordinate)
-            journeyRecorder.recordEnvironment(tileID: tileID, biome: biomeStore.snapshot(for: tile, tileEngine: engine), weather: weatherStore.snapshot(for: WeatherCellEngine().cellID(for: tile, tileEngine: engine)), at: sample.timestamp)
+            scheduleEnvironmentRecording(for: tileID, sample: sample, engine: engine)
             processTileIDs(
                 [tileID],
                 at: sample.timestamp,
                 activity: recorder.activityType
+            )
+        }
+    }
+
+    private func scheduleEnvironmentRecording(for tileID: String?, sample: LocationSample, engine: TileEngine) {
+        guard let tileID, let sessionID = journeySessionID else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await weatherStore.refresh(around: sample.coordinate, tileEngine: engine, at: sample.timestamp)
+            await biomeStore.refresh(around: sample.coordinate, tileEngine: engine, at: sample.timestamp)
+            guard journeySessionID == sessionID, let tile = engine.parseTileID(tileID) else { return }
+            journeyRecorder.recordEnvironment(
+                tileID: tileID,
+                biome: biomeStore.snapshot(for: tile, tileEngine: engine),
+                weather: weatherStore.snapshot(for: WeatherCellEngine().cellID(for: tile, tileEngine: engine)),
+                at: sample.timestamp
             )
         }
     }
@@ -994,6 +999,7 @@ final class WorldController: ObservableObject {
         Task { @MainActor [weak self] in
             guard let self else { return }
             await weatherStore.refresh(around: sample.coordinate, tileEngine: tileEngine, at: sample.timestamp)
+            await biomeStore.refresh(around: sample.coordinate, tileEngine: tileEngine, at: sample.timestamp)
         }
         explorationMode = .automatic
         store.applyWeeklyChargeResetIfNeeded()

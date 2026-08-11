@@ -363,6 +363,8 @@ struct DiscoveryMapView: View {
         .onChange(of: recorder.lastLocation?.timestamp) { _, _ in overlays = makeOverlays() }
         .onChange(of: controller.isRecording) { _, _ in overlays = makeOverlays() }
         .onChange(of: controller.sessionDiscoveredIDs) { _, _ in overlays = makeOverlays() }
+        .onChange(of: controller.biomeStore.state) { _, _ in overlays = makeOverlays() }
+        .onChange(of: controller.weatherStore.state) { _, _ in overlays = makeOverlays() }
         .onChange(of: dataLayer) { _, _ in overlays = makeOverlays() }
         .onChange(of: mapZoom) { _, _ in overlays = makeOverlays() }
         .onChange(of: showsFrontierLayer) { _, _ in overlays = makeOverlays() }
@@ -460,7 +462,8 @@ private struct MapboxPolygonFill {
         case .highland: .indigo
         case .waterside: .cyan
         case .heritage: .purple
-        case .open, .none: .yellow
+        case .open: .yellow
+        case .none: .secondary
         }
         return MapboxPolygonFill(color: StyleColor(UIColor(color.opacity(0.34))), outline: StyleColor(UIColor(color.opacity(0.86))), opacity: 1)
     }

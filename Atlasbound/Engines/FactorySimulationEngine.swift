@@ -36,6 +36,7 @@ struct FactorySimulationEngine: Sendable {
             tileEngine: tileEngine
         )
         let freshWeatherByCell = weatherByCell.filter { $0.value.expiresAt > date }
+        let freshBiomeByCell = biomeByCell.filter { $0.value.expiresAt > date }
         let speed = max(1, speedMultiplier)
         for _ in 0..<minutes {
             simulateMinute(
@@ -45,7 +46,7 @@ struct FactorySimulationEngine: Sendable {
                 tileEngine: tileEngine,
                 speedMultiplier: speed,
                 weatherByCell: freshWeatherByCell,
-                biomeByCell: biomeByCell
+                biomeByCell: freshBiomeByCell
             )
         }
         state.lastSimulatedAt = totalMinutes > Self.maximumOfflineMinutes

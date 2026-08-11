@@ -62,7 +62,7 @@ serve(async (request) => {
     const wind = Number(current.wind_speed_10m ?? 0)
     const cloud = Number(current.cloud_cover ?? 0)
     const code = Number(current.weather_code ?? 0)
-    const weatherCondition = (temperature: number, precipitation: number, wind: number, code: number) =>
+    const weatherCondition = (temperature: number, precipitation: number, wind: number, cloudCover: number, code: number) =>
       [95, 96, 99].includes(code) || precipitation >= 8 ? "storm"
         : [45, 48].includes(code) ? "fog"
         : [71, 73, 75, 77, 85, 86].includes(code) ? "snow"
@@ -70,8 +70,8 @@ serve(async (request) => {
         : temperature >= 32 ? "heat"
         : wind >= 35 ? "wind"
         : precipitation > 0.2 ? "rain"
-        : cloud >= 55 ? "cloudy" : "clear"
-    const condition = weatherCondition(temperature, precipitation, wind, code)
+        : cloudCover >= 55 ? "cloudy" : "clear"
+    const condition = weatherCondition(temperature, precipitation, wind, cloud, code)
     const observedAt = now.toISOString()
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
     const payload = {
@@ -84,9 +84,11 @@ serve(async (request) => {
         cloudCover: cloud,
         observedAt,
         expiresAt,
-        hourly: (data.hourly?.time ?? []).slice(0, 24).map((time: string, index: number) => ({
+        hourly: (data.hourly?.time ?? []).map((time: string, index: number) => ({ time, index }))
+          .filter(({ time }: { time: string }) => new Date(`${time}Z`) >= new Date(now.getTime() - now.getMinutes() * 60_000 - now.getSeconds() * 1_000 - now.getMilliseconds()))
+          .slice(0, 24).map(({ time, index }: { time: string; index: number }) => ({
           date: new Date(`${time}Z`).toISOString(),
-          condition: weatherCondition(Number(data.hourly.temperature_2m?.[index] ?? temperature), Number(data.hourly.precipitation?.[index] ?? 0), Number(data.hourly.wind_speed_10m?.[index] ?? 0), Number(data.hourly.weather_code?.[index] ?? 0)),
+          condition: weatherCondition(Number(data.hourly.temperature_2m?.[index] ?? temperature), Number(data.hourly.precipitation?.[index] ?? 0), Number(data.hourly.wind_speed_10m?.[index] ?? 0), Number(data.hourly.cloud_cover?.[index] ?? cloud), Number(data.hourly.weather_code?.[index] ?? 0)),
           temperatureC: Number(data.hourly.temperature_2m?.[index] ?? temperature),
           apparentTemperatureC: Number(data.hourly.apparent_temperature?.[index] ?? temperature),
           precipitationMM: Number(data.hourly.precipitation?.[index] ?? 0),

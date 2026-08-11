@@ -12,6 +12,19 @@ const headers = {
 const hasLayer = (features: Array<{ layer?: { id?: string }; properties?: Record<string, unknown> }>, layer: string) =>
   features.some((feature) => feature.layer?.id === layer)
 
+const upstreamRequests = new Map<string, { count: number; resetAt: number }>()
+
+function permitsUpstreamRequest(key: string, now: number): boolean {
+  const current = upstreamRequests.get(key)
+  if (!current || current.resetAt <= now) {
+    upstreamRequests.set(key, { count: 1, resetAt: now + 60_000 })
+    return true
+  }
+  if (current.count >= 20) return false
+  current.count += 1
+  return true
+}
+
 serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers })
   if (request.method !== "POST") return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405, headers })
@@ -28,6 +41,15 @@ serve(async (request) => {
     const { data: cached, error: cacheError } = await admin.from("biome_cache").select("payload, expires_at").eq("cell_id", body.cell_id).maybeSingle()
     if (cacheError) return new Response(JSON.stringify({ error: cacheError.message }), { status: 500, headers })
     if (cached && new Date(cached.expires_at) > now) return new Response(JSON.stringify(cached.payload), { headers })
+
+    // Cache hits stay free. Cache misses are bounded per requester, independent
+    // of the supplied cell ID or coordinate, so they cannot fan out unbounded
+    // Mapbox Tilequery calls.
+    const requester = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous"
+    const requestKey = requester
+    if (!permitsUpstreamRequest(requestKey, now.getTime())) {
+      return new Response(JSON.stringify({ error: "rate_limited" }), { status: 429, headers })
+    }
 
     const token = Deno.env.get("MAPBOX_ACCESS_TOKEN")
     if (!token) return new Response(JSON.stringify({ error: "environment_provider_not_configured" }), { status: 500, headers })

@@ -23,6 +23,7 @@ struct WeatherEngine: Sendable {
         if let weatherCode, [95, 96, 99].contains(weatherCode) { return .storm }
         if let weatherCode, [45, 48].contains(weatherCode) { return .fog }
         if let weatherCode, [71, 73, 75, 77, 85, 86].contains(weatherCode) { return .snow }
+        if let weatherCode, [2, 3].contains(weatherCode) { return .cloudy }
         if temperatureC <= 0 && precipitationMM > 0 { return .frost }
         if temperatureC >= 32 { return .heat }
         if windKPH >= 35 { return .wind }

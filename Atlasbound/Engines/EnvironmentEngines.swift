@@ -121,9 +121,9 @@ struct JourneyEngine: Sendable {
             result.append(waypoint)
         }
         guard unique.count > Self.maximumWaypoints else { return unique }
-        let step = Int(ceil(Double(unique.count) / Double(Self.maximumWaypoints)))
-        var reduced = Swift.stride(from: 0, to: unique.count, by: step).map { unique[$0] }
-        if let last = unique.last, reduced.last != last { reduced.append(last) }
-        return reduced
+        let lastIndex = unique.count - 1
+        return (0..<Self.maximumWaypoints).map { position in
+            unique[(position * lastIndex) / (Self.maximumWaypoints - 1)]
+        }
     }
 }

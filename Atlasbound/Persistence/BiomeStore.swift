@@ -61,5 +61,6 @@ final class BiomeStore: ObservableObject {
         inFlight.values.forEach { $0.cancel() }
         inFlight.removeAll()
         state = .empty()
+        database.saveBiomeState(state)
     }
 }
