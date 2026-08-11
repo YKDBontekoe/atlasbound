@@ -15,8 +15,8 @@ final class CardStore: ObservableObject {
         if let database { self.database = database }
         else if let fileURL { self.database = AtlasDatabase.makeIsolated(fileURL: Self.sqliteURL(from: fileURL)) }
         else { self.database = .shared }
-        state = self.database.loadCardState() ?? .empty(now: now)
-        persist()
+        if let loaded = self.database.loadCardState() { state = loaded }
+        else { state = .empty(now: now); persist() }
     }
 
     var blueprints: [CardBlueprint] {
@@ -104,8 +104,13 @@ final class CardStore: ObservableObject {
         persist()
     }
 
+    func playCard(instanceID: UUID, participantID: UUID, targetHex: BattleHex = .center, now: Date = .now) {
+        guard let instance = state.instances.first(where: { $0.id == instanceID }), let card = CrewfrontCatalog.byID[instance.blueprintID] else { return }
+        resolveTraining(action: PlannedBattleAction(id: UUID(), participantID: participantID, kind: card.kind == .tactic ? .reinforce : .deploy, cardInstanceID: instanceID, targetHex: targetHex, submittedAt: now), now: now)
+    }
+
     func abandonTraining() { state.activeBattle = nil; persist() }
-    func resetLocalSession() { state = .empty(); latestMessage = nil }
+    func resetLocalSession() { state = .empty(); latestMessage = nil; persist() }
 
     private func persist() { database.saveCardState(state) }
     private static func sqliteURL(from url: URL) -> URL { url.pathExtension.lowercased() == "json" ? url.deletingPathExtension().appendingPathExtension("sqlite") : url }

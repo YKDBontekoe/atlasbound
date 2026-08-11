@@ -114,7 +114,7 @@ struct TrainingBattleView: View {
             }
             .background(AtlasTheme.canvas(for: colorScheme).ignoresSafeArea())
             .navigationTitle("Guardian training")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { cardStore.abandonTraining(); onClose() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { if battle?.winner == nil { cardStore.abandonTraining() }; onClose() } } }
         }
     }
 
@@ -123,7 +123,7 @@ struct TrainingBattleView: View {
             HStack {
                 VStack(alignment: .leading) { Text("Dawn").font(.caption).foregroundStyle(.secondary); Text("\(battle.dawnInfluence)").font(.system(size: 34, weight: .bold, design: .rounded)) }
                 Spacer()
-                VStack { Text(battle.winner == nil ? "Round \(battle.round)/6" : "Complete").font(.headline); Text("Guardian \(battle.guardianDurability)").font(.caption).foregroundStyle(.secondary) }
+                VStack { Text(battle.winner == nil ? "Round \(battle.round)/\(BattleState.maximumRounds)" : "Complete").font(.headline); Text("Guardian \(battle.guardianDurability)").font(.caption).foregroundStyle(.secondary) }
                 Spacer()
                 VStack(alignment: .trailing) { Text("Dusk").font(.caption).foregroundStyle(.secondary); Text("\(battle.duskInfluence)").font(.system(size: 34, weight: .bold, design: .rounded)) }
             }
@@ -174,7 +174,7 @@ struct TrainingBattleView: View {
                 ForEach(player.hand, id: \.self) { id in
                     if let instance = cardStore.instances.first(where: { $0.id == id }), let card = CrewfrontCatalog.byID[instance.blueprintID] {
                         Button {
-                            cardStore.resolveTraining(action: PlannedBattleAction(id: UUID(), participantID: player.id, kind: card.kind == .tactic ? .reinforce : .deploy, cardInstanceID: id, targetHex: .center, submittedAt: .now))
+                            cardStore.playCard(instanceID: id, participantID: player.id)
                         } label: {
                             HStack { Image(systemName: card.symbolName); VStack(alignment: .leading) { Text(card.name); Text("\(card.energyCost) energy · \(card.kind.displayName)").font(.caption) }; Spacer(); Image(systemName: "play.fill") }
                         }

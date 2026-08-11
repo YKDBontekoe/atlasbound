@@ -38,6 +38,11 @@ struct CrewfrontBattleEngine: Sendable {
                   next.participants[index].hand.contains(instanceID),
                   next.participants[index].energy >= blueprint.energyCost
             else { continue }
+            if action.kind == .deploy, blueprint.kind != .tactic,
+               next.pieces.contains(where: { $0.hex == (action.targetHex ?? .center) }) {
+                next.events.append(event(next, "Target occupied", "Choose an open hex before deploying \(blueprint.name).", now))
+                continue
+            }
             next.participants[index].energy -= blueprint.energyCost
             next.participants[index].hand.removeAll { $0 == instanceID }
             switch action.kind {
@@ -78,7 +83,11 @@ struct CrewfrontBattleEngine: Sendable {
             if dawnCenter { state.dawnInfluence += 1 }
             else { state.duskInfluence += 1 }
         }
-        if state.guardianDurability == 0 { state.dawnInfluence += 2 }
+        if state.guardianDurability == 0 {
+            state.winner = .dawn
+            state.events.append(event(state, "Guardian defeated", "You broke the Guardian’s hold.", now))
+            return
+        }
         if state.dawnInfluence >= BattleState.victoryInfluence || state.duskInfluence >= BattleState.victoryInfluence || state.round >= BattleState.maximumRounds {
             if state.dawnInfluence == state.duskInfluence {
                 state.winner = state.seededTieBreak == 0 ? .dawn : .dusk
