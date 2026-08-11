@@ -150,8 +150,8 @@ final class FieldFindEngineTests: XCTestCase {
 
     func testCatalogHasContentRichCoverage() {
         XCTAssertGreaterThanOrEqual(ItemCatalog.all.count, 40)
-        XCTAssertEqual(ItemCatalog.materials.count, 14)
-        XCTAssertEqual(ItemCatalog.components.count, 5)
+        XCTAssertEqual(ItemCatalog.materials.count, 18)
+        XCTAssertEqual(ItemCatalog.components.count, 6)
         XCTAssertEqual(ItemCatalog.boosts.count, 5)
         XCTAssertEqual(ItemCatalog.charges.count, 5)
         XCTAssertEqual(ItemCatalog.assembled.count, 5)
