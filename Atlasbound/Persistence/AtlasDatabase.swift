@@ -6,7 +6,7 @@ import os
 /// Geometry is never stored — tiles keep IDs + mastery fields only.
 @MainActor
 final class AtlasDatabase {
-    static let schemaVersion = 7
+    static let schemaVersion = 8
     static let fileName = "atlasbound.sqlite"
 
     private static let logger = Logger(subsystem: "com.atlasbound.app", category: "database")
