@@ -7,6 +7,8 @@ struct RootTabView: View {
     @ObservedObject var activityHistory: ActivityHistoryStore
     @ObservedObject var regionLookup: RegionLookupStore
     @ObservedObject var factoryController: FactoryController
+    @ObservedObject var cardStore: CardStore
+    @ObservedObject var crewStore: CrewStore
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
 
@@ -18,7 +20,8 @@ struct RootTabView: View {
                 auth: auth,
                 controller: controller,
                 store: store,
-                factoryController: factoryController
+                factoryController: factoryController,
+                cardStore: cardStore
             )
                 .tabItem {
                     Label("Map", systemImage: "map.fill")
@@ -31,13 +34,21 @@ struct RootTabView: View {
                 store: store,
                 activityHistory: activityHistory,
                 treasureStore: controller.treasureStore,
-                factoryController: factoryController
+                factoryController: factoryController,
+                cardStore: cardStore
             )
                 .tabItem {
                     Label("Workshop", systemImage: "hammer.fill")
                 }
                 .accessibilityIdentifier("workshopTab")
                 .tag(1)
+
+            CrewHubView(store: crewStore, auth: auth)
+                .tabItem {
+                    Label("Crew", systemImage: "person.3.fill")
+                }
+                .accessibilityIdentifier("crewTab")
+                .tag(2)
 
             ProgressTabView(
                 store: store,
@@ -49,7 +60,7 @@ struct RootTabView: View {
                     Label("Progress", systemImage: "flag.fill")
                 }
                 .accessibilityIdentifier("progressTab")
-                .tag(2)
+                .tag(3)
         }
         .tint(AtlasTheme.blue)
         .toolbarBackground(AtlasTheme.tabBarBackground(for: colorScheme), for: .tabBar)

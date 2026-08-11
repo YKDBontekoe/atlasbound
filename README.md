@@ -22,6 +22,8 @@ Location-based exploration RPG for iPhone. Reveal a shared atlas, follow daily l
 - **Field finds** — deterministic tile pickups into a stackable inventory (materials, boosts, charges); assemble, salvage, use, and activate
 - **Home Base / territory claims** — claim neighborhood sectors, designate one Home Base, soft familiarity XP and find-rate buffs inside claims
 - **Real-world factory** — reveal deterministic deposits, craft construction kits, place roads and buildings on nearby discovered hexes, automate production, route goods, generate power, and research upgrades
+- **Crewfront training** — permanent tactical blueprints, crafted card copies, a 12-card Field Deck, and deterministic seven-hex Guardian practice encounters
+- **Crews** — account-backed crew creation/join codes and private crew chat; the server schema is ready for live 2v2 seasonal sector battles and card stakes
 - **Atlas Stats** — territory km², personal records, and a layered explorer map
 - **Activity session history** — last 100 finished sessions with detail sheets
 - Local persistence (SQLite in Documents) with authenticated Supabase account sync

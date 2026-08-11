@@ -105,7 +105,8 @@ final class AtlasDatabaseTests: XCTestCase {
         XCTAssertNil(database.loadWeatherState())
 
         let verifier = try SQLiteDatabase(fileURL: tempURL)
-        XCTAssertEqual(try scalar(verifier, "SELECT value FROM meta WHERE key = 'schema_version';"), "7")
+        XCTAssertEqual(try scalar(verifier, "SELECT value FROM meta WHERE key = 'schema_version';"), "8")
+        XCTAssertEqual(try scalar(verifier, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'card_state';"), "card_state")
         XCTAssertEqual(try scalar(verifier, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pulse_state';"), "pulse_state")
         XCTAssertEqual(try scalar(verifier, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'weather_state';"), "weather_state")
     }

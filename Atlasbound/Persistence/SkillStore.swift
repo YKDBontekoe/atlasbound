@@ -81,3 +81,11 @@ final class SkillStore: ObservableObject {
         return next
     }
 }
+
+#if DEBUG
+extension SkillStore {
+    func debugUnlockAll(rank: Int = 10) {
+        replaceState(SkillState(ranks: Dictionary(uniqueKeysWithValues: SkillTreeCatalog.all.map { ($0.id, max(1, rank)) })))
+    }
+}
+#endif

@@ -17,6 +17,21 @@ enum DevConfig {
         #endif
     }
 
+    /// Developer unlocks are compiled out of Release and require an explicit local flag.
+    static var isDeveloperModeAvailable: Bool {
+        #if DEBUG
+        if let value = ProcessInfo.processInfo.environment["ATLASBOUND_ENABLE_DEVELOPER_MODE"] {
+            return Self.isTruthy(value)
+        }
+        if let value = bundledEnv["ATLASBOUND_ENABLE_DEVELOPER_MODE"] {
+            return Self.isTruthy(value)
+        }
+        return false
+        #else
+        return false
+        #endif
+    }
+
     private static let bundledEnv: [String: String] = {
         #if DEBUG
         guard let url = Bundle.main.url(forResource: "atlasbound", withExtension: "env"),

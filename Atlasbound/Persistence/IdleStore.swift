@@ -96,3 +96,14 @@ final class IdleStore: ObservableObject {
         return next
     }
 }
+
+#if DEBUG
+extension IdleStore {
+    func debugHireAll(at date: Date = .now) {
+        update { state in
+            state.hiredScouts = ScoutCatalog.all.map { HiredScout(definitionID: $0.id, hiredAt: date) }
+            state.unlockedScoutIDs = Set(ScoutCatalog.all.map(\.id))
+        }
+    }
+}
+#endif

@@ -8,6 +8,7 @@ struct MainMapScreen: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     @ObservedObject var factoryController: FactoryController
+    @ObservedObject var cardStore: CardStore
     @ObservedObject private var recorder: ActivityRecorder
     @ObservedObject private var treasureStore: TreasureStore
     @ObservedObject private var weatherStore: WeatherStore
@@ -46,12 +47,14 @@ struct MainMapScreen: View {
         auth: AuthStore,
         controller: WorldController,
         store: TileStore,
-        factoryController: FactoryController
+        factoryController: FactoryController,
+        cardStore: CardStore
     ) {
         self.auth = auth
         self.controller = controller
         self.store = store
         self.factoryController = factoryController
+        self.cardStore = cardStore
         self._recorder = ObservedObject(wrappedValue: controller.recorder)
         self._treasureStore = ObservedObject(wrappedValue: controller.treasureStore)
         self._weatherStore = ObservedObject(wrappedValue: controller.weatherStore)
@@ -216,6 +219,7 @@ struct MainMapScreen: View {
                 controller: controller,
                 store: store,
                 factoryController: factoryController,
+                cardStore: cardStore,
                 showSimGPSControls: $showSimGPSControls
             )
             .presentationDetents([.medium, .large])
@@ -936,6 +940,7 @@ struct SettingsSheet: View {
     @ObservedObject var controller: WorldController
     @ObservedObject var store: TileStore
     @ObservedObject var factoryController: FactoryController
+    @ObservedObject var cardStore: CardStore
     @Binding var showSimGPSControls: Bool
     @AppStorage(AppearancePreference.storageKey) private var appearanceRaw = AppearancePreference.system.rawValue
     @AppStorage(BackgroundRecordingPreference.storageKey) private var backgroundRecordingEnabled = false
@@ -943,6 +948,9 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingDeleteConfirmation = false
     @State private var showingAuth = false
+    #if DEBUG
+    @State private var showingDeveloperTools = false
+    #endif
 
     private var appearanceBinding: Binding<AppearancePreference> {
         Binding(
@@ -1023,12 +1031,20 @@ struct SettingsSheet: View {
                 }
 
                 #if DEBUG
-                if DevConfig.isSimGPSFeatureAvailable {
+                if DevConfig.isSimGPSFeatureAvailable || DevConfig.isDeveloperModeAvailable {
                     Section("Developer") {
-                        Toggle("Show Sim GPS controls", isOn: $showSimGPSControls)
-                        Text("Requires ATLASBOUND_ENABLE_SIM_GPS=true in the project `.env` (then run `python3 scripts/sync-env.py` and rebuild).")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        if DevConfig.isSimGPSFeatureAvailable {
+                            Toggle("Show Sim GPS controls", isOn: $showSimGPSControls)
+                            Text("Requires ATLASBOUND_ENABLE_SIM_GPS=true in the project `.env` (then run `python3 scripts/sync-env.py` and rebuild).")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        if DevConfig.isDeveloperModeAvailable {
+                            Button("Open developer tools") { showingDeveloperTools = true }
+                            Text("Unlocks alter this device’s local test data only and are excluded from Release builds.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 #endif
@@ -1048,6 +1064,17 @@ struct SettingsSheet: View {
                 AuthView(auth: auth)
                     .presentationDetents([.medium, .large])
             }
+            #if DEBUG
+            .sheet(isPresented: $showingDeveloperTools) {
+                DeveloperToolsView(
+                    auth: auth,
+                    controller: controller,
+                    tileStore: store,
+                    factoryController: factoryController,
+                    cardStore: cardStore
+                )
+            }
+            #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
