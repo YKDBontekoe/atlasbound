@@ -52,6 +52,6 @@ final class CrewfrontBattleEngineTests: XCTestCase {
             now: now
         )
         XCTAssertEqual(result.guardianDurability, 0)
-        XCTAssertGreaterThanOrEqual(result.dawnInfluence, 2)
+        XCTAssertEqual(result.winner, .dawn)
     }
 }
