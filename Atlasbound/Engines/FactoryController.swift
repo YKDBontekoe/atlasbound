@@ -14,6 +14,7 @@ final class FactoryController: ObservableObject {
     let inventoryStore: InventoryStore
     let skillStore: SkillStore
     let weatherStore: WeatherStore
+    let biomeStore: BiomeStore
 
     private let constructionEngine = ConstructionEngine()
     private let networkEngine = FactoryNetworkEngine()
@@ -27,13 +28,15 @@ final class FactoryController: ObservableObject {
         tileStore: TileStore,
         inventoryStore: InventoryStore,
         skillStore: SkillStore? = nil,
-        weatherStore: WeatherStore? = nil
+        weatherStore: WeatherStore? = nil,
+        biomeStore: BiomeStore? = nil
     ) {
         self.store = store
         self.tileStore = tileStore
         self.inventoryStore = inventoryStore
         self.skillStore = skillStore ?? SkillStore()
         self.weatherStore = weatherStore ?? WeatherStore()
+        self.biomeStore = biomeStore ?? BiomeStore()
     }
 
     var structures: [PlacedFactoryStructure] {
@@ -142,7 +145,7 @@ final class FactoryController: ObservableObject {
             guard let generator = store.structures[generatorID],
                   let definition = FactoryCatalog.byID[generator.definitionID] else { continue }
             if definition.kind == .renewable {
-                let modifier = WeatherEngine().modifiers(for: weatherSnapshot(for: generator.tileID))
+                let modifier = environmentalModifiers(for: generator.tileID)
                 let base = definition.id == "solar_array" ? 18.0 * modifier.solarPower : 16.0 * modifier.windPower
                 supply += Int(base.rounded())
                 continue
@@ -296,9 +299,17 @@ final class FactoryController: ObservableObject {
             to: date,
             tileEngine: tileStore.tileEngine,
             speedMultiplier: skillStore.modifiers().factorySpeedMultiplier,
-            weatherByCell: weatherStore.snapshots.filter { $0.value.expiresAt > date }
+            weatherByCell: weatherStore.snapshots.filter { $0.value.expiresAt > date },
+            biomeByCell: biomeStore.snapshots.filter { $0.value.expiresAt > date }
         )
         store.replaceState(next)
+    }
+
+    private func environmentalModifiers(for tileID: String) -> EnvironmentalModifiers {
+        guard let tile = tileStore.tileEngine.parseTileID(tileID) else { return .neutral }
+        let weather = weatherSnapshot(for: tileID)
+        let biomeID = BiomeCellEngine().cellID(for: tile, tileEngine: tileStore.tileEngine)
+        return EnvironmentalModifierEngine().modifiers(biome: biomeStore.snapshots[biomeID], weather: weather)
     }
 
     func selectRecipe(_ recipeID: String?, for tileID: String) {

@@ -98,10 +98,15 @@ struct DiscoveryMapView: View {
             let isPerimeter = engine.neighbors(of: tile.coordinate).contains {
                 !discoveredIDs.contains(TileEngine.makeTileID(q: $0.q, r: $0.r, sizeMeters: engine.tileSizeMeters))
             }
-            return polygonOverlay(
-                id: "tile:\(tile.id)",
-                coordinate: tile.coordinate,
-                fill: .tile(
+            let fill: MapboxPolygonFill
+            switch dataLayer {
+            case .biome:
+                fill = .biome(controller.biomeStore.snapshot(for: tile.coordinate, tileEngine: engine))
+            case .weather:
+                let weatherID = WeatherCellEngine().cellID(for: tile.coordinate, tileEngine: engine)
+                fill = .weather(controller.weatherStore.snapshot(for: weatherID))
+            default:
+                fill = .tile(
                     tile,
                     dataLayer: dataLayer,
                     maximumVisitCount: maximumVisitCount,
@@ -111,6 +116,11 @@ struct DiscoveryMapView: View {
                     isHomeBase: isClaimed && sectorID == homeSectorID,
                     lod: lod
                 )
+            }
+            return polygonOverlay(
+                id: "tile:\(tile.id)",
+                coordinate: tile.coordinate,
+                fill: fill
             )
         }
         if showsFrontierLayer {
@@ -353,6 +363,8 @@ struct DiscoveryMapView: View {
         .onChange(of: recorder.lastLocation?.timestamp) { _, _ in overlays = makeOverlays() }
         .onChange(of: controller.isRecording) { _, _ in overlays = makeOverlays() }
         .onChange(of: controller.sessionDiscoveredIDs) { _, _ in overlays = makeOverlays() }
+        .onChange(of: controller.biomeStore.state) { _, _ in overlays = makeOverlays() }
+        .onChange(of: controller.weatherStore.state) { _, _ in overlays = makeOverlays() }
         .onChange(of: dataLayer) { _, _ in overlays = makeOverlays() }
         .onChange(of: mapZoom) { _, _ in overlays = makeOverlays() }
         .onChange(of: showsFrontierLayer) { _, _ in overlays = makeOverlays() }
@@ -416,6 +428,9 @@ private struct MapboxPolygonFill {
             )
         }
 
+        // Biome and weather are resolved by DiscoveryMapView before this shared
+        // material method is called.
+
         if isClaimed {
             let accent = isHomeBase ? AtlasTheme.homeBaseAccent : AtlasTheme.teal
             return MapboxPolygonFill(
@@ -437,6 +452,33 @@ private struct MapboxPolygonFill {
             outline: StyleColor(UIColor(material.outerStroke)),
             opacity: lod.drawsInteriorFills || isPerimeter ? 1 : 0
         )
+    }
+
+    static func biome(_ snapshot: BiomeSnapshot?) -> MapboxPolygonFill {
+        let color: Color = switch snapshot?.primary {
+        case .green: .green
+        case .urban: .gray
+        case .industrial: .orange
+        case .highland: .indigo
+        case .waterside: .cyan
+        case .heritage: .purple
+        case .open: .yellow
+        case .none: .secondary
+        }
+        return MapboxPolygonFill(color: StyleColor(UIColor(color.opacity(0.34))), outline: StyleColor(UIColor(color.opacity(0.86))), opacity: 1)
+    }
+
+    static func weather(_ snapshot: WeatherSnapshot?) -> MapboxPolygonFill {
+        let color: Color = switch snapshot?.condition {
+        case .rain, .storm: .blue
+        case .frost, .snow: .white
+        case .fog, .cloudy: .gray
+        case .heat: .orange
+        case .wind: .teal
+        case .clear: .yellow
+        case .none: .secondary
+        }
+        return MapboxPolygonFill(color: StyleColor(UIColor(color.opacity(0.30))), outline: StyleColor(UIColor(color.opacity(0.82))), opacity: 1)
     }
 }
 

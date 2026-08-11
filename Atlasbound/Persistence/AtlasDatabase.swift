@@ -6,7 +6,7 @@ import os
 /// Geometry is never stored — tiles keep IDs + mastery fields only.
 @MainActor
 final class AtlasDatabase {
-    static let schemaVersion = 8
+    static let schemaVersion = 9
     static let fileName = "atlasbound.sqlite"
 
     private static let logger = Logger(subsystem: "com.atlasbound.app", category: "database")
@@ -229,6 +229,19 @@ final class AtlasDatabase {
                 """
             )
             setMetaValue("8", for: "schema_version")
+        }
+
+        let afterV8 = Int(metaValue(for: "schema_version") ?? "0") ?? 0
+        if afterV8 < 9 {
+            try db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS environment_state (
+                  id INTEGER PRIMARY KEY CHECK (id = 1),
+                  payload TEXT NOT NULL
+                );
+                """
+            )
+            setMetaValue("9", for: "schema_version")
         }
     }
 
@@ -529,7 +542,7 @@ final class AtlasDatabase {
                 "tiles", "progress", "frontier", "territory_state",
                 "activity_sessions", "activity_aggregates", "region_cells",
                 "treasure_state", "pinpoint_games", "pinpoint_stats",
-                "inventory_state", "factory_state", "idle_state", "skill_state", "pulse_state", "weather_state", "card_state"
+                "inventory_state", "factory_state", "idle_state", "skill_state", "pulse_state", "weather_state", "environment_state", "card_state"
             ] {
                 guard tableExists(table) else { continue }
                 try db.execute("DELETE FROM \(table);")
@@ -950,6 +963,19 @@ final class AtlasDatabase {
         )
     }
 
+    func loadBiomeState() -> BiomeCacheState? {
+        guard let save = loadBlob(table: "environment_state", as: PersistedBiomeSave.self),
+              save.version == BiomeCacheState.schemaVersion else { return nil }
+        return save.state
+    }
+
+    func saveBiomeState(_ state: BiomeCacheState) {
+        saveBlob(
+            table: "environment_state",
+            value: PersistedBiomeSave(version: BiomeCacheState.schemaVersion, state: state)
+        )
+    }
+
     func loadCardState() -> CardState? {
         guard let save = loadBlob(table: "card_state", as: PersistedCardSave.self),
               save.version == CardState.schemaVersion else { return nil }
@@ -994,6 +1020,11 @@ struct PersistedPulseSave: Codable, Sendable {
 struct PersistedWeatherSave: Codable, Sendable {
     let version: Int
     let state: WeatherCacheState
+}
+
+struct PersistedBiomeSave: Codable, Sendable {
+    let version: Int
+    let state: BiomeCacheState
 }
 
 // MARK: - Legacy JSON shapes (migration + blob codec)

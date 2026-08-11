@@ -4,7 +4,9 @@ import Supabase
 struct WeatherRepository: Sendable {
     private let client: SupabaseClient?
 
-    init(client: SupabaseClient? = SupabaseClientProvider.authenticatedClient) {
+    /// Forecasts are shared environmental data, so signed-out explorers can use
+    /// the same read-only function without receiving account data.
+    init(client: SupabaseClient? = SupabaseClientProvider.client) {
         self.client = client
     }
 

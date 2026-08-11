@@ -18,19 +18,11 @@ serve(async (request) => {
   if (request.method !== "POST") return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405, headers })
 
   try {
-    const authorization = request.headers.get("Authorization")
-    if (!authorization?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "missing_authorization" }), { status: 401, headers })
-    }
     const supabaseURL = Deno.env.get("SUPABASE_URL")
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-    if (!supabaseURL || !anonKey || !serviceRoleKey) {
+    if (!supabaseURL || !serviceRoleKey) {
       return new Response(JSON.stringify({ error: "function_not_configured" }), { status: 500, headers })
     }
-    const userClient = createClient(supabaseURL, anonKey, { global: { headers: { Authorization: authorization } } })
-    const { data: { user }, error: userError } = await userClient.auth.getUser()
-    if (userError || !user) return new Response(JSON.stringify({ error: "invalid_session" }), { status: 401, headers })
 
     const body = await request.json() as WeatherResponse
     if (!/^weather:[0-9]+:-?[0-9]+:-?[0-9]+$/.test(body.cell_id) || !Number.isFinite(body.latitude) || !Number.isFinite(body.longitude)) {
@@ -54,8 +46,9 @@ serve(async (request) => {
       latitude: String(body.latitude),
       longitude: String(body.longitude),
       current: "temperature_2m,precipitation,wind_speed_10m,cloud_cover,weather_code",
-      forecast_days: "1",
-      timezone: "auto",
+      hourly: "temperature_2m,apparent_temperature,precipitation,precipitation_probability,snowfall,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover,visibility",
+      forecast_days: "2",
+      timezone: "GMT",
     })
     const upstreamURL = Deno.env.get("OPEN_METEO_API_URL") ?? "https://api.open-meteo.com/v1/forecast"
     const apiKey = Deno.env.get("OPEN_METEO_API_KEY")
@@ -69,11 +62,16 @@ serve(async (request) => {
     const wind = Number(current.wind_speed_10m ?? 0)
     const cloud = Number(current.cloud_cover ?? 0)
     const code = Number(current.weather_code ?? 0)
-    const condition = code >= 95 || precipitation >= 8 ? "storm"
-      : temperature <= 0 && precipitation > 0 ? "frost"
-      : temperature >= 32 ? "heat"
-      : wind >= 35 ? "wind"
-      : precipitation > 0.2 ? "rain" : "clear"
+    const weatherCondition = (temperature: number, precipitation: number, wind: number, cloudCover: number, code: number) =>
+      [95, 96, 99].includes(code) || precipitation >= 8 ? "storm"
+        : [45, 48].includes(code) ? "fog"
+        : [71, 73, 75, 77, 85, 86].includes(code) ? "snow"
+        : temperature <= 0 && precipitation > 0 ? "frost"
+        : temperature >= 32 ? "heat"
+        : wind >= 35 ? "wind"
+        : precipitation > 0.2 ? "rain"
+        : cloudCover >= 55 ? "cloudy" : "clear"
+    const condition = weatherCondition(temperature, precipitation, wind, cloud, code)
     const observedAt = now.toISOString()
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
     const payload = {
@@ -86,6 +84,22 @@ serve(async (request) => {
         cloudCover: cloud,
         observedAt,
         expiresAt,
+        hourly: (data.hourly?.time ?? []).map((time: string, index: number) => ({ time, index }))
+          .filter(({ time }: { time: string }) => new Date(`${time}Z`) >= new Date(now.getTime() - now.getMinutes() * 60_000 - now.getSeconds() * 1_000 - now.getMilliseconds()))
+          .slice(0, 24).map(({ time, index }: { time: string; index: number }) => ({
+          date: new Date(`${time}Z`).toISOString(),
+          condition: weatherCondition(Number(data.hourly.temperature_2m?.[index] ?? temperature), Number(data.hourly.precipitation?.[index] ?? 0), Number(data.hourly.wind_speed_10m?.[index] ?? 0), Number(data.hourly.cloud_cover?.[index] ?? cloud), Number(data.hourly.weather_code?.[index] ?? 0)),
+          temperatureC: Number(data.hourly.temperature_2m?.[index] ?? temperature),
+          apparentTemperatureC: Number(data.hourly.apparent_temperature?.[index] ?? temperature),
+          precipitationMM: Number(data.hourly.precipitation?.[index] ?? 0),
+          precipitationProbability: Number(data.hourly.precipitation_probability?.[index] ?? 0),
+          snowfallCM: Number(data.hourly.snowfall?.[index] ?? 0),
+          windKPH: Number(data.hourly.wind_speed_10m?.[index] ?? 0),
+          windGustKPH: Number(data.hourly.wind_gusts_10m?.[index] ?? 0),
+          windDirection: Number(data.hourly.wind_direction_10m?.[index] ?? 0),
+          cloudCover: Number(data.hourly.cloud_cover?.[index] ?? 0),
+          visibilityMeters: Number(data.hourly.visibility?.[index] ?? 0),
+        })),
       },
     }
     const { error: saveError } = await adminClient
